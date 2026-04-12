@@ -18,6 +18,10 @@ func setup(count: int, dmg: float, radius: float, col: Color, sz: float):
 	blade_size = sz
 
 
+func set_rotation_speed(spd: float):
+	rotation_speed = spd
+
+
 func _physics_process(delta):
 	_angle += rotation_speed * delta
 

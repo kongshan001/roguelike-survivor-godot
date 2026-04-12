@@ -1,6 +1,6 @@
 extends GutTest
 
-# Test Enemy logic: damage, death, drops
+# Test Enemy logic: damage, death, drops, status effects
 # Instantiates enemy scene to test full behavior
 
 var _enemy: CharacterBody2D
@@ -20,11 +20,9 @@ func before_each():
 	data.xp_value = 10
 	data.color = Color.GREEN
 	data.size = 16.0
-	data.drop_chance = 0.0  # No drops by default for deterministic tests
+	data.drop_chance = 0.0
 	_enemy.enemy_data = data
 
-	# Need to add to tree for _ready to fire
-	# Create a parent structure that mirrors arena (needs PickupManager child)
 	var arena = Node2D.new()
 	var pickup_mgr = Node2D.new()
 	pickup_mgr.name = "PickupManager"
@@ -37,7 +35,6 @@ func before_each():
 # --- Health and Damage ---
 
 func test_initial_hp():
-	# _ready scales HP by time, at time 0: time_bonus = 1.0
 	assert_eq(_enemy.current_hp, 50.0, "HP should equal max_hp at time 0")
 
 
@@ -55,7 +52,7 @@ func test_take_damage_lethal():
 func test_take_damage_when_dead():
 	_enemy.take_damage(50.0)
 	assert_false(_enemy.is_alive)
-	_enemy.take_damage(30.0)  # Should not crash
+	_enemy.take_damage(30.0)
 	assert_eq(_enemy.current_hp, 0.0)
 
 
@@ -75,6 +72,11 @@ func test_die_increments_score():
 	assert_eq(GameManager.score, 10, "Score should equal xp_value")
 
 
+func test_die_adds_gold():
+	_enemy.take_damage(50.0)
+	assert_eq(GameManager.gold, 3, "Should add 3 gold on kill")
+
+
 func test_die_decrements_enemy_count():
 	GameManager.enemy_count = 5
 	_enemy.take_damage(50.0)
@@ -82,7 +84,6 @@ func test_die_decrements_enemy_count():
 
 
 func test_die_drops_xp_gem():
-	# XP gem spawns as child of PickupManager
 	var pickup_mgr = _enemy.get_parent().get_node("PickupManager")
 	var initial_children = pickup_mgr.get_child_count()
 	_enemy.take_damage(50.0)
@@ -92,9 +93,7 @@ func test_die_drops_xp_gem():
 # --- HP Scaling with Time ---
 
 func test_time_scaled_hp():
-	# Create a new enemy with elapsed time > 0
-	GameManager.elapsed_time = 60.0  # 1 minute
-
+	GameManager.elapsed_time = 60.0
 	var enemy2_scene = load("res://scenes/enemy.tscn")
 	var enemy2 = enemy2_scene.instantiate()
 	var data = EnemyData.new()
@@ -114,8 +113,7 @@ func test_time_scaled_hp():
 	arena2.add_child(enemy2)
 	add_child_autofree(arena2)
 
-	# time_bonus = 1.0 + (60/60) * 0.1 = 1.1
-	# hp = 50 * 1.1 = 55.0
+	# time_bonus = 1.0 + (60/60) * 0.1 = 1.1, hp = 50 * 1.1 = 55.0
 	assert_almost_eq(enemy2.current_hp, 55.0, 0.1, "HP should scale with elapsed time")
 
 
@@ -136,5 +134,32 @@ func test_boss_drops_multiple_xp_gems():
 
 	var pickup_mgr = _enemy.get_parent().get_node("PickupManager")
 	_enemy.take_damage(500.0)
-	# Boss drops 1 (normal) + 5 (extra) = 6 XP gems
 	assert_eq(pickup_mgr.get_child_count(), 6, "Boss should drop 6 XP gems")
+	assert_true(GameManager.boss_killed, "Boss killed should be true")
+	assert_eq(GameManager.boss_kill_count, 1, "Boss kill count should be 1")
+
+
+# --- Status Effects ---
+
+func test_apply_burn():
+	_enemy.apply_burn(5.0, 2.0)
+	assert_eq(_enemy._burn_dps, 5.0, "Burn DPS should be set")
+	assert_eq(_enemy._burn_timer, 2.0, "Burn timer should be set")
+
+
+func test_apply_slow():
+	_enemy.apply_slow(0.5)
+	assert_eq(_enemy._slow_pct, 0.5, "Slow percentage should be set")
+	assert_eq(_enemy._slow_timer, 1.0, "Slow timer should be 1s")
+
+
+func test_apply_freeze():
+	_enemy.apply_freeze(0.5)
+	assert_eq(_enemy._freeze_timer, 0.5, "Freeze timer should be set")
+
+
+func test_burn_does_not_overwrite_stronger():
+	_enemy.apply_burn(5.0, 2.0)
+	_enemy.apply_burn(3.0, 1.0)  # Weaker burn
+	assert_eq(_enemy._burn_dps, 5.0, "Should keep stronger burn")
+	assert_eq(_enemy._burn_timer, 2.0, "Should keep longer burn timer")

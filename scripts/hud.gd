@@ -55,7 +55,7 @@ func _show_upgrade_panel():
 	if not player:
 		return
 
-	_upgrade_options = UpgradePool.get_random_upgrades(player.owned_weapons, 3)
+	_upgrade_options = UpgradePool.get_random_upgrades(player.owned_weapons, player.owned_passives, 3)
 
 	for i in range(3):
 		var card = $UpgradePanel/Panel.get_child(i) as Control

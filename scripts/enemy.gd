@@ -7,6 +7,13 @@ var is_alive: bool = true
 var _flash_timer: float = 0.0
 var _player: Node2D = null
 
+# Status effects
+var _burn_dps: float = 0.0
+var _burn_timer: float = 0.0
+var _slow_pct: float = 0.0
+var _slow_timer: float = 0.0
+var _freeze_timer: float = 0.0
+
 
 func _ready():
 	if enemy_data:
@@ -38,8 +45,25 @@ func _physics_process(delta):
 			return
 
 	var direction = global_position.direction_to(_player.global_position)
-	velocity = direction * enemy_data.speed
+	var speed_mult = 1.0
+	# Status effects
+	if _freeze_timer > 0:
+		_freeze_timer -= delta
+		speed_mult = 0.0
+	elif _slow_timer > 0:
+		_slow_timer -= delta
+		speed_mult = 1.0 - _slow_pct
+	else:
+		_slow_pct = 0.0
+
+	velocity = direction * enemy_data.speed * speed_mult
 	move_and_slide()
+
+	if _burn_timer > 0:
+		_burn_timer -= delta
+		current_hp -= _burn_dps * delta
+		if current_hp <= 0:
+			die()
 
 	if _flash_timer > 0:
 		_flash_timer -= delta
@@ -57,15 +81,32 @@ func take_damage(amount: float):
 		die()
 
 
+func apply_burn(dps: float, duration: float):
+	_burn_dps = maxf(_burn_dps, dps)
+	_burn_timer = maxf(_burn_timer, duration)
+
+
+func apply_slow(pct: float):
+	_slow_pct = maxf(_slow_pct, pct)
+	_slow_timer = 1.0
+
+
+func apply_freeze(duration: float):
+	_freeze_timer = maxf(_freeze_timer, duration)
+
+
 func die():
 	is_alive = false
-	GameManager.enemies_killed += 1
+	GameManager.register_kill()
 	GameManager.score += enemy_data.xp_value
 	GameManager.enemy_count -= 1
+	GameManager.add_gold(3)
 	_spawn_xp_gem()
 	if randf() < enemy_data.drop_chance:
 		_spawn_item_crate()
 	if enemy_data.is_boss:
+		GameManager.boss_killed = true
+		GameManager.boss_kill_count += 1
 		for i in range(5):
 			_spawn_xp_gem()
 	queue_free()
