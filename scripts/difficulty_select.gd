@@ -77,9 +77,13 @@ func _create_card(data: Dictionary) -> Panel:
 	btn.pressed.connect(_on_difficulty_selected.bind(data.id))
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
-	# Endless mode: check unlock status (for now always enabled)
+	# Endless mode: check unlock status
 	if data.id == "endless":
-		btn.text = "选择 (无尽)"
+		if SaveManager and not SaveManager.endless_unlocked:
+			btn.text = "🔒 击败Boss解锁"
+			btn.disabled = true
+		else:
+			btn.text = "选择 (无尽)"
 
 	vbox.add_child(btn)
 

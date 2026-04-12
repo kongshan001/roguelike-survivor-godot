@@ -167,3 +167,73 @@ func test_enemy_count_setter():
 	GameManager.enemy_count = 5
 	assert_eq(GameManager.enemy_count, 5)
 	assert_signal_emitted_with_parameters(GameManager, "enemies_changed", [5])
+
+
+# --- Difficulty Presets ---
+
+func test_difficulty_presets_exist():
+	assert_has(GameManager.DIFFICULTY_PRESETS, "easy")
+	assert_has(GameManager.DIFFICULTY_PRESETS, "normal")
+	assert_has(GameManager.DIFFICULTY_PRESETS, "hard")
+	assert_has(GameManager.DIFFICULTY_PRESETS, "endless")
+
+
+func test_difficulty_mul_easy():
+	GameManager.selected_difficulty = "easy"
+	assert_eq(GameManager.get_difficulty_mul("enemy_hp_mul"), 0.7)
+	assert_eq(GameManager.get_difficulty_mul("spawn_interval_mul"), 1.4)
+	assert_eq(GameManager.get_difficulty_mul("exp_mul"), 1.3)
+
+
+func test_difficulty_mul_hard():
+	GameManager.selected_difficulty = "hard"
+	assert_eq(GameManager.get_difficulty_mul("enemy_hp_mul"), 1.5)
+	assert_eq(GameManager.get_difficulty_mul("enemy_speed_mul"), 1.3)
+	assert_eq(GameManager.get_difficulty_mul("enemy_dmg_mul"), 1.5)
+	assert_eq(GameManager.get_difficulty_mul("spawn_interval_mul"), 0.7)
+	assert_eq(GameManager.get_difficulty_mul("boss_hp_mul"), 2.0)
+
+
+func test_difficulty_mul_normal():
+	GameManager.selected_difficulty = "normal"
+	assert_eq(GameManager.get_difficulty_mul("enemy_hp_mul"), 1.0)
+	assert_eq(GameManager.get_difficulty_mul("player_hp_mul"), 1.0)
+
+
+func test_difficulty_mul_default():
+	GameManager.selected_difficulty = ""
+	assert_eq(GameManager.get_difficulty_mul("enemy_hp_mul"), 1.0)
+
+
+func test_difficulty_count_mod():
+	GameManager.selected_difficulty = "hard"
+	assert_eq(GameManager.get_difficulty_count_mod(), 1)
+	GameManager.selected_difficulty = "easy"
+	assert_eq(GameManager.get_difficulty_count_mod(), -1)
+	GameManager.selected_difficulty = "normal"
+	assert_eq(GameManager.get_difficulty_count_mod(), 0)
+
+
+func test_damage_taken_initially_false():
+	GameManager.reset()
+	assert_eq(GameManager.damage_taken, false)
+
+
+func test_damage_taken_reset():
+	GameManager.damage_taken = true
+	GameManager.reset()
+	assert_eq(GameManager.damage_taken, false)
+
+
+func test_character_kills_tracking():
+	GameManager.reset()
+	GameManager.register_kill()
+	GameManager.register_kill()
+	assert_eq(GameManager.character_kills, 2)
+	assert_eq(GameManager.enemies_killed, 2)
+
+
+func test_character_kills_reset():
+	GameManager.register_kill()
+	GameManager.reset()
+	assert_eq(GameManager.character_kills, 0)

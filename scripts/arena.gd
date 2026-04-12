@@ -24,6 +24,9 @@ func _ready():
 		_:
 			# Default for testing
 			player.add_weapon("holywater")
+	# Apply difficulty multipliers to player
+	player.max_health *= GameManager.get_difficulty_mul("player_hp_mul")
+	player.move_speed *= GameManager.get_difficulty_mul("player_speed_mul")
 	player.current_health = player.max_health
 	player.add_to_group("players")
 	player.hurtbox.body_entered.connect(_on_player_hurtbox_entered.bind(player))
@@ -63,4 +66,5 @@ func _draw_grid():
 
 func _on_player_hurtbox_entered(body: Node2D, player: CharacterBody2D):
 	if body.is_in_group("enemies") and body.is_alive and player.is_alive:
-		player.take_damage(body.enemy_data.damage)
+		var dmg: float = body.enemy_data.damage * GameManager.get_difficulty_mul("enemy_dmg_mul")
+		player.take_damage(dmg)

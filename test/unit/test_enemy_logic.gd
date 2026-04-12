@@ -1,6 +1,6 @@
 extends GutTest
 
-# Test Enemy logic: damage, death, drops, status effects
+# Test Enemy logic: damage, death, drops, status effects, ranged, ghost, splitter, boss
 # Instantiates enemy scene to test full behavior
 
 var _enemy: CharacterBody2D
@@ -8,11 +8,12 @@ var _enemy: CharacterBody2D
 
 func before_each():
 	GameManager.reset()
-	var enemy_scene = load("res://scenes/enemy.tscn")
-	_enemy = enemy_scene.instantiate()
+	_enemy = _create_test_enemy(_default_data())
 
-	# Set up enemy data
-	var data = EnemyData.new()
+
+func _default_data() -> EnemyData:
+	var data := EnemyData.new()
+	data.enemy_id = "test"
 	data.enemy_name = "TestEnemy"
 	data.max_hp = 50.0
 	data.speed = 60.0
@@ -21,15 +22,21 @@ func before_each():
 	data.color = Color.GREEN
 	data.size = 16.0
 	data.drop_chance = 0.0
-	_enemy.enemy_data = data
+	return data
 
-	var arena = Node2D.new()
-	var pickup_mgr = Node2D.new()
+
+func _create_test_enemy(data: EnemyData) -> CharacterBody2D:
+	var enemy_scene := load("res://scenes/enemy.tscn") as PackedScene
+	var enemy: CharacterBody2D = enemy_scene.instantiate() as CharacterBody2D
+	enemy.enemy_data = data
+	var arena := Node2D.new()
+	var pickup_mgr := Node2D.new()
 	pickup_mgr.name = "PickupManager"
 	pickup_mgr.set_script(load("res://scripts/pickup_manager.gd"))
 	arena.add_child(pickup_mgr)
-	arena.add_child(_enemy)
+	arena.add_child(enemy)
 	add_child_autofree(arena)
+	return enemy
 
 
 # --- Health and Damage ---
@@ -60,6 +67,14 @@ func test_is_alive_initially_true():
 	assert_true(_enemy.is_alive, "Enemy should start alive")
 
 
+func test_die_no_double_die():
+	_enemy.take_damage(50.0)
+	assert_false(_enemy.is_alive)
+	# Calling die again should not crash or double-count
+	_enemy.die()
+	assert_eq(GameManager.enemies_killed, 1, "Should only count kill once")
+
+
 # --- Death and Scoring ---
 
 func test_die_increments_kills():
@@ -84,8 +99,8 @@ func test_die_decrements_enemy_count():
 
 
 func test_die_drops_xp_gem():
-	var pickup_mgr = _enemy.get_parent().get_node("PickupManager")
-	var initial_children = pickup_mgr.get_child_count()
+	var pickup_mgr := _enemy.get_parent().get_node("PickupManager")
+	var initial_children := pickup_mgr.get_child_count()
 	_enemy.take_damage(50.0)
 	assert_eq(pickup_mgr.get_child_count(), initial_children + 1, "Should spawn 1 XP gem")
 
@@ -94,33 +109,22 @@ func test_die_drops_xp_gem():
 
 func test_time_scaled_hp():
 	GameManager.elapsed_time = 60.0
-	var enemy2_scene = load("res://scenes/enemy.tscn")
-	var enemy2 = enemy2_scene.instantiate()
-	var data = EnemyData.new()
+	var data := EnemyData.new()
 	data.max_hp = 50.0
 	data.speed = 60.0
 	data.damage = 10.0
 	data.xp_value = 5
 	data.color = Color.GREEN
 	data.size = 16.0
-	enemy2.enemy_data = data
-
-	var arena2 = Node2D.new()
-	var pm = Node2D.new()
-	pm.name = "PickupManager"
-	pm.set_script(load("res://scripts/pickup_manager.gd"))
-	arena2.add_child(pm)
-	arena2.add_child(enemy2)
-	add_child_autofree(arena2)
-
+	var enemy := _create_test_enemy(data)
 	# time_bonus = 1.0 + (60/60) * 0.1 = 1.1, hp = 50 * 1.1 = 55.0
-	assert_almost_eq(enemy2.current_hp, 55.0, 0.1, "HP should scale with elapsed time")
+	assert_almost_eq(enemy.current_hp, 55.0, 0.1, "HP should scale with elapsed time")
 
 
-# --- Boss Extra Drops ---
+# --- Boss ---
 
 func test_boss_drops_multiple_xp_gems():
-	var boss_data = EnemyData.new()
+	var boss_data := EnemyData.new()
 	boss_data.max_hp = 500.0
 	boss_data.speed = 40.0
 	boss_data.damage = 40.0
@@ -132,11 +136,24 @@ func test_boss_drops_multiple_xp_gems():
 	_enemy.enemy_data = boss_data
 	_enemy.current_hp = 500.0
 
-	var pickup_mgr = _enemy.get_parent().get_node("PickupManager")
+	var pickup_mgr := _enemy.get_parent().get_node("PickupManager")
 	_enemy.take_damage(500.0)
 	assert_eq(pickup_mgr.get_child_count(), 6, "Boss should drop 6 XP gems")
 	assert_true(GameManager.boss_killed, "Boss killed should be true")
 	assert_eq(GameManager.boss_kill_count, 1, "Boss kill count should be 1")
+
+
+func test_boss_has_ai():
+	var boss_data := EnemyData.new()
+	boss_data.max_hp = 200.0
+	boss_data.speed = 30.0
+	boss_data.damage = 2.0
+	boss_data.xp_value = 100
+	boss_data.color = Color.RED
+	boss_data.size = 32.0
+	boss_data.is_boss = true
+	var boss := _create_test_enemy(boss_data)
+	assert_ne(boss._boss_ai, null, "Boss should have BossAI instance")
 
 
 # --- Status Effects ---
@@ -163,3 +180,56 @@ func test_burn_does_not_overwrite_stronger():
 	_enemy.apply_burn(3.0, 1.0)  # Weaker burn
 	assert_eq(_enemy._burn_dps, 5.0, "Should keep stronger burn")
 	assert_eq(_enemy._burn_timer, 2.0, "Should keep longer burn timer")
+
+
+# --- EnemyData Fields ---
+
+func test_enemy_data_ranged_fields():
+	var data := EnemyData.new()
+	data.is_ranged = true
+	data.shoot_cd = 1.2
+	data.is_elite = true
+	assert_true(data.is_ranged)
+	assert_eq(data.shoot_cd, 1.2)
+	assert_true(data.is_elite)
+
+
+func test_enemy_data_ghost_fields():
+	var data := EnemyData.new()
+	data.can_phase_shift = true
+	data.can_teleport = true
+	assert_true(data.can_phase_shift)
+	assert_true(data.can_teleport)
+
+
+func test_enemy_data_splitter_fields():
+	var data := EnemyData.new()
+	data.is_splitter = true
+	data.split_count = 2
+	data.is_child = true
+	assert_true(data.is_splitter)
+	assert_eq(data.split_count, 2)
+	assert_true(data.is_child)
+
+
+# --- Splitter ---
+
+func test_splitter_spawns_children():
+	var splitter_data := EnemyData.new()
+	splitter_data.enemy_id = "splitter"
+	splitter_data.enemy_name = "分裂者"
+	splitter_data.max_hp = 4.0
+	splitter_data.speed = 50.0
+	splitter_data.damage = 1.0
+	splitter_data.xp_value = 5
+	splitter_data.color = Color(0, 0.54, 0.48)
+	splitter_data.size = 16.0
+	splitter_data.is_splitter = true
+	splitter_data.split_count = 2
+	splitter_data.drop_chance = 0.0
+	_enemy.enemy_data = splitter_data
+	_enemy.current_hp = 4.0
+
+	GameManager.enemy_count = 1
+	_enemy.take_damage(4.0)
+	assert_eq(GameManager.enemy_count, 2, "Should spawn 2 children (original -1 + 2 new)")

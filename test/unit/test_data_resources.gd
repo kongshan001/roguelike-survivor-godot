@@ -119,6 +119,26 @@ func test_enemy_data_shapes():
 	assert_eq(d.shape, "circle")
 
 
+func test_enemy_data_ranged_defaults():
+	var d = EnemyData.new()
+	assert_false(d.is_ranged, "is_ranged default should be false")
+	assert_eq(d.shoot_cd, 2.0, "shoot_cd default should be 2.0")
+	assert_false(d.is_elite, "is_elite default should be false")
+
+
+func test_enemy_data_ghost_defaults():
+	var d = EnemyData.new()
+	assert_false(d.can_phase_shift, "can_phase_shift default should be false")
+	assert_false(d.can_teleport, "can_teleport default should be false")
+
+
+func test_enemy_data_splitter_defaults():
+	var d = EnemyData.new()
+	assert_false(d.is_splitter, "is_splitter default should be false")
+	assert_false(d.is_child, "is_child default should be false")
+	assert_eq(d.split_count, 2, "split_count default should be 2")
+
+
 # --- PassiveData ---
 
 func test_passive_data_defaults():

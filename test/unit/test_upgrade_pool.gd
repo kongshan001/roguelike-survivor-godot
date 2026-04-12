@@ -4,9 +4,8 @@ extends GutTest
 
 
 func before_each():
-	# Reset UpgradePool internal state via reflection
+	# Reset UpgradePool: clear weapons but keep passives initialized
 	UpgradePool._weapons = {}
-	UpgradePool._passives = {}
 	UpgradePool._initialized = false
 	GameManager.reset()
 

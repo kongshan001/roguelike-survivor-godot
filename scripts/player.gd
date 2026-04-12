@@ -23,12 +23,28 @@ var crit_damage_mul: float = 2.0
 var damage_bonus: float = 0.0  # mage: +20%
 var is_moving: bool = false
 
+# Dash system (H5 DASH config)
+var dash_distance: float = 80.0
+var dash_duration: float = 0.15
+var dash_cooldown: float = 2.5
+var dash_timer: float = 0.0
+var is_dashing: bool = false
+var dash_direction: Vector2 = Vector2.ZERO
+var dash_afterimage_count: int = 3
+
 @onready var hurtbox: Area2D = $Hurtbox
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var sprite: ColorRect = $Sprite
 
 
 func _ready():
+	# Apply shop bonuses (SaveManager may be null in GUT tests)
+	if SaveManager:
+		max_health += float(SaveManager.get_hp_bonus())
+		move_speed += move_speed * SaveManager.get_speed_bonus()
+		pickup_range += SaveManager.get_pickup_bonus()
+		damage_bonus += SaveManager.get_weapon_dmg_bonus()
+
 	current_health = max_health
 	GameManager.health_changed.emit(current_health, max_health)
 
@@ -45,6 +61,27 @@ func _ready():
 func _physics_process(delta):
 	if not is_alive:
 		return
+
+	# Dash cooldown
+	if dash_timer > 0:
+		dash_timer -= delta
+
+	# Dash input
+	if is_dashing:
+		velocity = dash_direction * (dash_distance / dash_duration)
+		move_and_slide()
+		is_dashing = false
+		invincible_timer = maxf(invincible_timer, 0.15)
+		dash_timer = dash_cooldown
+		return
+
+	if Input.is_action_just_pressed("dash") and dash_timer <= 0:
+		var direction = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+		if direction.length_squared() > 0.01:
+			dash_direction = direction.normalized()
+			is_dashing = true
+			_spawn_afterimages()
+			return
 
 	var direction = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	velocity = direction * move_speed * speed_multiplier
@@ -74,6 +111,7 @@ func take_damage(amount: float):
 
 	var actual_damage = maxf(1.0, amount - armor)
 	current_health -= actual_damage
+	GameManager.damage_taken = true
 	GameManager.health_changed.emit(current_health, max_health)
 	took_damage.emit()
 
@@ -103,6 +141,8 @@ func die():
 
 func add_weapon(weapon_id: String):
 	owned_weapons[weapon_id] = 1
+	if SynergyManager:
+		SynergyManager.check_synergies(owned_weapons, owned_passives)
 
 
 func upgrade_weapon(weapon_id: String) -> bool:
@@ -148,3 +188,7 @@ func apply_passive(passive_id: String):
 			regen_amount += 1.0
 		"luckycoin":
 			crit_damage_mul += 0.5
+
+	# Re-check synergies after passive change
+	if SynergyManager:
+		SynergyManager.check_synergies(owned_weapons, owned_passives)

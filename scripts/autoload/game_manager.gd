@@ -8,12 +8,50 @@ signal enemies_changed(count: int)
 signal combo_changed(count: int)
 signal gold_changed(amount: int)
 
+# Difficulty multiplier presets (from H5 DIFFICULTY config)
+const DIFFICULTY_PRESETS: Dictionary = {
+	"easy": {
+		"player_hp_mul": 1.25, "player_speed_mul": 1.0,
+		"enemy_hp_mul": 0.7, "enemy_speed_mul": 0.8, "enemy_dmg_mul": 0.75,
+		"spawn_interval_mul": 1.4, "spawn_count_mod": -1,
+		"boss_hp_mul": 0.6, "boss_speed_mul": 0.8, "exp_mul": 1.3
+	},
+	"normal": {
+		"player_hp_mul": 1.0, "player_speed_mul": 1.0,
+		"enemy_hp_mul": 1.0, "enemy_speed_mul": 1.0, "enemy_dmg_mul": 1.0,
+		"spawn_interval_mul": 1.0, "spawn_count_mod": 0,
+		"boss_hp_mul": 1.0, "boss_speed_mul": 1.0, "exp_mul": 1.0
+	},
+	"hard": {
+		"player_hp_mul": 0.75, "player_speed_mul": 0.9,
+		"enemy_hp_mul": 1.5, "enemy_speed_mul": 1.3, "enemy_dmg_mul": 1.5,
+		"spawn_interval_mul": 0.7, "spawn_count_mod": 1,
+		"boss_hp_mul": 2.0, "boss_speed_mul": 1.3, "exp_mul": 0.8
+	},
+	"endless": {
+		"player_hp_mul": 1.0, "player_speed_mul": 1.0,
+		"enemy_hp_mul": 1.0, "enemy_speed_mul": 1.0, "enemy_dmg_mul": 1.0,
+		"spawn_interval_mul": 1.0, "spawn_count_mod": 0,
+		"boss_hp_mul": 1.0, "boss_speed_mul": 1.0, "exp_mul": 1.0
+	}
+}
+
 # XP experience table from H5 config (index 0 = level 1→2)
 const EXP_TABLE: Array[float] = [8.0, 12.0, 18.0, 24.0, 32.0, 42.0, 55.0, 70.0, 88.0, 108.0, 132.0, 160.0, 195.0, 240.0]
 const COMBO_TIMEOUT: float = 3.0
 
+func get_difficulty_mul(key: String, default: float = 1.0) -> float:
+	var preset: Dictionary = DIFFICULTY_PRESETS.get(selected_difficulty, {})
+	return preset.get(key, default)
+
+func get_difficulty_count_mod() -> int:
+	var preset: Dictionary = DIFFICULTY_PRESETS.get(selected_difficulty, {})
+	return preset.get("spawn_count_mod", 0)
+
 var score: int = 0
 var enemies_killed: int = 0
+var character_kills: int = 0  # kills in current game for character-specific quests
+var damage_taken: bool = false  # tracks if player took damage this run
 var elapsed_time: float = 0.0
 var player_level: int = 1
 var current_xp: float = 0.0
@@ -59,6 +97,8 @@ func reset():
 	combo_count = 0
 	combo_timer = 0.0
 	best_combo = 0
+	character_kills = 0
+	damage_taken = false
 
 
 func add_xp(amount: float):
@@ -78,6 +118,7 @@ func add_gold(amount: int):
 
 func register_kill():
 	enemies_killed += 1
+	character_kills += 1
 	combo_count += 1
 	combo_timer = COMBO_TIMEOUT
 	if combo_count > best_combo:

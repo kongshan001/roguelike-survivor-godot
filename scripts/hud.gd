@@ -11,6 +11,12 @@ func _ready():
 	GameManager.xp_changed.connect(_on_xp_changed)
 	GameManager.level_up.connect(_on_level_up)
 	GameManager.player_died.connect(_on_player_died)
+	GameManager.gold_changed.connect(_on_gold_changed)
+	GameManager.combo_changed.connect(_on_combo_changed)
+
+	# Show difficulty indicator
+	var diff_names: Dictionary = {"easy": "休闲", "normal": "标准", "hard": "噩梦", "endless": "无尽"}
+	$DifficultyLabel.text = diff_names.get(GameManager.selected_difficulty, "")
 
 	$UpgradePanel.visible = false
 	$UpgradePanel/Panel/Card1.gui_input.connect(_on_card_input.bind(0))
@@ -26,6 +32,17 @@ func _ready():
 
 func _process(_delta):
 	$TimerLabel.text = GameManager.format_time(GameManager.elapsed_time)
+
+
+func _on_gold_changed(amount: int):
+	$GoldLabel.text = "Gold: %d" % amount
+
+
+func _on_combo_changed(count: int):
+	if count > 1:
+		$ComboLabel.text = "Combo: %d" % count
+	else:
+		$ComboLabel.text = ""
 
 
 func _on_health_changed(current: float, max_hp: float):
@@ -101,6 +118,8 @@ func _select_upgrade(index: int):
 			player.upgrade_weapon(option.id)
 		"passive":
 			player.apply_passive(option.id)
+		"evolution":
+			_perform_evolution(player, option)
 
 	$UpgradePanel.visible = false
 
@@ -115,3 +134,27 @@ func _get_player() -> Node2D:
 	if players.size() > 0:
 		return players[0]
 	return null
+
+
+func _perform_evolution(player: Node2D, option: Dictionary) -> void:
+	# Remove the two base weapons
+	var weapon_a: String = option.recipe_a
+	var weapon_b: String = option.recipe_b
+
+	# Clean up weapon instances (orbits, boomerangs)
+	var wc: Node = player.get_node_or_null("WeaponController")
+	if wc and wc.has_method("remove_weapon_instances"):
+		wc.remove_weapon_instances(weapon_a)
+		wc.remove_weapon_instances(weapon_b)
+
+	player.owned_weapons.erase(weapon_a)
+	player.owned_weapons.erase(weapon_b)
+
+	# Add evolved weapon at level 1
+	player.owned_weapons[option.id] = 1
+
+	# Evolution flash effect
+	var arena := player.get_parent()
+	if arena:
+		var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
+		effects.create_evolution_flash(arena)

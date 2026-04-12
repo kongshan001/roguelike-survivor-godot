@@ -7,6 +7,13 @@ func _ready():
 	$VBox/LevelLabel.text = "Level: %d" % GameManager.player_level
 	$VBox/ScoreLabel.text = "Score: %d" % GameManager.score
 
+	# Check quests/achievements and convert gold to soul fragments
+	if SaveManager:
+		SaveManager.check_quests_and_achievements()
+		$VBox/GoldLabel.text = "Gold: %d → Soul Fragments: %d" % [GameManager.gold, SaveManager.soul_fragments]
+	else:
+		$VBox/GoldLabel.text = "Gold: %d" % GameManager.gold
+
 	$VBox/RestartButton.pressed.connect(_on_restart)
 	$VBox/MenuButton.pressed.connect(_on_menu)
 

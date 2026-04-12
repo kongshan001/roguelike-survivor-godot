@@ -47,5 +47,9 @@ func _find_player() -> Node2D:
 
 
 func _collect():
-	GameManager.add_xp(xp_value)
+	var xp: float = float(xp_value)
+	if SaveManager:
+		xp *= (1.0 + SaveManager.get_exp_bonus())
+	xp *= GameManager.get_difficulty_mul("exp_mul")
+	GameManager.add_xp(xp)
 	queue_free()

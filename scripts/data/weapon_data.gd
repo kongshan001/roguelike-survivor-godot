@@ -42,3 +42,6 @@ extends Resource
 @export var boomerang_return_speed: float = 320.0
 @export var boomerang_curvature: float = 0.3
 @export var boomerang_track_angle: float = 0.52
+
+# Evolution
+@export var is_evolved: bool = false

@@ -1,0 +1,339 @@
+extends Node
+## 存档管理器 — 灵魂碎片、商店升级、任务/成就进度持久化
+## 挂载为 Autoload，使用 Godot ConfigFile 存储到 user://save.cfg
+
+signal soul_fragments_changed(amount: int)
+signal achievement_unlocked(achievement_id: String)
+signal quest_completed(quest_id: String)
+
+var soul_fragments: int = 0
+var shop_upgrades: Dictionary = {}  # id -> level (0-3)
+var completed_quests: Dictionary = {}
+var completed_achievements: Dictionary = {}
+var total_kills: int = 0
+var games_played: int = 0
+var endless_unlocked: bool = false
+# Track per-character clears for all_chars achievement
+var characters_cleared: Dictionary = {}
+
+const SAVE_PATH: String = "user://save.cfg"
+
+# Shop upgrade definitions
+const SHOP_UPGRADES: Dictionary = {
+	"maxhp": {"name": "生命强化", "icon": "❤️", "costs": [20, 40, 80], "max_level": 3},
+	"speed": {"name": "速度训练", "icon": "👟", "costs": [20, 40, 80], "max_level": 3},
+	"pickup": {"name": "拾取精通", "icon": "📡", "costs": [15, 30, 60], "max_level": 3},
+	"expbonus": {"name": "知识汲取", "icon": "📚", "costs": [25, 50, 100], "max_level": 3},
+	"weapondmg": {"name": "武器精通", "icon": "⚔️", "costs": [30, 60, 120], "max_level": 3},
+	"gold": {"name": "贪婪之心", "icon": "💰", "costs": [15, 30, 60], "max_level": 3},
+}
+
+# Quest definitions
+const QUESTS: Array = [
+	{"id": "warrior_30", "name": "战士之道", "desc": "用战士击杀30只敌人", "reward": 50},
+	{"id": "ranger_30", "name": "箭无虚发", "desc": "用游侠击杀30只敌人", "reward": 50},
+	{"id": "hard_survive", "name": "勇者无惧", "desc": "噩梦难度存活2分钟", "reward": 100},
+	{"id": "hard_boss", "name": "噩梦征服者", "desc": "噩梦难度击败Boss", "reward": 200},
+	{"id": "kill_50", "name": "屠戮者", "desc": "单局击杀50个敌人", "reward": 75},
+	{"id": "kill_100", "name": "百人斩", "desc": "单局击杀100个敌人", "reward": 150},
+	{"id": "kill_boss", "name": "屠龙者", "desc": "击败Boss", "reward": 100},
+	{"id": "no_damage", "name": "完美闪避", "desc": "不受伤存活1分钟", "reward": 120},
+	{"id": "combo_20", "name": "连击大师", "desc": "达成20连击", "reward": 100},
+	{"id": "combo_50", "name": "连击之王", "desc": "达成50连击", "reward": 200},
+	{"id": "endless_5min", "name": "无尽征途", "desc": "无尽模式存活5分钟", "reward": 150},
+	{"id": "endless_10min", "name": "不朽传说", "desc": "无尽模式存活10分钟", "reward": 300},
+	{"id": "endless_boss3", "name": "连斩三龙", "desc": "无尽击杀3Boss", "reward": 400},
+	{"id": "endless_kill200", "name": "无尽屠戮", "desc": "无尽击杀200敌人", "reward": 250},
+]
+
+# Achievement definitions (27 total, 8 categories)
+const ACHIEVEMENTS: Array = [
+	# 里程碑(5)
+	{"id": "total_kills_100", "name": "初出茅庐", "desc": "累计击杀100", "reward": 30},
+	{"id": "total_kills_500", "name": "身经百战", "desc": "累计击杀500", "reward": 80},
+	{"id": "total_kills_2000", "name": "杀戮机器", "desc": "累计击杀2000", "reward": 200},
+	{"id": "games_10", "name": "常客", "desc": "游玩10局", "reward": 20},
+	{"id": "games_50", "name": "老手", "desc": "游玩50局", "reward": 60},
+	# 生存(3)
+	{"id": "survive_3min", "name": "站稳脚跟", "desc": "标准存活3分钟", "reward": 30},
+	{"id": "survive_5min", "name": "生存专家", "desc": "标准存活5分钟", "reward": 80},
+	{"id": "survive_hard_5min", "name": "噩梦幸存者", "desc": "噩梦存活5分钟", "reward": 150},
+	# 角色(1)
+	{"id": "all_chars", "name": "全角色精通", "desc": "使用全部角色通关", "reward": 100},
+	# 击杀/挑战(8)
+	{"id": "boss_kill", "name": "Boss猎人", "desc": "击败Boss", "reward": 50},
+	{"id": "hard_boss_kill", "name": "噩梦征服", "desc": "噩梦击败Boss", "reward": 150},
+	{"id": "no_damage_survive", "name": "无伤生存", "desc": "不受伤存活2分钟", "reward": 120},
+	{"id": "kill_100_single", "name": "单局百杀", "desc": "单局击杀100敌人", "reward": 100},
+	{"id": "survive_10min", "name": "生存大师", "desc": "存活10分钟", "reward": 200},
+	{"id": "combo_30", "name": "连击达人", "desc": "30连击", "reward": 60},
+	{"id": "combo_50", "name": "连击之王", "desc": "50连击", "reward": 120},
+	{"id": "hard_survive_ach", "name": "勇者无惧成就", "desc": "噩梦存活2分钟", "reward": 100},
+	# 进化/协同(4)
+	{"id": "evolve_weapon", "name": "武器觉醒", "desc": "首次武器进化", "reward": 40},
+	{"id": "synergy_first", "name": "协同初现", "desc": "首次触发协同", "reward": 40},
+	{"id": "all_evolved", "name": "进化大师", "desc": "收集全部进化武器", "reward": 200},
+	{"id": "all_synergies", "name": "协同全览", "desc": "触发全部协同效应", "reward": 200},
+	# 商店(3)
+	{"id": "shop_first", "name": "初次投资", "desc": "首次商店购买", "reward": 20},
+	{"id": "shop_single_max", "name": "专精一项", "desc": "单项升级满级", "reward": 50},
+	{"id": "shop_max_all", "name": "全部满级", "desc": "所有商店升级满级", "reward": 300},
+	# 任务(2)
+	{"id": "quests_half", "name": "半程", "desc": "完成一半任务", "reward": 50},
+	{"id": "quests_all", "name": "全任务完成", "desc": "完成所有任务", "reward": 150},
+	# 隐藏(2)
+	{"id": "fast_boss", "name": "速杀", "desc": "3分钟内击败Boss", "reward": 200},
+	{"id": "pacifist_1min", "name": "和平主义者", "desc": "开局1分钟不杀敌", "reward": 60},
+]
+
+
+func _ready():
+	_init_data()
+	load_save()
+
+
+func _init_data() -> void:
+	for id in SHOP_UPGRADES:
+		shop_upgrades[id] = 0
+	for q: Dictionary in QUESTS:
+		completed_quests[q["id"]] = false
+	for a: Dictionary in ACHIEVEMENTS:
+		completed_achievements[a["id"]] = false
+
+
+# --- Soul Fragments ---
+
+func add_soul_fragments(amount: int) -> void:
+	soul_fragments += amount
+	soul_fragments_changed.emit(soul_fragments)
+
+
+func spend_soul_fragments(amount: int) -> bool:
+	if soul_fragments >= amount:
+		soul_fragments -= amount
+		soul_fragments_changed.emit(soul_fragments)
+		return true
+	return false
+
+
+# --- Shop ---
+
+func get_upgrade_cost(upgrade_id: String) -> int:
+	var level: int = shop_upgrades.get(upgrade_id, 0)
+	var def: Dictionary = SHOP_UPGRADES.get(upgrade_id, {})
+	if level >= def.get("max_level", 3):
+		return -1  # Maxed
+	return def.get("costs", [])[level] if level < def.get("costs", []).size() else -1
+
+
+func purchase_upgrade(upgrade_id: String) -> bool:
+	var cost: int = get_upgrade_cost(upgrade_id)
+	if cost < 0:
+		return false
+	if not spend_soul_fragments(cost):
+		return false
+	shop_upgrades[upgrade_id] = shop_upgrades.get(upgrade_id, 0) + 1
+	# Check shop achievements
+	_check_shop_achievements()
+	save()
+	return true
+
+
+func get_upgrade_level(upgrade_id: String) -> int:
+	return shop_upgrades.get(upgrade_id, 0)
+
+
+# --- Shop bonus application ---
+
+func get_hp_bonus() -> int:
+	var level: int = shop_upgrades.get("maxhp", 0)
+	return [0, 1, 2, 3][level]
+
+
+func get_speed_bonus() -> float:
+	var level: int = shop_upgrades.get("speed", 0)
+	return [0.0, 0.05, 0.10, 0.15][level]
+
+
+func get_pickup_bonus() -> float:
+	var level: int = shop_upgrades.get("pickup", 0)
+	return [0.0, 5.0, 10.0, 15.0][level]
+
+
+func get_exp_bonus() -> float:
+	var level: int = shop_upgrades.get("expbonus", 0)
+	return [0.0, 0.05, 0.10, 0.15][level]
+
+
+func get_weapon_dmg_bonus() -> float:
+	var level: int = shop_upgrades.get("weapondmg", 0)
+	return [0.0, 0.03, 0.06, 0.10][level]
+
+
+func get_gold_bonus() -> float:
+	var level: int = shop_upgrades.get("gold", 0)
+	return [0.0, 0.10, 0.20, 0.30][level]
+
+
+# --- Quest/Achievement Checking ---
+
+func check_quests_and_achievements() -> void:
+	# Called at end of game or during gameplay
+	var kills: int = GameManager.enemies_killed
+	var elapsed: float = GameManager.elapsed_time
+	var boss_kills: int = GameManager.boss_kill_count
+	var best_combo: int = GameManager.best_combo
+	var difficulty: String = GameManager.selected_difficulty
+	var character: String = GameManager.selected_character
+
+	# Quests
+	var char_kills: int = GameManager.character_kills
+	_check_quest("warrior_30", character == "warrior" and char_kills >= 30)
+	_check_quest("ranger_30", character == "ranger" and char_kills >= 30)
+	_check_quest("kill_50", kills >= 50)
+	_check_quest("kill_100", kills >= 100)
+	_check_quest("kill_boss", boss_kills > 0)
+	_check_quest("combo_20", best_combo >= 20)
+	_check_quest("combo_50", best_combo >= 50)
+	_check_quest("endless_5min", difficulty == "endless" and elapsed >= 300.0)
+	_check_quest("endless_10min", difficulty == "endless" and elapsed >= 600.0)
+	_check_quest("endless_boss3", difficulty == "endless" and boss_kills >= 3)
+	_check_quest("endless_kill200", difficulty == "endless" and kills >= 200)
+	_check_quest("hard_survive", difficulty == "hard" and elapsed >= 120.0)
+	_check_quest("hard_boss", difficulty == "hard" and boss_kills > 0)
+	_check_quest("no_damage", not GameManager.damage_taken and elapsed >= 60.0)
+	# Achievements
+	total_kills += kills
+	games_played += 1
+	_check_achievement("total_kills_100", total_kills >= 100)
+	_check_achievement("total_kills_500", total_kills >= 500)
+	_check_achievement("total_kills_2000", total_kills >= 2000)
+	_check_achievement("games_10", games_played >= 10)
+	_check_achievement("games_50", games_played >= 50)
+	_check_achievement("survive_3min", difficulty == "normal" and elapsed >= 180.0)
+	_check_achievement("survive_5min", difficulty == "normal" and elapsed >= 300.0)
+	_check_achievement("survive_hard_5min", difficulty == "hard" and elapsed >= 300.0)
+	_check_achievement("boss_kill", boss_kills > 0)
+	_check_achievement("hard_boss_kill", difficulty == "hard" and boss_kills > 0)
+	_check_achievement("no_damage_survive", not GameManager.damage_taken and elapsed >= 120.0 and kills > 0)
+	_check_achievement("kill_100_single", kills >= 100)
+	_check_achievement("survive_10min", elapsed >= 600.0)
+	_check_achievement("combo_30", best_combo >= 30)
+	_check_achievement("combo_50", best_combo >= 50)
+	_check_achievement("hard_survive_ach", difficulty == "hard" and elapsed >= 120.0)
+	# Fast boss: kill boss within 3 minutes
+	_check_achievement("fast_boss", boss_kills > 0 and elapsed <= 180.0)
+	# Pacifist: 1 minute without killing
+	_check_achievement("pacifist_1min", elapsed >= 60.0 and kills == 0)
+	# Character clears
+	if character != "" and elapsed >= 180.0:
+		characters_cleared[character] = true
+	_check_achievement("all_chars", characters_cleared.size() >= 3)
+
+	# Quest completion achievements
+	var completed_count: int = 0
+	for id in completed_quests:
+		if completed_quests[id]:
+			completed_count += 1
+	_check_achievement("quests_half", completed_count >= QUESTS.size() / 2)
+	_check_achievement("quests_all", completed_count >= QUESTS.size())
+
+	# Endless unlock: beat boss
+	if boss_kills > 0:
+		endless_unlocked = true
+
+	# Convert 30% gold to soul fragments
+	var soul_reward: int = int(GameManager.gold * 0.3)
+	add_soul_fragments(soul_reward)
+
+	save()
+
+
+func _check_quest(quest_id: String, condition: bool) -> void:
+	if condition and not completed_quests.get(quest_id, false):
+		completed_quests[quest_id] = true
+		for q: Dictionary in QUESTS:
+			if q["id"] == quest_id:
+				add_soul_fragments(q["reward"])
+				quest_completed.emit(quest_id)
+				return
+
+
+func _check_achievement(achievement_id: String, condition: bool) -> void:
+	if condition and not completed_achievements.get(achievement_id, false):
+		completed_achievements[achievement_id] = true
+		for a: Dictionary in ACHIEVEMENTS:
+			if a["id"] == achievement_id:
+				add_soul_fragments(a["reward"])
+				achievement_unlocked.emit(achievement_id)
+				return
+
+
+func _check_shop_achievements() -> void:
+	# First purchase
+	_check_achievement("shop_first", true)
+	# Any single maxed
+	for id in shop_upgrades:
+		if shop_upgrades[id] >= SHOP_UPGRADES[id]["max_level"]:
+			_check_achievement("shop_single_max", true)
+			break
+	# All maxed
+	var all_maxed := true
+	for id in shop_upgrades:
+		if shop_upgrades[id] < SHOP_UPGRADES[id]["max_level"]:
+			all_maxed = false
+	_check_achievement("shop_max_all", all_maxed)
+
+
+# --- Save/Load ---
+
+func save() -> void:
+	var config := ConfigFile.new()
+	config.set_value("soul_fragments", "amount", soul_fragments)
+	config.set_value("stats", "total_kills", total_kills)
+	config.set_value("stats", "games_played", games_played)
+	config.set_value("stats", "endless_unlocked", endless_unlocked)
+
+	for id in shop_upgrades:
+		config.set_value("shop", id, shop_upgrades[id])
+	for id in completed_quests:
+		config.set_value("quests", id, completed_quests[id])
+	for id in completed_achievements:
+		config.set_value("achievements", id, completed_achievements[id])
+	for char_id in characters_cleared:
+		config.set_value("chars_cleared", char_id, characters_cleared[char_id])
+
+	config.save(SAVE_PATH)
+
+
+func load_save() -> void:
+	var config := ConfigFile.new()
+	if config.load(SAVE_PATH) != OK:
+		return
+
+	soul_fragments = config.get_value("soul_fragments", "amount", 0)
+	total_kills = config.get_value("stats", "total_kills", 0)
+	games_played = config.get_value("stats", "games_played", 0)
+	endless_unlocked = config.get_value("stats", "endless_unlocked", false)
+
+	for id in SHOP_UPGRADES:
+		shop_upgrades[id] = config.get_value("shop", id, 0)
+	for q: Dictionary in QUESTS:
+		completed_quests[q["id"]] = config.get_value("quests", q["id"], false)
+	for a: Dictionary in ACHIEVEMENTS:
+		completed_achievements[a["id"]] = config.get_value("achievements", a["id"], false)
+	# Load character clears
+	var chars: PackedStringArray = ["mage", "warrior", "ranger"]
+	for c: String in chars:
+		if config.get_value("chars_cleared", c, false):
+			characters_cleared[c] = true
+
+
+func reset_save() -> void:
+	soul_fragments = 0
+	total_kills = 0
+	games_played = 0
+	endless_unlocked = false
+	characters_cleared = {}
+	_init_data()
+	save()
