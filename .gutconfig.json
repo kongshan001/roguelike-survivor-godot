@@ -1,0 +1,11 @@
+{
+  "dirs": ["res://test/unit"],
+  "include_subdirs": true,
+  "log_level": 1.0,
+  "should_exit": true,
+  "should_maximize": false,
+  "junit_xml_file": "test/results.xml",
+  "compact_mode": true,
+  "prefix": "test_",
+  "suffix": ".gd"
+}
