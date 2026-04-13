@@ -36,7 +36,10 @@
 | test_weapon_evolution.gd | 18 | 进化配方匹配/替换 |
 | test_enemy_spawner.gd | 29 | 波次进度/生成间隔/敌人模板/可用类型 |
 | test_weapon_fire.gd | 31 | 武器数值缩放/协同加成/回旋镖创建 |
-| **合计** | **317** | **16 个测试文件** |
+| test_item_crate.gd | 14 | 箱子类型/收集逻辑/概率阈值 |
+| test_enemy_bullet.gd | 15 | 弹幕方向/速度/伤害/生命周期 |
+| test_boss_ai.gd | 22 | Boss三阶段/充能/螺旋/角度 |
+| **合计** | **394** | **21 个测试文件** |
 
 ## 缺陷跟踪
 
@@ -57,3 +60,4 @@
 | 2026-04-13 | 288 | 681 | 全部通过（weapon_fire.gd 31项新测试 + 发现并修复 boomerang set_script 属性重置 bug） |
 | 2026-04-13 | 317 | 738 | 全部通过（enemy_spawner.gd 29项新测试：波次进度/生成间隔/敌人模板/可用类型） |
 | 2026-04-13 | 343 | 768 | 全部通过（xp_gem 16项 + spin_blade 12项新测试，发现并修复 mini→minf float bug） |
+| 2026-04-13 | 394 | 823 | 全部通过（SYNERGIES→SYNERGY_DEFINITIONS修复 + _find_player提取 + shop清理 + 3个新测试文件51项） |

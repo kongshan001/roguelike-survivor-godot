@@ -368,3 +368,32 @@
 - **343 测试 / 768 断言 / 0 失败** — 18 个测试文件
 - **关键 bug 修复**: xp_gem.gd combo 经验加成现在正确使用 `minf()`
 - **测试驱动的 bug 发现**: 第 3 个由测试编写直接发现的 Critical bug
+
+### 2026-04-13: 代码质量修复 + 测试覆盖扩展审核
+
+#### 修复内容
+| 项目 | 严重度 | 修复 |
+|------|--------|------|
+| save_manager.gd SYNERGIES → SYNERGY_DEFINITIONS | Critical | 运行时崩溃 bug，成就检查引用错误常量名 |
+| shop.gd _upgrade_labels 未使用 | Low | 移除未使用变量 |
+| _find_player() 4处重复 | Medium | 提取到 GameManager.find_player() 静态方法 |
+
+#### 新增测试 (51项)
+| 文件 | 测试数 | 覆盖内容 |
+|------|--------|----------|
+| test_item_crate.gd | 14 | 箱子类型/收集逻辑/概率阈值/FindPlayer |
+| test_enemy_bullet.gd | 15 | 方向/速度/伤害/尺寸/生命周期/Boss弹幕数量 |
+| test_boss_ai.gd | 22 | 三阶段转换/充能机制/螺旋计时/角度计算 |
+
+#### 审核结果
+- **394 测试 / 823 断言 / 0 失败** — 21 个测试文件
+- **Critical Bug 修复**: save_manager.gd 引用 SynergyManager.SYNERGIES（不存在）→ SYNERGY_DEFINITIONS
+- **代码重复消除**: _find_player() 从 4 处重复代码收敛为 GameManager.find_player() 静态方法
+- **所有文件 < 500行**: 最大 save_manager.gd 391行（78%）
+- **源代码量**: ~3,704 行 GDScript（33 脚本文件）
+
+#### 测试驱动的 Bug 发现统计
+1. boomerang set_script 属性重置 (Critical)
+2. boomerang add_child 循环外 (Critical)
+3. xp_gem mini() float bug (Critical)
+4. **save_manager SYNERGIES 常量名 (Critical)** — 本轮发现
