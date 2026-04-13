@@ -15,6 +15,9 @@ var games_played: int = 0
 var endless_unlocked: bool = false
 # Track per-character clears for all_chars achievement
 var characters_cleared: Dictionary = {}
+# Track cumulative evolution/synergy history across sessions
+var evolution_history: Dictionary = {}  # evo_id -> true
+var synergy_history: Dictionary = {}    # synergy_id -> true
 
 const SAVE_PATH: String = "user://save.cfg"
 
@@ -224,7 +227,7 @@ func check_quests_and_achievements() -> void:
 	# Fast boss: kill boss within 3 minutes
 	_check_achievement("fast_boss", boss_kills > 0 and elapsed <= 180.0)
 	# Pacifist: 1 minute without killing
-	_check_achievement("pacifist_1min", elapsed >= 60.0 and kills == 0)
+	_check_achievement("pacifist_1min", elapsed >= 60.0 and GameManager.kills_at_60 == 0)
 	# Character clears
 	if character != "" and elapsed >= 180.0:
 		characters_cleared[character] = true
@@ -237,10 +240,44 @@ func check_quests_and_achievements() -> void:
 			completed_count += 1
 	_check_achievement("quests_half", completed_count >= QUESTS.size() / 2)
 	_check_achievement("quests_all", completed_count >= QUESTS.size())
-
 	# Endless unlock: beat boss
 	if boss_kills > 0:
 		endless_unlocked = true
+
+	# Accumulate evolution history across sessions
+	if GameManager.has_meta("evolutions"):
+		for evo_id: String in GameManager.get_meta("evolutions"):
+			evolution_history[evo_id] = true
+	# Accumulate synergy history
+	if SynergyManager:
+		for syn: Dictionary in SynergyManager.SYNERGY_DEFINITIONS:
+			if SynergyManager.has_synergy(syn["id"]):
+				synergy_history[syn["id"]] = true
+
+	# Evolution achievements
+	var evolutions: Array = []
+	if GameManager.has_meta("evolutions"):
+		evolutions = GameManager.get_meta("evolutions")
+	_check_achievement("evolve_weapon", evolutions.size() >= 1)
+
+	# All evolved: collected all 8 evolution weapons (cumulative)
+	var all_evo_ids: Array = ["thunderholywater", "fireknife", "holydomain", "blizzard", "frostknife", "flamebible", "thunderang", "blazerang"]
+	var evo_count: int = 0
+	for eid: String in all_evo_ids:
+		if evolution_history.has(eid):
+			evo_count += 1
+	_check_achievement("all_evolved", evo_count >= all_evo_ids.size())
+
+	# Synergy achievements
+	if SynergyManager:
+		var syn_count: int = 0
+		for syn: Dictionary in SynergyManager.SYNERGY_DEFINITIONS:
+			if SynergyManager.has_synergy(syn["id"]):
+				syn_count += 1
+		_check_achievement("synergy_first", syn_count >= 1)
+
+	# All synergies: triggered all 18 synergy effects (cumulative)
+	_check_achievement("all_synergies", synergy_history.size() >= SynergyManager.SYNERGY_DEFINITIONS.size() if SynergyManager else false)
 
 	# Convert 30% gold to soul fragments
 	var soul_reward: int = int(GameManager.gold * 0.3)
@@ -302,6 +339,10 @@ func save() -> void:
 		config.set_value("achievements", id, completed_achievements[id])
 	for char_id in characters_cleared:
 		config.set_value("chars_cleared", char_id, characters_cleared[char_id])
+	for evo_id in evolution_history:
+		config.set_value("evo_history", evo_id, true)
+	for syn_id in synergy_history:
+		config.set_value("syn_history", syn_id, true)
 
 	config.save(SAVE_PATH)
 
@@ -327,6 +368,15 @@ func load_save() -> void:
 	for c: String in chars:
 		if config.get_value("chars_cleared", c, false):
 			characters_cleared[c] = true
+	# Load evolution/synergy history
+	if config.has_section("evo_history"):
+		for key in config.get_section_keys("evo_history"):
+			if config.get_value("evo_history", key, false):
+				evolution_history[key] = true
+	if config.has_section("syn_history"):
+		for key in config.get_section_keys("syn_history"):
+			if config.get_value("syn_history", key, false):
+				synergy_history[key] = true
 
 
 func reset_save() -> void:
@@ -335,5 +385,7 @@ func reset_save() -> void:
 	games_played = 0
 	endless_unlocked = false
 	characters_cleared = {}
+	evolution_history = {}
+	synergy_history = {}
 	_init_data()
 	save()

@@ -1,0 +1,328 @@
+extends RefCounted
+## Weapon firing logic extracted from weapon_controller.gd
+
+var _controller: Node = null
+
+
+func _init(controller: Node) -> void:
+	_controller = controller
+
+
+func _get_pm(player: CharacterBody2D) -> Node:
+	var parent: Node = player.get_parent()
+	if parent and parent.has_node("ProjectileManager"):
+		return parent.get_node("ProjectileManager")
+	return null
+
+
+func _get_effects() -> RefCounted:
+	return _controller._get_effects()
+
+
+func _get_enemies(player: Node2D, range_val: float) -> Array:
+	return _controller._get_enemies_in_range(player, range_val)
+
+
+# --- Projectile ---
+
+func fire_projectile(data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float) -> void:
+	var count: int = data.projectile_count + (level - 1)
+	var damage: float = data.damage + (level - 1) * 0.6
+	var pierce: int = data.projectile_pierce + (level - 1)
+
+	if data.is_evolved:
+		count = data.projectile_count
+		damage = data.damage
+		pierce = data.projectile_pierce
+
+	var enemies := _get_enemies(player, 600.0)
+	if enemies.is_empty():
+		return
+
+	for i in range(count):
+		var target: Node2D = enemies[i % enemies.size()]
+		var projectile_scene: PackedScene = preload("res://scenes/projectile.tscn")
+		var proj: Area2D = projectile_scene.instantiate()
+		proj.setup(
+			player.global_position,
+			target.global_position,
+			data.projectile_speed,
+			damage * dmg_bonus,
+			pierce,
+			data.color,
+			data.projectile_size
+		)
+		proj.weapon_id = data.weapon_id
+		var proj_damage: float = damage * dmg_bonus
+		if data.weapon_id == "knife" and SynergyManager and SynergyManager.has_synergy("knife_crit"):
+			if randf() < player.crit_chance:
+				proj_damage *= player.crit_damage_mul
+				proj.color = Color(1.0, 0.85, 0.0)
+				proj.is_crit = true
+		proj.damage = proj_damage
+
+		if data.burn_dps > 0 or data.slow_pct > 0:
+			proj.set_status_effects(data.burn_dps, data.burn_duration, data.slow_pct)
+		var pm: Node = _get_pm(player)
+		if pm:
+			pm.add_child(proj)
+		if SynergyManager and SynergyManager.has_synergy("crit_boots") and proj.is_crit:
+			_spawn_crit_knife(player, proj.damage * 0.5)
+
+
+func _spawn_crit_knife(player: CharacterBody2D, dmg: float) -> void:
+	var enemies := _get_enemies(player, 400.0)
+	if enemies.is_empty():
+		return
+	var target: Node2D = enemies[0]
+	var proj_scene: PackedScene = preload("res://scenes/projectile.tscn")
+	var knife: Area2D = proj_scene.instantiate()
+	knife.setup(player.global_position, target.global_position, 250.0, dmg, 0, Color(1.0, 0.85, 0.0), 4.0)
+	knife.weapon_id = "crit_boots"
+	knife.is_crit = true
+	knife.lifetime = 1.0
+	var pm: Node = _get_pm(player)
+	if pm:
+		pm.add_child(knife)
+
+
+# --- Orbit ---
+
+func update_orbit(weapon_id: String, data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float, orbit_instances: Dictionary) -> Dictionary:
+	var orbit_count: int
+	var radius: float
+	var damage: float
+
+	if data.is_evolved:
+		orbit_count = data.orbit_count
+		radius = data.orbit_radius
+		damage = data.damage * dmg_bonus
+	elif weapon_id == "holywater":
+		orbit_count = level
+		radius = 50.0 + (level - 1) * 5.0
+		damage = (1.5 if level < 3 else 2.0) * dmg_bonus
+		if SynergyManager and SynergyManager.has_synergy("holywater_maxhp"):
+			radius *= SynergyManager.get_synergy_value("holywater_maxhp", "value", 1.3)
+	elif weapon_id == "bible":
+		orbit_count = 1
+		radius = 80.0 + (level - 1) * 20.0
+		if SynergyManager and SynergyManager.has_synergy("bible_boots"):
+			radius += SynergyManager.get_synergy_value("bible_boots", "radius_bonus", 20.0)
+		damage = (1.0 if level < 3 else 2.0) * dmg_bonus
+	else:
+		return orbit_instances
+
+	var key: String = weapon_id
+	if orbit_instances.has(key) and _controller.is_instance_valid(orbit_instances[key]):
+		var existing: Node2D = orbit_instances[key]
+		if existing.orbit_count != orbit_count or existing.orbit_radius != radius:
+			existing.queue_free()
+			orbit_instances.erase(key)
+		else:
+			existing.damage = damage
+			existing.global_position = player.global_position
+			return orbit_instances
+
+	var instance := Node2D.new()
+	instance.set_script(load("res://scripts/spin_blade.gd"))
+	instance.setup(orbit_count, damage, radius, data.color, data.projectile_size)
+	var rot_speed: float = data.orbit_speed + (0 if data.is_evolved else (level - 1) * 0.6)
+	if weapon_id == "bible" and SynergyManager and SynergyManager.has_synergy("bible_boots"):
+		rot_speed *= SynergyManager.get_synergy_value("bible_boots", "value", 1.5)
+	instance.rotation_speed = rot_speed
+	instance.weapon_id = weapon_id
+	var pm: Node = _get_pm(player)
+	if pm:
+		pm.add_child(instance)
+	instance.global_position = player.global_position
+	orbit_instances[key] = instance
+	return orbit_instances
+
+
+# --- Lightning ---
+
+func fire_lightning(data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float) -> void:
+	var damage: float
+	var chains: int
+	var bolt_count: int
+	var range_val: float = data.projectile_range
+
+	if SynergyManager and SynergyManager.has_synergy("lightning_magnet"):
+		range_val += SynergyManager.get_synergy_value("lightning_magnet", "range_bonus", 50.0)
+
+	if data.is_evolved:
+		damage = data.damage * dmg_bonus
+		chains = data.chain_count
+		bolt_count = data.projectile_count
+	else:
+		damage = (5.0 + (level - 1)) * dmg_bonus
+		chains = level - 1
+		bolt_count = 1 if level < 3 else 2
+		if SynergyManager and SynergyManager.has_synergy("lightning_magnet"):
+			chains += int(SynergyManager.get_synergy_value("lightning_magnet", "chains", 1))
+
+	var enemies := _get_enemies(player, range_val)
+	if enemies.is_empty():
+		return
+
+	var hit_count := mini(bolt_count + chains, enemies.size())
+	for i in range(hit_count):
+		var target: Node2D = enemies[i]
+		if target.has_method("take_damage"):
+			target.take_damage(damage, data.weapon_id)
+		var pm: Node = _get_pm(player)
+		if pm:
+			_get_effects().create_lightning_effect(player.global_position, target.global_position, data.color, pm)
+
+
+# --- Cone ---
+
+func fire_cone(data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float) -> void:
+	var angle: float = data.cone_angle + (level - 1) * 20.0
+	var range_val: float = data.cone_range + (level - 1) * 30.0
+	var damage: float = (data.damage + (level - 1) * 2.0) * dmg_bonus
+	var burn: float = 0.0
+	var burn_dur: float = 0.0
+	if level >= 3:
+		burn = 2.0
+		burn_dur = 2.0
+
+	if SynergyManager and SynergyManager.has_synergy("firestaff_armor"):
+		angle += SynergyManager.get_synergy_value("firestaff_armor", "angle", 40.0)
+		if burn_dur > 0.0:
+			burn_dur += SynergyManager.get_synergy_value("firestaff_armor", "burn_dur_bonus", 1.0)
+
+	var player_dir: Vector2 = Vector2.RIGHT
+	var velocity := player.velocity
+	if velocity.length_squared() > 1.0:
+		player_dir = velocity.normalized()
+
+	var half_angle := deg_to_rad(angle / 2.0)
+	var dir_angle: float = player_dir.angle()
+
+	var enemies := _get_enemies(player, range_val)
+	for enemy in enemies:
+		var to_enemy: Vector2 = enemy.global_position - player.global_position
+		var enemy_angle: float = to_enemy.angle()
+		var angle_diff := absf(wrapf(enemy_angle - dir_angle, -PI, PI))
+		if angle_diff <= half_angle:
+			enemy.take_damage(damage, data.weapon_id)
+			if burn > 0.0 and enemy.has_method("apply_burn"):
+				enemy.apply_burn(burn, burn_dur)
+
+	var pm: Node = _get_pm(player)
+	if pm:
+		_get_effects().create_cone_effect(player.global_position, dir_angle, half_angle, range_val, data.color, pm)
+
+
+# --- Aura ---
+
+func update_aura(weapon_id: String, data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float, weapon_timers: Dictionary) -> void:
+	var radius: float
+	var slow: float
+	var damage: float
+	var freeze_pct: float
+	var freeze_dur_bonus: float = 0.0
+
+	if data.is_evolved:
+		radius = data.aoe_radius
+		slow = data.slow_pct
+		damage = data.damage * dmg_bonus
+		freeze_pct = data.freeze_pct
+	else:
+		radius = 80.0 + (level - 1) * 25.0
+		slow = 0.3 + (level - 1) * 0.15
+		damage = (1.0 + (level - 1) * 0.5) * dmg_bonus
+		freeze_pct = 0.08 if level >= 3 else 0.0
+
+	if SynergyManager and SynergyManager.has_synergy("frost_regen"):
+		freeze_pct += SynergyManager.get_synergy_value("frost_regen", "chance", 0.05)
+		freeze_dur_bonus = SynergyManager.get_synergy_value("frost_regen", "dur_bonus", 0.5)
+
+	var delta: float = _controller.get_process_delta_time()
+	var enemies := _get_enemies(player, radius)
+	for enemy in enemies:
+		enemy.take_damage(damage * delta, weapon_id)
+		if enemy.has_method("apply_slow"):
+			enemy.apply_slow(slow)
+		if freeze_pct > 0.0 and enemy.has_method("apply_freeze"):
+			enemy.apply_freeze(freeze_pct * delta + freeze_dur_bonus)
+
+	# Evolved blizzard: also fire lightning periodically
+	if weapon_id == "blizzard":
+		if not weapon_timers.has("_blizzard_lightning"):
+			weapon_timers["_blizzard_lightning"] = 2.0
+		weapon_timers["_blizzard_lightning"] -= delta
+		if weapon_timers["_blizzard_lightning"] <= 0:
+			weapon_timers["_blizzard_lightning"] = 2.0
+			var bolt_enemies := _get_enemies(player, 300.0)
+			var hit := mini(3, bolt_enemies.size())
+			for i in range(hit):
+				bolt_enemies[i].take_damage(8.0 * dmg_bonus, "blizzard")
+				var pm: Node = _get_pm(player)
+				if pm:
+					_get_effects().create_lightning_effect(player.global_position, bolt_enemies[i].global_position, Color(0.5, 0.8, 1.0), pm)
+
+
+# --- Boomerang ---
+
+func fire_boomerang(data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float, weapon_timers: Dictionary, boomerang_instances: Array) -> Array:
+	var count: int
+	var damage: float
+	var pierce: int
+	var max_dist: float
+	var cooldown: float
+	var track_angle: float
+
+	if data.is_evolved:
+		count = data.projectile_count
+		damage = data.damage * dmg_bonus
+		pierce = data.projectile_pierce
+		max_dist = data.boomerang_max_dist
+		cooldown = data.cooldown
+		track_angle = data.boomerang_track_angle
+	else:
+		count = data.projectile_count + (level - 1)
+		damage = (data.damage + (level - 1)) * dmg_bonus
+		pierce = data.projectile_pierce + (level - 1)
+		max_dist = data.boomerang_max_dist + (level - 1) * 50.0
+		if SynergyManager and SynergyManager.has_synergy("boomerang_crit"):
+			pierce += int(SynergyManager.get_synergy_value("boomerang_crit", "pierce_bonus", 1))
+		cooldown = data.cooldown - (level - 1) * 0.4
+		track_angle = data.boomerang_track_angle + (level - 1) * 0.26
+
+	weapon_timers[data.weapon_id] = maxf(cooldown, 0.5)
+
+	var valid_boomerangs := boomerang_instances.filter(func(b): return _controller.is_instance_valid(b))
+
+	for i in range(count):
+		if valid_boomerangs.size() >= 8:
+			break
+
+		var enemies := _get_enemies(player, 400.0)
+		var target_dir: Vector2 = Vector2.RIGHT.rotated(randf() * TAU)
+		if not enemies.is_empty():
+			target_dir = player.global_position.direction_to(enemies[i % enemies.size()].global_position)
+
+		var bm: Area2D = _create_boomerang(player.global_position, target_dir, damage, pierce, max_dist, data.boomerang_return_speed, track_angle, data.color, data.projectile_size)
+		var pm: Node = _get_pm(player)
+		if pm:
+			pm.add_child(bm)
+			valid_boomerangs.append(bm)
+
+	return valid_boomerangs
+
+
+func _create_boomerang(pos: Vector2, dir: Vector2, dmg: float, prc: int, max_dist: float, return_spd: float, track_angle: float, col: Color, sz: float) -> Area2D:
+	var bm_scene: PackedScene = preload("res://scenes/projectile.tscn")
+	var bm: Area2D = bm_scene.instantiate()
+	bm.global_position = pos
+	bm.set_script(load("res://scripts/weapons/boomerang.gd"))
+	bm.direction = dir
+	bm.speed = 280.0
+	bm.damage = dmg
+	bm.pierce = prc
+	bm.color = col
+	bm.size = sz
+	bm.setup_boomerang(pos, dir, max_dist, return_spd, track_angle)
+	return bm

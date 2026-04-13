@@ -86,6 +86,12 @@ func _physics_process(delta):
 		queue_free()
 	rotation = direction.angle()
 
+	# boomerang_magnet synergy: attract nearby xp_gems
+	if SynergyManager and SynergyManager.has_synergy("boomerang_magnet"):
+		for area in get_overlapping_areas():
+			if is_instance_valid(area) and "xp_value" in area:
+				area.is_moving_to_player = true
+
 
 func _get_nearest_enemy_in_cone() -> Node2D:
 	var enemies = get_tree().get_nodes_in_group("enemies")
@@ -102,7 +108,7 @@ func _get_nearest_enemy_in_cone() -> Node2D:
 
 func _on_body_entered(body: Node2D):
 	if body.is_in_group("enemies") and body.has_method("take_damage") and not body in _hit_enemies:
-		body.take_damage(damage)
+		body.take_damage(damage, "boomerang")
 		_hit_enemies.append(body)
 		# Clear hit list on return to allow re-hitting
 		if _returning:

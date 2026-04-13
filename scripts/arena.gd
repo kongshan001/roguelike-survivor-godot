@@ -1,5 +1,8 @@
 extends Node2D
 
+var _shake_amount: float = 0.0
+var _shake_decay: float = 5.0
+
 
 func _ready():
 	GameManager.reset()
@@ -31,13 +34,44 @@ func _ready():
 	player.add_to_group("players")
 	player.hurtbox.body_entered.connect(_on_player_hurtbox_entered.bind(player))
 
+	# Connect screen shake triggers
+	GameManager.health_changed.connect(_on_health_changed_shake)
+	GameManager.combo_changed.connect(_on_combo_changed_shake)
+
 	_draw_grid()
 
 
-func _process(_delta):
+func _process(delta):
 	var player = $Player
 	if player and is_instance_valid(player):
 		$Camera2D.global_position = player.global_position
+
+	# Screen shake
+	if _shake_amount > 0:
+		_shake_amount = maxf(0, _shake_amount - _shake_decay * delta)
+		$Camera2D.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * _shake_amount
+	else:
+		$Camera2D.offset = Vector2.ZERO
+
+
+func screen_shake(amount: float) -> void:
+	_shake_amount = amount
+
+
+func _on_health_changed_shake(_cur: float, _max: float) -> void:
+	screen_shake(3.0)
+
+
+func _on_combo_changed_shake(count: int) -> void:
+	# Tiered shake based on combo count
+	if count >= 50:
+		screen_shake(10.0)
+	elif count >= 20:
+		screen_shake(7.0)
+	elif count >= 10:
+		screen_shake(5.0)
+	elif count >= 5:
+		screen_shake(3.0)
 
 
 func _draw_grid():

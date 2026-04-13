@@ -149,12 +149,20 @@ func _spawn_wave_enemies() -> void:
 		_spawn_enemy(data)
 
 
+var _boss_warning_sent: bool = false
+
 func _process_boss_spawn(delta: float) -> void:
 	var is_endless: bool = GameManager.selected_difficulty == "endless"
 
 	# First boss timing scaled by difficulty (hard spawns earlier)
 	var boss_time: float = 270.0 * GameManager.get_difficulty_mul("spawn_interval_mul")
 	boss_time = clampf(boss_time, 120.0, 300.0)
+
+	# Boss warning 15s before spawn
+	if not _boss_warning_sent and GameManager.elapsed_time >= boss_time - 15.0:
+		_boss_warning_sent = true
+		GameManager.boss_warning.emit()
+
 	if not _boss_spawned and GameManager.elapsed_time >= boss_time:
 		_boss_spawned = true
 		_spawn_boss(1.0)

@@ -13,7 +13,7 @@
 | P1 | 7种敌人 + Boss三阶段 + 弹幕系统 | ✅ 已完成 |
 | P1 | 5段波次进度 + 无尽模式生成 | ✅ 已完成 |
 | P2 | 8种进化武器系统 | ✅ 已完成 |
-| P2 | 17种协同效应系统 | ✅ 已完成 |
+| P2 | 18种协同效应系统 | ✅ 已完成 |
 | P3 | 商店/存档/任务/成就系统 | ✅ 已完成 |
 
 ## 技术决策
@@ -67,3 +67,35 @@
 - **修改**: arena.gd 碰撞伤害应用 enemy_dmg_mul
 - **修改**: enemy.gd 子弹伤害 + 分裂子体 HP/速度/伤害 应用难度乘数
 - **修改**: difficulty_select.gd 无尽模式锁定检查（SaveManager.endless_unlocked）
+
+### 2026-04-13: Dash 闪避 + 食物掉落 + 屏幕震动 + 第18个协同
+- **决策**: 新增 Dash 系统、食物掉落、屏幕震动反馈、第18个协同效应
+- **新增文件**:
+  - `scripts/food_pickup.gd` — 食物拾取脚本（1HP 回血，磁铁吸引）
+  - `test/unit/test_player_dash.gd` — 7 个 Dash 系统测试
+  - `test/unit/test_food_pickup.gd` — 6 个食物拾取测试
+  - `test/unit/test_arena_screen_shake.gd` — 9 个屏幕震动测试
+- **修改文件**:
+  - `scripts/player.gd` — Dash 系统（Space 键触发，80px 冲刺，2.5s 冷却，无敌帧）
+  - `scripts/enemy.gd` — _spawn_food()（10% 掉落，难度乘数），修复 _spawn_food 和 _spawn_split_children 函数合并错误
+  - `scripts/arena.gd` — 屏幕震动（受伤 3.0，连杀≥20 时 2.0，衰减 5.0/s）
+  - `scripts/autoload/synergy_manager.gd` — 第18个协同 "命运赌徒"（crit+luckycoin）
+  - `scripts/autoload/game_manager.gd` — food_drop_mul 难度乘数
+  - `test/unit/test_synergy_manager.gd` — 新增 crit_luckycoin 测试，总数更新为 18
+- **Bug修复**: enemy.gd 中 _spawn_food() 和 _spawn_split_children() 被错误合并为一个函数，导致 parse error，已拆分修复
+
+### 2026-04-13: 15个协同效应接入 + 连击奖励 + Boss警告 + 进化追踪
+- **决策**: 将定义在 synergy_manager.gd 中的18个协同效应接入实际游戏逻辑
+- **修改文件**:
+  - `scripts/weapon_controller.gd` — knife_crit/lightning_magnet/firestaff_armor/frost_regen/boomerang_crit 协同（9处 has_synergy 检查）
+  - `scripts/player.gd` — armor_maxhp(护甲翻倍)/armor_regen(低HP+3护甲) 协同
+  - `scripts/enemy.gd` — magnet_crit(额外宝石)/crit_luckycoin(双倍金币)/luckycoin基础(金币+15%)/combo gold(+1金≥5连击)
+  - `scripts/xp_gem.gd` — magnet_maxhp(2%回复1HP)/combo exp(combo×5%加成)
+  - `scripts/enemy_spawner.gd` — Boss出生前15s触发 boss_warning 信号
+  - `scripts/hud.gd` — Boss警告Label显示、combo里程碑颜色变化、进化追踪(meta)
+  - `scenes/hud.tscn` — 新增 BossWarningLabel 节点
+  - `scripts/arena.gd` — 分级屏幕震动(combo 5→3/10→5/20→7/50→10)
+  - `scripts/autoload/game_manager.gd` — combo_milestone/boss_warning 信号, COMBO_MILESTONES常量
+  - `test/unit/test_arena_screen_shake.gd` — 更新为分级震动预期值
+- **接入状态**: 13/18 协同已生效，5个需要额外基础设施（击杀归属追踪等）
+- **新增系统**: 连击奖励(经验+金币)、Boss警告UI、进化武器追踪、幸运硬币被动基础效果

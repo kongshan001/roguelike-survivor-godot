@@ -1,7 +1,6 @@
 extends CharacterBody2D
 
 signal died
-signal took_damage
 
 @export var move_speed: float = 160.0
 @export var max_health: float = 8.0
@@ -109,11 +108,18 @@ func take_damage(amount: float):
 	if invincible_timer > 0 or not is_alive:
 		return
 
-	var actual_damage = maxf(1.0, amount - armor)
+	var effective_armor: int = armor
+	# armor_maxhp synergy: 护甲效果翻倍
+	if SynergyManager and SynergyManager.has_synergy("armor_maxhp"):
+		effective_armor *= 2
+	# armor_regen synergy: 低HP时临时+3护甲
+	if SynergyManager and SynergyManager.has_synergy("armor_regen"):
+		if current_health <= max_health * 0.3:
+			effective_armor += 3
+	var actual_damage = maxf(1.0, amount - effective_armor)
 	current_health -= actual_damage
 	GameManager.damage_taken = true
 	GameManager.health_changed.emit(current_health, max_health)
-	took_damage.emit()
 
 	if current_health <= 0:
 		current_health = 0
@@ -192,3 +198,17 @@ func apply_passive(passive_id: String):
 	# Re-check synergies after passive change
 	if SynergyManager:
 		SynergyManager.check_synergies(owned_weapons, owned_passives)
+
+
+func _spawn_afterimages() -> void:
+	for i in range(dash_afterimage_count):
+		var afterimage: ColorRect = ColorRect.new()
+		afterimage.size = sprite.size
+		afterimage.position = sprite.position
+		afterimage.color = Color(sprite.color.r, sprite.color.g, sprite.color.b, 0.3)
+		afterimage.z_index = -1
+		get_parent().call_deferred("add_child", afterimage)
+		var tween: Tween = afterimage.create_tween()
+		tween.tween_interval(i * 0.03)
+		tween.tween_property(afterimage, "color:a", 0.0, 0.2)
+		tween.tween_callback(afterimage.queue_free)

@@ -4,9 +4,9 @@ extends Node
 
 var active_synergies: Dictionary = {}  # synergy_id -> Dictionary (definition)
 
-# 17 种协同配方定义
+# 18 种协同配方定义
 const SYNERGY_DEFINITIONS: Array = [
-	# --- 被动+被动 (6种) ---
+	# --- 被动+被动 (7种) ---
 	{
 		"id": "crit_boots", "name": "风之锋刃", "type": "passive_passive",
 		"a": "crit", "b": "speedboots",
@@ -36,6 +36,11 @@ const SYNERGY_DEFINITIONS: Array = [
 		"id": "magnet_maxhp", "name": "命运齿轮", "type": "passive_passive",
 		"a": "magnet", "b": "maxhp",
 		"effect": "gem_heal_chance", "value": 0.02, "desc": "拾取宝石2%回复1HP"
+	},
+	{
+		"id": "crit_luckycoin", "name": "命运赌徒", "type": "passive_passive",
+		"a": "crit", "b": "luckycoin",
+		"effect": "crit_double_gold", "desc": "暴击时双倍金币"
 	},
 	# --- 武器+被动 (11种) ---
 	{

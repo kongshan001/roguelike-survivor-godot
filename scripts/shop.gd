@@ -2,7 +2,6 @@ extends Control
 ## 商店界面 — 使用灵魂碎片购买永久升级
 
 var _upgrade_buttons: Array[Button] = []
-var _upgrade_labels: Array[RichTextLabel] = []
 
 
 func _ready():

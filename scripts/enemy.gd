@@ -28,6 +28,10 @@ var _boss_ai = null  # BossAI instance
 # Splitter death tracking (prevents double-spawn)
 var _has_split: bool = false
 
+# Kill attribution (for synergy tracking)
+var _last_hit_by: String = ""
+var _was_crit: bool = false
+
 
 func _ready():
 	if enemy_data:
@@ -187,9 +191,12 @@ func _spawn_bullet(dir: Vector2) -> void:
 
 # --- Combat ---
 
-func take_damage(amount: float):
+func take_damage(amount: float, source: String = "", was_crit: bool = false):
 	if not is_alive:
 		return
+	if source != "":
+		_last_hit_by = source
+	_was_crit = was_crit
 	current_hp -= amount
 	_flash_timer = 0.2
 	if current_hp <= 0:
@@ -220,8 +227,39 @@ func die():
 	var gold_amount: int = 3
 	if SaveManager:
 		gold_amount = int(float(gold_amount) * (1.0 + SaveManager.get_gold_bonus()))
+	# Lucky coin passive: +15% gold per stack
+	if SynergyManager:
+		pass  # Lucky coin gold handled via player owned_passives
+	var player_ref = _find_player()
+	if player_ref and player_ref.has_passive("luckycoin"):
+		var lucky_stacks: int = player_ref.owned_passives.get("luckycoin", 0)
+		gold_amount = int(float(gold_amount) * (1.0 + 0.15 * lucky_stacks))
+	# crit_luckycoin synergy: 暴击时双倍金币
+	if SynergyManager and SynergyManager.has_synergy("crit_luckycoin"):
+		gold_amount *= 2
+	# Combo gold bonus: 连击≥5时+1金币/击杀
+	if GameManager.combo_count >= 5:
+		gold_amount += 1
 	GameManager.add_gold(gold_amount)
 	_spawn_xp_gem()
+
+	# magnet_crit synergy: 暴击额外掉落价值+2宝石
+	if SynergyManager and SynergyManager.has_synergy("magnet_crit") and _was_crit:
+		_spawn_bonus_gem(2)
+
+	# holywater_luckycoin synergy: 圣水击杀+1金币
+	if SynergyManager and SynergyManager.has_synergy("holywater_luckycoin"):
+		if _last_hit_by == "holywater":
+			GameManager.add_gold(1)
+
+	# firestaff_luckycoin synergy: 燃烧击杀+1宝石
+	if SynergyManager and SynergyManager.has_synergy("firestaff_luckycoin"):
+		if _last_hit_by == "firestaff" and _burn_timer > 0:
+			_spawn_bonus_gem(1)
+
+	# Food drop (H5: 10% base, scaled by difficulty)
+	if randf() < 0.1 * GameManager.get_difficulty_mul("food_drop_mul", 1.0):
+		_spawn_food()
 
 	if randf() < enemy_data.drop_chance:
 		_spawn_item_crate()
@@ -248,14 +286,36 @@ func _spawn_xp_gem():
 	var gem: Area2D = gem_scene.instantiate()
 	gem.global_position = global_position + Vector2(randf_range(-10, 10), randf_range(-10, 10))
 	gem.xp_value = enemy_data.xp_value
-	get_parent().get_node("PickupManager").add_child(gem)
+	var pm: Node = get_parent().get_node_or_null("PickupManager")
+	if pm:
+		pm.add_child(gem)
 
 
 func _spawn_item_crate():
 	var crate_scene: PackedScene = preload("res://scenes/item_crate.tscn")
 	var crate: Area2D = crate_scene.instantiate()
 	crate.global_position = global_position
-	get_parent().get_node("PickupManager").add_child(crate)
+	var pm: Node = get_parent().get_node_or_null("PickupManager")
+	if pm:
+		pm.add_child(crate)
+
+
+func _spawn_food():
+	var food: Area2D = Area2D.new()
+	food.collision_mask = 1  # Player layer
+	food.set_script(preload("res://scripts/food_pickup.gd"))
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	var circle: CircleShape2D = CircleShape2D.new()
+	circle.radius = 6.0
+	shape.shape = circle
+	food.add_child(shape)
+	var sprite: ColorRect = ColorRect.new()
+	sprite.size = Vector2(8, 8)
+	sprite.position = Vector2(-4, -4)
+	sprite.color = Color(0.4, 0.9, 0.3)
+	food.add_child(sprite)
+	food.global_position = global_position + Vector2(randf_range(-15, 15), randf_range(-15, 15))
+	get_parent().call_deferred("add_child", food)
 
 
 func _spawn_split_children():
@@ -284,8 +344,15 @@ func _spawn_split_children():
 		GameManager.enemy_count += 1
 
 
+func _spawn_bonus_gem(value: int) -> void:
+	var gem_scene: PackedScene = preload("res://scenes/xp_gem.tscn")
+	var gem: Area2D = gem_scene.instantiate()
+	gem.global_position = global_position + Vector2(randf_range(-15, 15), randf_range(-15, 15))
+	gem.xp_value = value
+	var pm: Node = get_parent().get_node_or_null("PickupManager")
+	if pm:
+		pm.add_child(gem)
+
+
 func _find_player() -> Node2D:
-	var players: Array = get_tree().get_nodes_in_group("players")
-	if players.size() > 0:
-		return players[0]
-	return null
+	return GameManager.find_player()

@@ -14,6 +14,10 @@ var burn_dps: float = 0.0
 var burn_duration: float = 0.0
 var slow_pct: float = 0.0
 
+# Kill attribution
+var weapon_id: String = ""
+var is_crit: bool = false
+
 
 func setup(pos: Vector2, target_pos: Vector2, spd: float, dmg: float, prc: int, col: Color, sz: float):
 	global_position = pos
@@ -51,7 +55,7 @@ func _physics_process(delta):
 
 func _on_body_entered(body: Node2D):
 	if body.is_in_group("enemies") and body.has_method("take_damage") and not body in _hit_enemies:
-		body.take_damage(damage)
+		body.take_damage(damage, weapon_id, is_crit)
 		# Apply status effects
 		if burn_dps > 0.0 and burn_duration > 0.0 and body.has_method("apply_burn"):
 			body.apply_burn(burn_dps, burn_duration)

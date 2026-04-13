@@ -2,6 +2,8 @@ extends CanvasLayer
 
 var _upgrade_options: Array[Dictionary] = []
 var _pending_level_ups: int = 0
+var _rerolls_used: int = 0
+const MAX_REROLLS: int = 1
 
 
 func _ready():
@@ -13,6 +15,8 @@ func _ready():
 	GameManager.player_died.connect(_on_player_died)
 	GameManager.gold_changed.connect(_on_gold_changed)
 	GameManager.combo_changed.connect(_on_combo_changed)
+	GameManager.combo_milestone.connect(_on_combo_milestone)
+	GameManager.boss_warning.connect(_on_boss_warning)
 
 	# Show difficulty indicator
 	var diff_names: Dictionary = {"easy": "休闲", "normal": "标准", "hard": "噩梦", "endless": "无尽"}
@@ -22,6 +26,7 @@ func _ready():
 	$UpgradePanel/Panel/Card1.gui_input.connect(_on_card_input.bind(0))
 	$UpgradePanel/Panel/Card2.gui_input.connect(_on_card_input.bind(1))
 	$UpgradePanel/Panel/Card3.gui_input.connect(_on_card_input.bind(2))
+	$UpgradePanel/RerollButton.pressed.connect(_reroll_upgrades)
 
 	# Card children consume mouse events by default, prevent that
 	for card in [$UpgradePanel/Panel/Card1, $UpgradePanel/Panel/Card2, $UpgradePanel/Panel/Card3]:
@@ -43,6 +48,27 @@ func _on_combo_changed(count: int):
 		$ComboLabel.text = "Combo: %d" % count
 	else:
 		$ComboLabel.text = ""
+
+
+func _on_combo_milestone(count: int):
+	var labels: Dictionary = {5: "5 连击！", 10: "10 连击！！", 20: "20 连击！！！", 50: "50 连击！！！"}
+	$ComboLabel.text = labels.get(count, "%d 连击！" % count)
+	# Flash combo label color
+	match count:
+		5: $ComboLabel.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
+		10: $ComboLabel.add_theme_color_override("font_color", Color(1.0, 0.5, 0.0))
+		20: $ComboLabel.add_theme_color_override("font_color", Color(1.0, 0.2, 0.0))
+		50: $ComboLabel.add_theme_color_override("font_color", Color(1.0, 0.1, 0.1))
+
+
+func _on_boss_warning():
+	$BossWarningLabel.text = "💀 Boss 即将来袭！"
+	$BossWarningLabel.visible = true
+	$BossWarningLabel.add_theme_color_override("font_color", Color(1.0, 0.1, 0.1))
+	# Auto-hide after 2.5s
+	get_tree().create_timer(2.5).timeout.connect(func():
+		$BossWarningLabel.visible = false
+	)
 
 
 func _on_health_changed(current: float, max_hp: float):
@@ -87,6 +113,7 @@ func _show_upgrade_panel():
 			card.visible = false
 
 	$UpgradePanel.visible = true
+	$UpgradePanel/RerollButton.visible = _rerolls_used < MAX_REROLLS
 
 
 func _on_card_input(event: InputEvent, index: int):
@@ -100,6 +127,7 @@ func _input(event: InputEvent):
 			KEY_1: _select_upgrade(0)
 			KEY_2: _select_upgrade(1)
 			KEY_3: _select_upgrade(2)
+			KEY_R: _reroll_upgrades()
 
 
 func _select_upgrade(index: int):
@@ -127,6 +155,13 @@ func _select_upgrade(index: int):
 		_show_upgrade_panel()
 	else:
 		get_tree().paused = false
+
+
+func _reroll_upgrades() -> void:
+	if _rerolls_used >= MAX_REROLLS:
+		return
+	_rerolls_used += 1
+	_show_upgrade_panel()
 
 
 func _get_player() -> Node2D:

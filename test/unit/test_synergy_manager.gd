@@ -146,5 +146,10 @@ func test_recheck_removes_lost_passive():
 
 # --- Definition count ---
 
+func test_crit_luckycoin_synergy():
+	_check({}, {"crit": 1, "luckycoin": 1})
+	assert_true(_mgr.has_synergy("crit_luckycoin"), "Should have crit_luckycoin synergy")
+
+
 func test_total_synergy_definitions():
-	assert_eq(_mgr.SYNERGY_DEFINITIONS.size(), 17, "Should have 17 synergy definitions")
+	assert_eq(_mgr.SYNERGY_DEFINITIONS.size(), 18, "Should have 18 synergy definitions")

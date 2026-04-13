@@ -237,3 +237,65 @@ func test_character_kills_reset():
 	GameManager.register_kill()
 	GameManager.reset()
 	assert_eq(GameManager.character_kills, 0)
+
+
+# --- Pacifist Tracking (kills_at_60) ---
+
+func test_kills_at_60_initially_minus_one():
+	GameManager.reset()
+	assert_eq(GameManager.kills_at_60, -1, "Not recorded until 60s")
+
+
+func test_kills_at_60_recorded():
+	GameManager.reset()
+	GameManager.elapsed_time = 30.0
+	GameManager.register_kill()
+	GameManager.register_kill()
+	GameManager.update_combo(0.016)
+	assert_eq(GameManager.kills_at_60, -1, "Not yet 60s")
+	GameManager.elapsed_time = 60.0
+	GameManager.update_combo(0.016)
+	assert_eq(GameManager.kills_at_60, 2, "Should record kills at 60s mark")
+
+
+func test_kills_at_60_zero_for_pacifist():
+	GameManager.reset()
+	GameManager.elapsed_time = 60.0
+	GameManager.update_combo(0.016)
+	assert_eq(GameManager.kills_at_60, 0, "No kills at 60s = pacifist eligible")
+
+
+func test_kills_at_60_reset():
+	GameManager.kills_at_60 = 5
+	GameManager.reset()
+	assert_eq(GameManager.kills_at_60, -1)
+
+
+# --- Combo Milestones ---
+
+func test_combo_milestone_at_5():
+	watch_signals(GameManager)
+	for i in range(5):
+		GameManager.register_kill()
+	assert_signal_emitted_with_parameters(GameManager, "combo_milestone", [5])
+
+
+func test_combo_milestone_at_20():
+	watch_signals(GameManager)
+	for i in range(20):
+		GameManager.register_kill()
+	assert_signal_emitted_with_parameters(GameManager, "combo_milestone", [20])
+
+
+func test_combo_constants():
+	assert_eq(GameManager.COMBO_MILESTONES, [5, 10, 20, 50])
+	assert_eq(GameManager.COMBO_EXP_RATE, 0.05)
+	assert_eq(GameManager.COMBO_MAX_BONUS, 0.5)
+
+
+# --- Boss Warning Signal ---
+
+func test_boss_warning_signal_exists():
+	watch_signals(GameManager)
+	GameManager.boss_warning.emit()
+	assert_signal_emitted(GameManager, "boss_warning")

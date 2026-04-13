@@ -282,3 +282,33 @@ func test_reset_clears_characters():
 	_mgr.characters_cleared["mage"] = true
 	_mgr.reset_save()
 	assert_eq(_mgr.characters_cleared.size(), 0, "Should clear on reset")
+
+
+func test_evolve_weapon_achievement():
+	_mgr._check_achievement("evolve_weapon", true)
+	assert_eq(_mgr.completed_achievements["evolve_weapon"], true, "Should unlock on first evolution")
+
+
+func test_synergy_first_achievement():
+	_mgr._check_achievement("synergy_first", true)
+	assert_eq(_mgr.completed_achievements["synergy_first"], true, "Should unlock on first synergy")
+
+
+func test_evolution_history_initialized():
+	assert_eq(_mgr.evolution_history.size(), 0, "Should start empty")
+
+
+func test_synergy_history_initialized():
+	assert_eq(_mgr.synergy_history.size(), 0, "Should start empty")
+
+
+func test_reset_clears_evolution_history():
+	_mgr.evolution_history["fireknife"] = true
+	_mgr.reset_save()
+	assert_eq(_mgr.evolution_history.size(), 0, "Should clear on reset")
+
+
+func test_reset_clears_synergy_history():
+	_mgr.synergy_history["knife_crit"] = true
+	_mgr.reset_save()
+	assert_eq(_mgr.synergy_history.size(), 0, "Should clear on reset")

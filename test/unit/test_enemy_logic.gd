@@ -233,3 +233,56 @@ func test_splitter_spawns_children():
 	GameManager.enemy_count = 1
 	_enemy.take_damage(4.0)
 	assert_eq(GameManager.enemy_count, 2, "Should spawn 2 children (original -1 + 2 new)")
+
+
+# --- Kill Attribution ---
+
+func test_last_hit_by_set():
+	_enemy.take_damage(5.0, "knife")
+	assert_eq(_enemy._last_hit_by, "knife", "Should record last hit weapon")
+
+func test_was_crit_set():
+	_enemy.take_damage(5.0, "knife", true)
+	assert_true(_enemy._was_crit, "Should record crit")
+
+func test_last_hit_by_updates():
+	_enemy.take_damage(5.0, "holywater")
+	_enemy.take_damage(5.0, "firestaff")
+	assert_eq(_enemy._last_hit_by, "firestaff", "Should update to latest source")
+
+func test_kill_attribution_in_die():
+	_enemy.take_damage(5.0, "knife")
+	_enemy.take_damage(50.0, "holywater")
+	# Enemy should have died with _last_hit_by == "holywater"
+	assert_false(_enemy.is_alive)
+	assert_eq(_enemy._last_hit_by, "holywater", "Should record killing blow source")
+
+
+# --- Combo Gold Bonus ---
+
+func test_combo_gold_bonus():
+	var gold_before: int = GameManager.gold
+	GameManager.combo_count = 5
+	_enemy.take_damage(50.0)
+	assert_gt(GameManager.gold, gold_before + 3, "Combo >= 5 should give +1 gold")
+
+func test_no_combo_gold_below_5():
+	var gold_before: int = GameManager.gold
+	GameManager.combo_count = 3
+	_enemy.take_damage(50.0)
+	# register_kill makes it 4, which is still < 5, so no bonus
+	assert_eq(GameManager.gold, gold_before + 3, "Combo < 5 should not give bonus gold")
+
+
+# --- Lucky Coin Gold ---
+
+func test_lucky_coin_gold_bonus():
+	# Need a player with luckycoin passive
+	var player: CharacterBody2D = load("res://scenes/player.tscn").instantiate()
+	player.add_to_group("players")
+	player.owned_passives["luckycoin"] = 2
+	add_child_autofree(player)
+	var gold_before: int = GameManager.gold
+	_enemy.take_damage(50.0)
+	# base 3 gold × (1 + 0.15×2) = 3 × 1.3 = 3.9 → int = 3
+	assert_gt(GameManager.gold, gold_before, "Lucky coin should affect gold")

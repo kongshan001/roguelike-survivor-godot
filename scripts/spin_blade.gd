@@ -8,6 +8,7 @@ var blade_size: float = 10.0
 var rotation_speed: float = 3.0
 var _angle: float = 0.0
 var _hit_cooldowns: Dictionary = {}
+var weapon_id: String = ""
 
 
 func setup(count: int, dmg: float, radius: float, col: Color, sz: float):
@@ -43,7 +44,7 @@ func _physics_process(delta):
 			if is_instance_valid(enemy) and enemy.is_alive and not _hit_cooldowns.has(enemy):
 				var dist = blade_pos.distance_to(enemy.global_position - global_position)
 				if dist < blade_size + 10.0:
-					enemy.take_damage(damage)
+					enemy.take_damage(damage, weapon_id)
 					_hit_cooldowns[enemy] = 0.3
 
 

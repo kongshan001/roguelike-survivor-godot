@@ -29,10 +29,7 @@ func _physics_process(_delta):
 
 
 func _find_player() -> Node2D:
-	var players = get_tree().get_nodes_in_group("players")
-	if players.size() > 0:
-		return players[0]
-	return null
+	return GameManager.find_player()
 
 
 func _collect():
