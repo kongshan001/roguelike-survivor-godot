@@ -7,18 +7,14 @@ var _player: Node2D = null
 
 
 func _ready():
-	var sprite = $Sprite as ColorRect
+	var sprite = $Sprite as Sprite2D
 	if sprite:
 		if xp_value >= 15:
-			sprite.color = Color(0.2, 0.4, 1.0)
-			sprite.size = Vector2(12, 12)
+			sprite.texture = preload("res://assets/sprites/pickups/xp_gem_large.png")
 		elif xp_value >= 10:
-			sprite.color = Color.GREEN
-			sprite.size = Vector2(10, 10)
+			sprite.texture = preload("res://assets/sprites/pickups/xp_gem_medium.png")
 		else:
-			sprite.color = Color.YELLOW
-			sprite.size = Vector2(8, 8)
-		sprite.position = -sprite.size / 2.0
+			sprite.texture = preload("res://assets/sprites/pickups/xp_gem_small.png")
 
 
 func _physics_process(delta):

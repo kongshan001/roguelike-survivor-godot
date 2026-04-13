@@ -26,11 +26,14 @@ func setup(pos: Vector2, dir: Vector2, start_pos: Vector2):
 	direction = dir
 	_dist_traveled = 0.0
 	_returning = false
-	var sprite = $Sprite as ColorRect
+	var sprite = $Sprite as Sprite2D
 	if sprite:
-		sprite.color = color
-		sprite.size = Vector2(size * 2, size * 2)
-		sprite.position = -sprite.size / 2.0
+		sprite.modulate = color
+		if ResourceLoader.exists("res://assets/sprites/weapons/boomerang.png"):
+			sprite.texture = load("res://assets/sprites/weapons/boomerang.png")
+		var base_size: float = 16.0
+		var scale_factor: float = (size * 2.0) / base_size
+		sprite.scale = Vector2(scale_factor, scale_factor)
 	var shape = $CollisionShape2D.shape as CircleShape2D
 	if shape:
 		shape.radius = size

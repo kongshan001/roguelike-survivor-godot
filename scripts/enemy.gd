@@ -53,11 +53,14 @@ func _ready():
 
 
 func _setup_visual() -> void:
-	var sprite: ColorRect = $Sprite as ColorRect
+	var sprite: Sprite2D = $Sprite as Sprite2D
 	if sprite:
-		sprite.color = enemy_data.color
-		sprite.size = Vector2(enemy_data.size * 2, enemy_data.size * 2)
-		sprite.position = -sprite.size / 2.0
+		var tex_path := "res://assets/sprites/enemies/%s.png" % enemy_data.enemy_id
+		if ResourceLoader.exists(tex_path):
+			sprite.texture = load(tex_path)
+		var base_size: float = 32.0
+		var scale_factor: float = (enemy_data.size * 2.0) / base_size
+		sprite.scale = Vector2(scale_factor, scale_factor)
 
 
 func _setup_collision() -> void:
@@ -123,9 +126,9 @@ func _physics_process(delta: float):
 	# Flash effect
 	if _flash_timer > 0:
 		_flash_timer -= delta
-		var sprite: ColorRect = $Sprite as ColorRect
+		var sprite: Sprite2D = $Sprite as Sprite2D
 		if sprite:
-			sprite.color = Color.WHITE if fmod(_flash_timer, 0.1) > 0.05 else enemy_data.color
+			sprite.modulate = Color(8, 8, 8) if fmod(_flash_timer, 0.1) > 0.05 else Color.WHITE
 
 
 # --- Ghost behavior ---

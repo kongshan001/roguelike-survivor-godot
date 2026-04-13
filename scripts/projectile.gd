@@ -29,11 +29,14 @@ func setup(pos: Vector2, target_pos: Vector2, spd: float, dmg: float, prc: int, 
 	pierce = prc
 	color = col
 	size = sz
-	var sprite = $Sprite as ColorRect
+	var sprite = $Sprite as Sprite2D
 	if sprite:
-		sprite.color = color
-		sprite.size = Vector2(size * 2, size * 2)
-		sprite.position = -sprite.size / 2.0
+		sprite.modulate = color
+		if weapon_id != "" and ResourceLoader.exists("res://assets/sprites/weapons/%s.png" % weapon_id):
+			sprite.texture = load("res://assets/sprites/weapons/%s.png" % weapon_id)
+		var base_size: float = 16.0
+		var scale_factor: float = (size * 2.0) / base_size
+		sprite.scale = Vector2(scale_factor, scale_factor)
 	var shape = $CollisionShape2D.shape as CircleShape2D
 	if shape:
 		shape.radius = size

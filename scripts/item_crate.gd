@@ -8,13 +8,13 @@ func _ready():
 	var roll = randf()
 	if roll < 0.5:
 		crate_type = "heal"
-		$Sprite.color = Color.GREEN
+		$Sprite.texture = preload("res://assets/sprites/pickups/crate_heal.png")
 	elif roll < 0.8:
 		crate_type = "xp_bonus"
-		$Sprite.color = Color.CYAN
+		$Sprite.texture = preload("res://assets/sprites/pickups/crate_xp.png")
 	else:
 		crate_type = "speed_boost"
-		$Sprite.color = Color(1, 0.5, 0)
+		$Sprite.texture = preload("res://assets/sprites/pickups/crate_speed.png")
 
 
 func _physics_process(_delta):

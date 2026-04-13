@@ -63,7 +63,8 @@ var dash_afterimage_count: int = 3
 
 @onready var hurtbox: Area2D = $Hurtbox
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
-@onready var sprite: ColorRect = $Sprite
+@onready var sprite: Sprite2D = $Sprite
+var _char_color: Color = Color.WHITE
 
 
 func _ready():
@@ -81,10 +82,16 @@ func _ready():
 	match GameManager.selected_character:
 		"warrior":
 			armor += 1
+			sprite.texture = preload("res://assets/sprites/characters/warrior.png")
+			_char_color = Color(0.83, 0.18, 0.18)
 		"ranger":
 			crit_chance += 0.1
+			sprite.texture = preload("res://assets/sprites/characters/ranger.png")
+			_char_color = Color(0.18, 0.45, 0.2)
 		"mage":
 			damage_bonus += 0.2
+			sprite.texture = preload("res://assets/sprites/characters/mage.png")
+			_char_color = Color(0.08, 0.4, 0.75)
 
 
 func _physics_process(delta):
@@ -233,9 +240,9 @@ func apply_passive(passive_id: String):
 func _spawn_afterimages() -> void:
 	for i in range(dash_afterimage_count):
 		var afterimage: ColorRect = ColorRect.new()
-		afterimage.size = sprite.size
-		afterimage.position = sprite.position
-		afterimage.color = Color(sprite.color.r, sprite.color.g, sprite.color.b, AFTERIMAGE_ALPHA)
+		afterimage.size = Vector2(32, 32)
+		afterimage.position = Vector2(-16, -16)
+		afterimage.color = Color(_char_color.r, _char_color.g, _char_color.b, AFTERIMAGE_ALPHA)
 		afterimage.z_index = -1
 		get_parent().call_deferred("add_child", afterimage)
 		var tween: Tween = afterimage.create_tween()

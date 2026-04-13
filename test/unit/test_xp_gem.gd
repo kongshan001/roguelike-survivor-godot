@@ -95,24 +95,24 @@ func test_xp_with_difficulty():
 # --- Gem visual by value (tests _ready sprite logic) ---
 
 func test_gem_small_value():
-	# xp < 10: yellow, size 8x8
+	# xp < 10: small gem texture
 	var gem: Area2D = _create_gem(3)
-	var sprite: ColorRect = gem.get_node("Sprite") as ColorRect
-	if sprite:
-		assert_eq(sprite.color, Color.YELLOW, "Small gem is yellow")
+	var sprite: Sprite2D = gem.get_node("Sprite") as Sprite2D
+	if sprite and sprite.texture:
+		assert_eq(sprite.texture.resource_path, "res://assets/sprites/pickups/xp_gem_small.png", "Small gem texture")
 
 
 func test_gem_medium_value():
-	# 10 <= xp < 15: green, size 10x10
+	# 10 <= xp < 15: medium gem texture
 	var gem: Area2D = _create_gem(10)
-	var sprite: ColorRect = gem.get_node("Sprite") as ColorRect
-	if sprite:
-		assert_eq(sprite.color, Color.GREEN, "Medium gem is green")
+	var sprite: Sprite2D = gem.get_node("Sprite") as Sprite2D
+	if sprite and sprite.texture:
+		assert_eq(sprite.texture.resource_path, "res://assets/sprites/pickups/xp_gem_medium.png", "Medium gem texture")
 
 
 func test_gem_large_value():
-	# xp >= 15: blue, size 12x12
+	# xp >= 15: large gem texture
 	var gem: Area2D = _create_gem(20)
-	var sprite: ColorRect = gem.get_node("Sprite") as ColorRect
-	if sprite:
-		assert_eq(sprite.color, Color(0.2, 0.4, 1.0), "Large gem is blue")
+	var sprite: Sprite2D = gem.get_node("Sprite") as Sprite2D
+	if sprite and sprite.texture:
+		assert_eq(sprite.texture.resource_path, "res://assets/sprites/pickups/xp_gem_large.png", "Large gem texture")
