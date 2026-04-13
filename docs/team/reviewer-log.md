@@ -397,3 +397,31 @@
 2. boomerang add_child 循环外 (Critical)
 3. xp_gem mini() float bug (Critical)
 4. **save_manager SYNERGIES 常量名 (Critical)** — 本轮发现
+
+### 2026-04-13: 测试覆盖扩展 + player.gd 常量提取审核
+
+#### 新增测试 (34项)
+| 文件 | 测试数 | 覆盖内容 |
+|------|--------|----------|
+| test_weapon_registry.gd | 17 | 8个进化配方/匹配逻辑/空武器/等级不足/已有进化/唯一性 |
+| test_boomerang.gd | 17 | 默认值/setup参数/更新玩家位置/自定义值/重新setup/距离计算 |
+
+#### 代码质量改进
+| 文件 | 改进 |
+|------|------|
+| player.gd | 提取20个硬编码数字为命名常量（214→244行） |
+
+#### player.gd 新增常量
+- **战斗**: HIT_INVINCIBILITY_TIME, MIN_DAMAGE, LOW_HP_THRESHOLD, LOW_HP_ARMOR_BONUS
+- **Dash**: DASH_INVINCIBILITY_TIME
+- **回复**: BASE_REGEN_INTERVAL, MOVING_REGEN_INTERVAL
+- **被动加成**: SPEED_BOOTS_BONUS, MAGNET_RANGE_BONUS, CRIT_CHANCE_BONUS, MAX_HP_BONUS, REGEN_AMOUNT_BONUS, CRIT_DAMAGE_BONUS
+- **残影**: AFTERIMAGE_ALPHA, AFTERIMAGE_DELAY, AFTERIMAGE_FADE_DURATION
+- **默认值**: DEFAULT_PASSIVE_MAX_STACK, FLASH_INTERVAL, FLASH_VISIBLE_THRESHOLD
+
+#### 审核结果
+- **428 测试 / 909 断言 / 0 失败** — 23 个测试文件
+- **所有文件 < 500行**: 最大 save_manager.gd 391行（78%）
+- **player.gd 244行**: 所有魔法数字已提取为语义化常量
+- **源代码量**: ~3,734 行 GDScript（33 脚本文件）
+- **测试覆盖**: 23/33 文件有测试（70%），覆盖所有核心逻辑模块

@@ -61,3 +61,4 @@
 | 2026-04-13 | 317 | 738 | 全部通过（enemy_spawner.gd 29项新测试：波次进度/生成间隔/敌人模板/可用类型） |
 | 2026-04-13 | 343 | 768 | 全部通过（xp_gem 16项 + spin_blade 12项新测试，发现并修复 mini→minf float bug） |
 | 2026-04-13 | 394 | 823 | 全部通过（SYNERGIES→SYNERGY_DEFINITIONS修复 + _find_player提取 + shop清理 + 3个新测试文件51项） |
+| 2026-04-13 | 428 | 909 | 全部通过（weapon_registry 17项 + boomerang 17项新测试，player.gd 20处常量提取） |

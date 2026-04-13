@@ -1,6 +1,36 @@
 extends CharacterBody2D
 
+
 signal died
+
+# Combat constants
+const HIT_INVINCIBILITY_TIME: float = 0.5
+const MIN_DAMAGE: float = 1.0
+const LOW_HP_THRESHOLD: float = 0.3
+const LOW_HP_ARMOR_BONUS: int = 3
+const FLASH_INTERVAL: float = 0.1
+const FLASH_VISIBLE_THRESHOLD: float = 0.05
+
+# Dash constants
+const DASH_INVINCIBILITY_TIME: float = 0.15
+
+# Regen constants
+const BASE_REGEN_INTERVAL: float = 5.0
+const MOVING_REGEN_INTERVAL: float = 2.5
+
+# Passive bonus constants
+const SPEED_BOOTS_BONUS: float = 0.15
+const MAGNET_RANGE_BONUS: float = 0.3
+const CRIT_CHANCE_BONUS: float = 0.08
+const MAX_HP_BONUS: float = 2.0
+const REGEN_AMOUNT_BONUS: float = 1.0
+const CRIT_DAMAGE_BONUS: float = 0.5
+const DEFAULT_PASSIVE_MAX_STACK: int = 3
+
+# Afterimage constants
+const AFTERIMAGE_ALPHA: float = 0.3
+const AFTERIMAGE_DELAY: float = 0.03
+const AFTERIMAGE_FADE_DURATION: float = 0.2
 
 @export var move_speed: float = 160.0
 @export var max_health: float = 8.0
@@ -70,7 +100,7 @@ func _physics_process(delta):
 		velocity = dash_direction * (dash_distance / dash_duration)
 		move_and_slide()
 		is_dashing = false
-		invincible_timer = maxf(invincible_timer, 0.15)
+		invincible_timer = maxf(invincible_timer, DASH_INVINCIBILITY_TIME)
 		dash_timer = dash_cooldown
 		return
 
@@ -89,14 +119,14 @@ func _physics_process(delta):
 
 	if invincible_timer > 0:
 		invincible_timer -= delta
-		sprite.visible = fmod(invincible_timer, 0.1) > 0.05
+		sprite.visible = fmod(invincible_timer, FLASH_INTERVAL) > FLASH_VISIBLE_THRESHOLD
 
 	if regen_amount > 0:
 		regen_timer += delta
-		var regen_interval = 5.0
+		var regen_interval: float = BASE_REGEN_INTERVAL
 		# Synergy: boots_regen - moving regens 2x faster
 		if is_moving and has_passive("speedboots") and has_passive("regen"):
-			regen_interval = 2.5
+			regen_interval = MOVING_REGEN_INTERVAL
 		if regen_timer >= regen_interval:
 			regen_timer -= regen_interval
 			heal(regen_amount)
@@ -114,9 +144,9 @@ func take_damage(amount: float):
 		effective_armor *= 2
 	# armor_regen synergy: 低HP时临时+3护甲
 	if SynergyManager and SynergyManager.has_synergy("armor_regen"):
-		if current_health <= max_health * 0.3:
-			effective_armor += 3
-	var actual_damage = maxf(1.0, amount - effective_armor)
+		if current_health <= max_health * LOW_HP_THRESHOLD:
+			effective_armor += LOW_HP_ARMOR_BONUS
+	var actual_damage = maxf(MIN_DAMAGE, amount - effective_armor)
 	current_health -= actual_damage
 	GameManager.damage_taken = true
 	GameManager.health_changed.emit(current_health, max_health)
@@ -125,7 +155,7 @@ func take_damage(amount: float):
 		current_health = 0
 		die()
 	else:
-		invincible_timer = 0.5
+		invincible_timer = HIT_INVINCIBILITY_TIME
 
 
 func heal(amount: float):
@@ -170,9 +200,9 @@ func apply_passive(passive_id: String):
 	if not owned_passives.has(passive_id):
 		owned_passives[passive_id] = 0
 
-	var max_stack: int = 3
+	var max_stack: int = DEFAULT_PASSIVE_MAX_STACK
 	if UpgradePool._passives.has(passive_id):
-		max_stack = UpgradePool._passives[passive_id].get("max_stack", 3)
+		max_stack = UpgradePool._passives[passive_id].get("max_stack", DEFAULT_PASSIVE_MAX_STACK)
 
 	if owned_passives[passive_id] >= max_stack:
 		return
@@ -180,20 +210,20 @@ func apply_passive(passive_id: String):
 
 	match passive_id:
 		"speedboots":
-			speed_multiplier += 0.15
+			speed_multiplier += SPEED_BOOTS_BONUS
 		"armor":
 			armor += 1
 		"magnet":
-			pickup_range += pickup_range * 0.3
+			pickup_range += pickup_range * MAGNET_RANGE_BONUS
 		"crit":
-			crit_chance += 0.08
+			crit_chance += CRIT_CHANCE_BONUS
 		"maxhp":
 			max_health += 2.0
 			heal(2.0)
 		"regen":
-			regen_amount += 1.0
+			regen_amount += REGEN_AMOUNT_BONUS
 		"luckycoin":
-			crit_damage_mul += 0.5
+			crit_damage_mul += CRIT_DAMAGE_BONUS
 
 	# Re-check synergies after passive change
 	if SynergyManager:
@@ -205,10 +235,10 @@ func _spawn_afterimages() -> void:
 		var afterimage: ColorRect = ColorRect.new()
 		afterimage.size = sprite.size
 		afterimage.position = sprite.position
-		afterimage.color = Color(sprite.color.r, sprite.color.g, sprite.color.b, 0.3)
+		afterimage.color = Color(sprite.color.r, sprite.color.g, sprite.color.b, AFTERIMAGE_ALPHA)
 		afterimage.z_index = -1
 		get_parent().call_deferred("add_child", afterimage)
 		var tween: Tween = afterimage.create_tween()
-		tween.tween_interval(i * 0.03)
-		tween.tween_property(afterimage, "color:a", 0.0, 0.2)
+		tween.tween_interval(i * AFTERIMAGE_DELAY)
+		tween.tween_property(afterimage, "color:a", 0.0, AFTERIMAGE_FADE_DURATION)
 		tween.tween_callback(afterimage.queue_free)
