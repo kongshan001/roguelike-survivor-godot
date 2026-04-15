@@ -31,6 +31,8 @@ func setup(pos: Vector2, dir: Vector2, start_pos: Vector2):
 		sprite.modulate = color
 		if ResourceLoader.exists("res://assets/sprites/weapons/boomerang.png"):
 			sprite.texture = load("res://assets/sprites/weapons/boomerang.png")
+		else:
+			sprite.texture = preload("res://assets/sprites/weapons/enemy_bullet.png")
 		var base_size: float = 16.0
 		var scale_factor: float = (size * 2.0) / base_size
 		sprite.scale = Vector2(scale_factor, scale_factor)

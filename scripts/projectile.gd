@@ -32,8 +32,11 @@ func setup(pos: Vector2, target_pos: Vector2, spd: float, dmg: float, prc: int, 
 	var sprite = $Sprite as Sprite2D
 	if sprite:
 		sprite.modulate = color
-		if weapon_id != "" and ResourceLoader.exists("res://assets/sprites/weapons/%s.png" % weapon_id):
-			sprite.texture = load("res://assets/sprites/weapons/%s.png" % weapon_id)
+		var tex_path := "res://assets/sprites/weapons/%s.png" % weapon_id
+		if weapon_id != "" and ResourceLoader.exists(tex_path):
+			sprite.texture = load(tex_path)
+		else:
+			sprite.texture = preload("res://assets/sprites/weapons/enemy_bullet.png")
 		var base_size: float = 16.0
 		var scale_factor: float = (size * 2.0) / base_size
 		sprite.scale = Vector2(scale_factor, scale_factor)

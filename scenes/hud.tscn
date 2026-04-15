@@ -100,23 +100,28 @@ alignment = 1
 [node name="Card1" type="PanelContainer" parent="UpgradePanel/Panel"]
 custom_minimum_size = Vector2(180, 240)
 
-[node name="Icon" type="ColorRect" parent="UpgradePanel/Panel/Card1"]
+[node name="VBox" type="VBoxContainer" parent="UpgradePanel/Panel/Card1"]
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="ColorRect" parent="UpgradePanel/Panel/Card1/VBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(40, 40)
+size_flags_horizontal = 4
 color = Color(1, 1, 1, 1)
 
-[node name="NameLabel" type="Label" parent="UpgradePanel/Panel/Card1"]
+[node name="NameLabel" type="Label" parent="UpgradePanel/Panel/Card1/VBox"]
 layout_mode = 2
 text = "Weapon"
 horizontal_alignment = 1
 
-[node name="DescLabel" type="Label" parent="UpgradePanel/Panel/Card1"]
+[node name="DescLabel" type="Label" parent="UpgradePanel/Panel/Card1/VBox"]
 layout_mode = 2
 text = "Description"
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="KeyLabel" type="Label" parent="UpgradePanel/Panel/Card1"]
+[node name="KeyLabel" type="Label" parent="UpgradePanel/Panel/Card1/VBox"]
 layout_mode = 2
 text = "[1]"
 horizontal_alignment = 1
@@ -124,23 +129,28 @@ horizontal_alignment = 1
 [node name="Card2" type="PanelContainer" parent="UpgradePanel/Panel"]
 custom_minimum_size = Vector2(180, 240)
 
-[node name="Icon" type="ColorRect" parent="UpgradePanel/Panel/Card2"]
+[node name="VBox" type="VBoxContainer" parent="UpgradePanel/Panel/Card2"]
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="ColorRect" parent="UpgradePanel/Panel/Card2/VBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(40, 40)
+size_flags_horizontal = 4
 color = Color(1, 1, 1, 1)
 
-[node name="NameLabel" type="Label" parent="UpgradePanel/Panel/Card2"]
+[node name="NameLabel" type="Label" parent="UpgradePanel/Panel/Card2/VBox"]
 layout_mode = 2
 text = "Weapon"
 horizontal_alignment = 1
 
-[node name="DescLabel" type="Label" parent="UpgradePanel/Panel/Card2"]
+[node name="DescLabel" type="Label" parent="UpgradePanel/Panel/Card2/VBox"]
 layout_mode = 2
 text = "Description"
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="KeyLabel" type="Label" parent="UpgradePanel/Panel/Card2"]
+[node name="KeyLabel" type="Label" parent="UpgradePanel/Panel/Card2/VBox"]
 layout_mode = 2
 text = "[2]"
 horizontal_alignment = 1
@@ -148,23 +158,28 @@ horizontal_alignment = 1
 [node name="Card3" type="PanelContainer" parent="UpgradePanel/Panel"]
 custom_minimum_size = Vector2(180, 240)
 
-[node name="Icon" type="ColorRect" parent="UpgradePanel/Panel/Card3"]
+[node name="VBox" type="VBoxContainer" parent="UpgradePanel/Panel/Card3"]
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="ColorRect" parent="UpgradePanel/Panel/Card3/VBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(40, 40)
+size_flags_horizontal = 4
 color = Color(1, 1, 1, 1)
 
-[node name="NameLabel" type="Label" parent="UpgradePanel/Panel/Card3"]
+[node name="NameLabel" type="Label" parent="UpgradePanel/Panel/Card3/VBox"]
 layout_mode = 2
 text = "Weapon"
 horizontal_alignment = 1
 
-[node name="DescLabel" type="Label" parent="UpgradePanel/Panel/Card3"]
+[node name="DescLabel" type="Label" parent="UpgradePanel/Panel/Card3/VBox"]
 layout_mode = 2
 text = "Description"
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="KeyLabel" type="Label" parent="UpgradePanel/Panel/Card3"]
+[node name="KeyLabel" type="Label" parent="UpgradePanel/Panel/Card3/VBox"]
 layout_mode = 2
 text = "[3]"
 horizontal_alignment = 1

@@ -47,6 +47,50 @@
 |----|--------|------|------|------|
 | (暂无) | | | | |
 
+## 视觉验证记录
+
+### 2026-04-14 ColorRect -> Sprite2D 迁移视觉验证
+
+**方法**：启动 Godot 游戏至 main.tscn，截屏至 `test/screenshots/qa_visual_test.png`
+
+**Godot 引擎输出**：
+```
+Godot Engine v4.6.stable.official.89cea1439
+OpenGL API 4.1 INTEL-18.8.16 - Compatibility - Using Device: Intel Inc. - Intel(R) HD Graphics 6000
+```
+无运行时错误，无缺失资源警告。
+
+**代码审查验证**：
+
+1. **场景文件迁移确认** -- 全部 6 个游戏实体场景已迁移为 Sprite2D 节点：
+   - `scenes/player.tscn`: `[node name="Sprite" type="Sprite2D"]` -- OK
+   - `scenes/enemy.tscn`: `[node name="Sprite" type="Sprite2D"]` -- OK
+   - `scenes/projectile.tscn`: `[node name="Sprite" type="Sprite2D"]` -- OK
+   - `scenes/xp_gem.tscn`: `[node name="Sprite" type="Sprite2D"]` -- OK
+   - `scenes/item_crate.tscn`: `[node name="Sprite" type="Sprite2D"]` -- OK
+   - `scenes/enemy_bullet.tscn`: `[node name="Sprite" type="Sprite2D"]` -- OK
+
+2. **脚本纹理加载验证**：
+   - `scripts/player.gd`: 按 `GameManager.selected_character` 加载 `warrior.png`/`ranger.png`/`mage.png` -- OK
+   - `scripts/enemy.gd`: 通过 `enemy_data.enemy_id` 动态加载 `res://assets/sprites/enemies/{id}.png` -- OK
+   - `scripts/projectile.gd`: 通过 `weapon_id` 加载 `res://assets/sprites/weapons/{id}.png` -- OK
+   - `scripts/xp_gem.gd`: 按 `xp_value` 分级加载 `xp_gem_small/medium/large.png` -- OK
+   - `scripts/item_crate.gd`: 按 `crate_type` 加载 `crate_heal/xp/speed.png` -- OK
+   - `scripts/enemy_bullet.gd`: 加载 `res://assets/sprites/weapons/enemy_bullet.png` -- OK
+
+3. **像素精灵资源完整性**：
+   - `assets/sprites/characters/`: warrior.png, ranger.png, mage.png (3/3)
+   - `assets/sprites/enemies/`: bat, boss, elite_skeleton, ghost, skeleton, splitter, splitter_small, zombie (8/8)
+   - `assets/sprites/weapons/`: bible, boomerang, enemy_bullet, holy_water, knife (5/5)
+   - `assets/sprites/pickups/`: crate_heal, crate_speed, crate_xp, food, xp_gem_small, xp_gem_medium, xp_gem_large (7/7)
+
+4. **残留 ColorRect 检查**：
+   - 场景中仅剩 UI 背景用 ColorRect（main/arena/hud/shop 等场景），属正常用途
+   - 脚本中仅剩特效用 ColorRect（残影、闪白、角色选择图标），属正常用途
+   - 所有游戏实体节点已完成 ColorRect -> Sprite2D 迁移，无遗漏
+
+**结论**：ColorRect -> Sprite2D 迁移完整，428 项单元测试全部通过（910 断言），Godot 引擎启动无错误，所有像素精灵资源文件齐全。
+
 ## 测试命令
 - `./run_tests.sh` — 运行全部 GUT 测试
 - Godot movie capture: `Godot --path . --write-movie /tmp/capture.avi --quit-after 90`
@@ -62,3 +106,4 @@
 | 2026-04-13 | 343 | 768 | 全部通过（xp_gem 16项 + spin_blade 12项新测试，发现并修复 mini→minf float bug） |
 | 2026-04-13 | 394 | 823 | 全部通过（SYNERGIES→SYNERGY_DEFINITIONS修复 + _find_player提取 + shop清理 + 3个新测试文件51项） |
 | 2026-04-13 | 428 | 909 | 全部通过（weapon_registry 17项 + boomerang 17项新测试，player.gd 20处常量提取） |
+| 2026-04-14 | 428 | 910 | 全部通过（ColorRect->Sprite2D像素精灵迁移回归测试 + 视觉验证） |

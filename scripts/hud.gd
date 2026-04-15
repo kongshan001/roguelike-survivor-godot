@@ -105,10 +105,10 @@ func _show_upgrade_panel():
 		if i < _upgrade_options.size():
 			card.visible = true
 			var option = _upgrade_options[i]
-			card.get_node("NameLabel").text = option.name
-			card.get_node("DescLabel").text = option.description
-			card.get_node("Icon").color = option.icon_color
-			card.get_node("KeyLabel").text = "[%d]" % (i + 1)
+			card.get_node("VBox/NameLabel").text = option.name
+			card.get_node("VBox/DescLabel").text = option.description
+			card.get_node("VBox/Icon").color = option.icon_color
+			card.get_node("VBox/KeyLabel").text = "[%d]" % (i + 1)
 		else:
 			card.visible = false
 
