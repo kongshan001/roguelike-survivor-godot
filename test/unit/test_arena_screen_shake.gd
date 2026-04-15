@@ -27,10 +27,18 @@ func test_screen_shake_overwrites():
 	assert_eq(_arena._shake_amount, 7.0, "Latest shake overwrites previous")
 
 
-func test_health_changed_triggers_shake():
+func test_health_decrease_triggers_shake():
 	_arena._shake_amount = 0.0
+	_arena._prev_health = 8.0
 	GameManager.health_changed.emit(5.0, 8.0)
-	assert_eq(_arena._shake_amount, 3.0, "Health change should trigger 3.0 shake")
+	assert_eq(_arena._shake_amount, 3.0, "Health decrease should trigger 3.0 shake")
+
+
+func test_health_increase_no_shake():
+	_arena._shake_amount = 0.0
+	_arena._prev_health = 5.0
+	GameManager.health_changed.emit(7.0, 8.0)
+	assert_eq(_arena._shake_amount, 0.0, "Healing should NOT trigger shake")
 
 
 func test_combo_20_triggers_shake():
@@ -61,3 +69,9 @@ func test_combo_100_shakes():
 	_arena._shake_amount = 0.0
 	GameManager.combo_changed.emit(100)
 	assert_eq(_arena._shake_amount, 10.0, "Combo 100 triggers 10.0 (>=50 tier)")
+
+
+func test_combo_reset_no_shake():
+	_arena._shake_amount = 0.0
+	GameManager.combo_changed.emit(0)
+	assert_eq(_arena._shake_amount, 0.0, "Combo reset to 0 should NOT trigger shake")

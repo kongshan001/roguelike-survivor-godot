@@ -47,6 +47,7 @@ func _draw():
 	points.append(Vector2.ZERO)
 	draw_colored_polygon(points, Color(color.r, color.g, color.b, alpha))
 """
+	script.reload()
 	node.set_script(script)
 	# set_script resets all vars via _init, so use set_deferred
 	node.set_deferred("dir_angle", dir_angle)

@@ -127,6 +127,8 @@ func _physics_process(delta):
 	if invincible_timer > 0:
 		invincible_timer -= delta
 		sprite.visible = fmod(invincible_timer, FLASH_INTERVAL) > FLASH_VISIBLE_THRESHOLD
+	else:
+		sprite.visible = true
 
 	if regen_amount > 0:
 		regen_timer += delta

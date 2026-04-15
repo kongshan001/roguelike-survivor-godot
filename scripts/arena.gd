@@ -2,6 +2,7 @@ extends Node2D
 
 var _shake_amount: float = 0.0
 var _shake_decay: float = 5.0
+var _prev_health: float = -1.0
 
 
 func _ready():
@@ -58,11 +59,17 @@ func screen_shake(amount: float) -> void:
 	_shake_amount = amount
 
 
-func _on_health_changed_shake(_cur: float, _max: float) -> void:
-	screen_shake(3.0)
+func _on_health_changed_shake(cur: float, _max: float) -> void:
+	# Only shake on damage, not healing
+	if _prev_health >= 0.0 and cur < _prev_health:
+		screen_shake(3.0)
+	_prev_health = cur
 
 
 func _on_combo_changed_shake(count: int) -> void:
+	# Only shake on milestone increases, not on combo reset to 0
+	if count <= 0:
+		return
 	# Tiered shake based on combo count
 	if count >= 50:
 		screen_shake(10.0)
