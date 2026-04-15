@@ -9,6 +9,8 @@ var color: Color = Color.WHITE
 var size: float = 8.0
 var lifetime: float = 5.0
 var _hit_enemies: Array = []
+var weapon_id: String = ""
+var is_crit: bool = false
 
 var _start_pos: Vector2 = Vector2.ZERO
 var _max_dist: float = 250.0
@@ -29,7 +31,10 @@ func setup(pos: Vector2, dir: Vector2, start_pos: Vector2):
 	var sprite = $Sprite as Sprite2D
 	if sprite:
 		sprite.modulate = color
-		if ResourceLoader.exists("res://assets/sprites/weapons/boomerang.png"):
+		var tex_path := "res://assets/sprites/weapons/%s.png" % weapon_id
+		if weapon_id != "" and ResourceLoader.exists(tex_path):
+			sprite.texture = load(tex_path)
+		elif ResourceLoader.exists("res://assets/sprites/weapons/boomerang.png"):
 			sprite.texture = load("res://assets/sprites/weapons/boomerang.png")
 		else:
 			sprite.texture = preload("res://assets/sprites/weapons/enemy_bullet.png")
@@ -48,6 +53,23 @@ func setup_boomerang(start_pos: Vector2, dir: Vector2, max_dist: float, return_s
 	_max_dist = max_dist
 	_return_speed = return_spd
 	_track_angle = track_angle
+	# Load sprite based on weapon_id (evolved weapons get custom sprites)
+	var sprite = $Sprite as Sprite2D
+	if sprite:
+		sprite.modulate = color
+		var tex_path := "res://assets/sprites/weapons/%s.png" % weapon_id
+		if weapon_id != "" and ResourceLoader.exists(tex_path):
+			sprite.texture = load(tex_path)
+		elif ResourceLoader.exists("res://assets/sprites/weapons/boomerang.png"):
+			sprite.texture = load("res://assets/sprites/weapons/boomerang.png")
+		else:
+			sprite.texture = preload("res://assets/sprites/weapons/enemy_bullet.png")
+		var base_size: float = 16.0
+		var scale_factor: float = (size * 2.0) / base_size
+		sprite.scale = Vector2(scale_factor, scale_factor)
+	var shape = $CollisionShape2D.shape as CircleShape2D
+	if shape:
+		shape.radius = size
 
 
 func update_player_pos(pos: Vector2):
@@ -113,7 +135,7 @@ func _get_nearest_enemy_in_cone() -> Node2D:
 
 func _on_body_entered(body: Node2D):
 	if body.is_in_group("enemies") and body.has_method("take_damage") and not body in _hit_enemies:
-		body.take_damage(damage, "boomerang")
+		body.take_damage(damage, "boomerang", is_crit)
 		_hit_enemies.append(body)
 		# Clear hit list on return to allow re-hitting
 		if _returning:

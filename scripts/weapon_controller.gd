@@ -56,6 +56,11 @@ func _physics_process(delta):
 func _fire_weapon(weapon_id: String, data: WeaponData, player: CharacterBody2D):
 	var level: int = player.owned_weapons[weapon_id]
 	var dmg_bonus: float = 1.0 + player.damage_bonus
+
+	# Mage passive: Mana Attunement -- +10% weapon damage while skill is on cooldown
+	if player.skill_id == "elemental_burst" and not player.is_skill_ready:
+		dmg_bonus *= (1.0 + 0.10)
+
 	var wf: RefCounted = _get_weapon_fire()
 	match data.weapon_type:
 		"projectile":
@@ -105,6 +110,17 @@ func remove_weapon_instances(weapon_id: String) -> void:
 		_orbit_instances.erase(weapon_id)
 	_boomerang_instances = _boomerang_instances.filter(func(b): return not is_instance_valid(b) or b.get("weapon_id") != weapon_id)
 	_weapon_timers.erase(weapon_id)
+
+
+## Increment keen_eye counter and return true if this hit should be a guaranteed crit (Ranger passive)
+func notify_weapon_hit(player: CharacterBody2D) -> bool:
+	if player.skill_id != "arrow_rain":
+		return false
+	player._keen_eye_counter += 1
+	if player._keen_eye_counter >= 5:
+		player._keen_eye_counter = 0
+		return true
+	return false
 
 
 func _process(_delta):

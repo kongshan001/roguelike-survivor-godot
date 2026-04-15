@@ -1,5 +1,6 @@
 extends GutTest
-## Tests for enemy_spawner.gd: wave progression, spawn intervals, enemy templates
+## Tests for enemy_spawner.gd: wave-based spawning, enemy templates, spawn interval/count/types
+## Updated for R7 wave state machine (WAVE_STAGES replaced by GameManager.WAVE_DEFS)
 
 var _spawner: Node
 
@@ -13,22 +14,32 @@ func before_each():
 	add_child_autofree(_spawner)
 
 
-# --- Wave stages ---
+# --- Wave definitions come from GameManager.WAVE_DEFS ---
 
-func test_wave_stages_count():
-	assert_eq(_spawner.WAVE_STAGES.size(), 5, "Should have 5 wave stages")
-
-
-func test_wave_stage_times():
-	assert_eq(_spawner.WAVE_STAGES[0]["time"], 0, "Stage 0: time 0")
-	assert_eq(_spawner.WAVE_STAGES[1]["time"], 120, "Stage 1: time 120")
-	assert_eq(_spawner.WAVE_STAGES[2]["time"], 180, "Stage 2: time 180")
-	assert_eq(_spawner.WAVE_STAGES[3]["time"], 210, "Stage 3: time 210")
-	assert_eq(_spawner.WAVE_STAGES[4]["time"], 270, "Stage 4: time 270 (boss)")
+func test_wave_defs_has_5_stages():
+	assert_eq(GameManager.WAVE_DEFS.size(), 5, "Should have 5 wave definitions")
 
 
-func test_initial_enemies_only_zombie():
-	assert_eq(_spawner.WAVE_STAGES[0]["enemies"], ["zombie"], "Stage 0 has only zombie")
+func test_wave_def_opening_enemies():
+	assert_eq(GameManager.WAVE_DEFS[0]["enemies"], ["zombie"], "Wave 1 (Opening) has only zombie")
+
+
+func test_wave_def_opening_spawn_base():
+	assert_eq(GameManager.WAVE_DEFS[0]["spawn_base"], 2.0, "Opening spawn_base = 2.0")
+
+
+func test_wave_def_opening_count_base():
+	assert_eq(GameManager.WAVE_DEFS[0]["count_base"], 1, "Opening count_base = 1")
+
+
+func test_wave_def_swarm_enemies():
+	var enemies: Array = GameManager.WAVE_DEFS[1]["enemies"]
+	assert_has(enemies, "zombie", "Swarm should have zombie")
+	assert_has(enemies, "bat", "Swarm should have bat")
+
+
+func test_wave_def_boss_has_boss_flag():
+	assert_true(GameManager.WAVE_DEFS[4].get("boss", false), "Wave 5 (Boss) should have boss=true")
 
 
 # --- Enemy templates ---
@@ -77,89 +88,127 @@ func test_splitter_template():
 	assert_eq(t["split_count"], 2, "Splitter splits into 2")
 
 
-# --- Spawn interval calculation ---
+# --- Spawn interval calculation (now wave-based via _get_current_wave_def) ---
 
-func test_spawn_interval_early():
+func test_spawn_interval_wave_1_opening():
+	GameManager.current_wave = 1
+	GameManager.wave_state = GameManager.WaveState.ACTIVE
+	var interval: float = _spawner._get_spawn_interval()
+	assert_eq(interval, 2.0, "Wave 1 (Opening) spawn_base = 2.0, normal multiplier = 1.0")
+
+
+func test_spawn_interval_wave_2_swarm():
+	GameManager.current_wave = 2
+	GameManager.wave_state = GameManager.WaveState.ACTIVE
+	var interval: float = _spawner._get_spawn_interval()
+	assert_eq(interval, 1.5, "Wave 2 (Swarm) spawn_base = 1.5")
+
+
+func test_spawn_interval_wave_3_darkness():
+	GameManager.current_wave = 3
+	GameManager.wave_state = GameManager.WaveState.ACTIVE
+	var interval: float = _spawner._get_spawn_interval()
+	assert_eq(interval, 1.2, "Wave 3 (Darkness) spawn_base = 1.2")
+
+
+func test_spawn_interval_wave_4_elite():
+	GameManager.current_wave = 4
+	GameManager.wave_state = GameManager.WaveState.ACTIVE
+	var interval: float = _spawner._get_spawn_interval()
+	assert_eq(interval, 1.0, "Wave 4 (Elite) spawn_base = 1.0")
+
+
+func test_spawn_interval_wave_5_boss():
+	GameManager.current_wave = 5
+	GameManager.wave_state = GameManager.WaveState.ACTIVE
+	var interval: float = _spawner._get_spawn_interval()
+	assert_eq(interval, 0.8, "Wave 5 (Boss) spawn_base = 0.8")
+
+
+func test_spawn_interval_hard_mode_floor():
+	GameManager.selected_difficulty = "hard"
+	GameManager.current_wave = 4
+	GameManager.wave_state = GameManager.WaveState.ACTIVE
+	var interval: float = _spawner._get_spawn_interval()
+	# base=1.0, hard spawn_interval_mul=0.7 -> 1.0*0.7=0.7, but floor is 0.7
+	assert_eq(interval, 0.7, "Hard mode spawn interval floor = 0.7")
+
+
+# --- Spawn count calculation (wave count_base + time_bonus + difficulty mod) ---
+
+func test_spawn_count_wave_1_early():
+	GameManager.current_wave = 1
 	GameManager.elapsed_time = 10.0
-	var interval: float = _spawner._get_spawn_interval()
-	assert_eq(interval, 2.0, "t<30: interval = 2.0")
+	assert_eq(_spawner._get_spawn_count(), 1, "Wave 1, early: count_base=1 + 0 bonus = 1")
 
 
-func test_spawn_interval_mid():
+func test_spawn_count_wave_2_mid():
+	GameManager.current_wave = 2
 	GameManager.elapsed_time = 45.0
-	var interval: float = _spawner._get_spawn_interval()
-	assert_eq(interval, 1.5, "30<=t<60: interval = 1.5")
+	assert_eq(_spawner._get_spawn_count(), 2, "Wave 2, mid: count_base=2 + 0 bonus = 2")
 
 
-func test_spawn_interval_late():
-	GameManager.elapsed_time = 150.0
-	var interval: float = _spawner._get_spawn_interval()
-	assert_eq(interval, 1.0, "120<=t<180: interval = 1.0")
+func test_spawn_count_wave_3_with_time_bonus():
+	GameManager.current_wave = 3
+	GameManager.elapsed_time = 130.0  # >= 120 -> time_bonus = 1
+	assert_eq(_spawner._get_spawn_count(), 4, "Wave 3, t>=120: count_base=3 + 1 bonus = 4")
 
 
-func test_spawn_interval_endgame():
-	GameManager.elapsed_time = 200.0
-	var interval: float = _spawner._get_spawn_interval()
-	assert_eq(interval, 0.8, "t>=180: interval = 0.8")
+func test_spawn_count_wave_4_with_time_bonus():
+	GameManager.current_wave = 4
+	GameManager.elapsed_time = 185.0  # >= 180 -> time_bonus = 2
+	assert_eq(_spawner._get_spawn_count(), 6, "Wave 4, t>=180: count_base=4 + 2 bonus = 6")
 
 
-# --- Spawn count calculation ---
-
-func test_spawn_count_early():
-	GameManager.elapsed_time = 10.0
-	assert_eq(_spawner._get_spawn_count(), 1, "t<30: count = 1")
-
-
-func test_spawn_count_mid():
-	GameManager.elapsed_time = 45.0
-	assert_eq(_spawner._get_spawn_count(), 2, "30<=t<60: count = 2")
-
-
-func test_spawn_count_late():
-	GameManager.elapsed_time = 90.0
-	assert_eq(_spawner._get_spawn_count(), 3, "60<=t<120: count = 3")
-
-
-func test_spawn_count_endgame():
-	GameManager.elapsed_time = 150.0
-	assert_eq(_spawner._get_spawn_count(), 4, "120<=t<180: count = 4")
-
-
-func test_spawn_count_max():
+func test_spawn_count_wave_5_max():
+	GameManager.current_wave = 5
 	GameManager.elapsed_time = 300.0
-	assert_eq(_spawner._get_spawn_count(), 5, "t>=180: count = 5")
+	assert_eq(_spawner._get_spawn_count(), 7, "Wave 5, t>=180: count_base=5 + 2 bonus = 7")
 
 
-# --- Available enemy types ---
+func test_spawn_count_difficulty_mod():
+	GameManager.current_wave = 1
+	GameManager.selected_difficulty = "hard"
+	GameManager.elapsed_time = 10.0
+	assert_eq(_spawner._get_spawn_count(), 2, "Wave 1 hard: count_base=1 + hard mod(+1) = 2")
 
-func test_types_initial():
-	GameManager.elapsed_time = 0.0
+
+# --- Available enemy types (wave-based via _get_current_wave_def) ---
+
+func test_types_wave_1_opening():
+	GameManager.current_wave = 1
 	var types: Array = _spawner._get_available_types()
-	assert_eq(types, ["zombie"], "t=0: only zombie")
+	assert_eq(types, ["zombie"], "Wave 1: only zombie")
 
 
-func test_types_after_120():
-	GameManager.elapsed_time = 120.0
+func test_types_wave_2_swarm():
+	GameManager.current_wave = 2
 	var types: Array = _spawner._get_available_types()
-	assert_has(types, "zombie", "Should have zombie")
-	assert_has(types, "bat", "Should have bat")
-	assert_eq(types.size(), 2, "Should have 2 types at t=120")
+	assert_has(types, "zombie", "Wave 2 should have zombie")
+	assert_has(types, "bat", "Wave 2 should have bat")
+	assert_eq(types.size(), 2, "Wave 2 should have 2 types")
 
 
-func test_types_after_180():
-	GameManager.elapsed_time = 180.0
+func test_types_wave_3_darkness():
+	GameManager.current_wave = 3
 	var types: Array = _spawner._get_available_types()
-	assert_has(types, "skeleton", "Should have skeleton")
-	assert_has(types, "ghost", "Should have ghost")
-	assert_eq(types.size(), 4, "Should have 4 types at t=180")
+	assert_has(types, "skeleton", "Wave 3 should have skeleton")
+	assert_has(types, "ghost", "Wave 3 should have ghost")
+	assert_eq(types.size(), 4, "Wave 3 should have 4 types")
 
 
-func test_types_after_210():
-	GameManager.elapsed_time = 210.0
+func test_types_wave_4_elite():
+	GameManager.current_wave = 4
 	var types: Array = _spawner._get_available_types()
-	assert_has(types, "elite_skeleton", "Should have elite_skeleton")
-	assert_has(types, "splitter", "Should have splitter")
-	assert_eq(types.size(), 6, "Should have all 6 types at t=210")
+	assert_has(types, "elite_skeleton", "Wave 4 should have elite_skeleton")
+	assert_has(types, "splitter", "Wave 4 should have splitter")
+	assert_eq(types.size(), 6, "Wave 4 should have all 6 types")
+
+
+func test_types_wave_5_boss():
+	GameManager.current_wave = 5
+	var types: Array = _spawner._get_available_types()
+	assert_eq(types.size(), 6, "Wave 5 (boss wave) should also have 6 types")
 
 
 # --- Boss spawn time ---
@@ -171,7 +220,6 @@ func test_boss_time_normal():
 
 
 func test_boss_warning_before_spawn():
-	# Warning should be 15s before boss
 	var boss_time: float = 270.0
 	var warning_time: float = boss_time - 15.0
 	assert_eq(warning_time, 255.0, "Boss warning at 255s")

@@ -11,6 +11,13 @@ func before_each():
 	_enemy = _create_test_enemy(_default_data())
 
 
+func after_each():
+	# Wait for call_deferred spawns from die() to complete before autofree runs
+	# This ensures XP gems, splitter children are added to the tree so they
+	# get freed when the arena (autofree) is freed
+	await get_tree().process_frame
+
+
 func _default_data() -> EnemyData:
 	var data := EnemyData.new()
 	data.enemy_id = "test"

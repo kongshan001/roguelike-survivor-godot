@@ -7,6 +7,9 @@ var _player: CharacterBody2D
 
 func before_each():
 	GameManager.reset()
+	if SaveManager:
+		for id in SaveManager.SHOP_UPGRADES:
+			SaveManager.shop_upgrades[id] = 0
 	GameManager.selected_character = ""
 	var player_scene = load("res://scenes/player.tscn")
 	_player = player_scene.instantiate()
@@ -38,6 +41,7 @@ func test_food_magnet_speed():
 	var food: Area2D = Area2D.new()
 	food.set_script(load("res://scripts/food_pickup.gd"))
 	assert_eq(food.magnet_speed, 200.0, "Base magnet speed is 200")
+	food.free()
 
 
 func test_food_heals_player():
@@ -54,7 +58,7 @@ func test_food_heals_player():
 	circle.radius = 6.0
 	shape.shape = circle
 	food.add_child(shape)
-	add_child(food)
+	add_child_autofree(food)
 	food._player = _player
 	food._collect()
 	assert_eq(_player.current_health, hp_after_damage + 1.0, "HP should increase by 1")
@@ -71,7 +75,7 @@ func test_food_heal_capped():
 	circle.radius = 6.0
 	shape.shape = circle
 	food.add_child(shape)
-	add_child(food)
+	add_child_autofree(food)
 	food._player = _player
 	food._collect()
 	assert_eq(_player.current_health, _player.max_health, "HP should not exceed max")
@@ -89,7 +93,7 @@ func test_food_no_heal_if_player_dead():
 	circle.radius = 6.0
 	shape.shape = circle
 	food.add_child(shape)
-	add_child(food)
+	add_child_autofree(food)
 	food._player = _player
 	food._collect()
 	assert_eq(_player.current_health, hp_before, "Dead player should not be healed")

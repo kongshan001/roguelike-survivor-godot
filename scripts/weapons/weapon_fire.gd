@@ -1,6 +1,31 @@
 extends RefCounted
 ## Weapon firing logic extracted from weapon_controller.gd
 
+# --- Named constants (extracted from magic numbers) ---
+
+# Projectile
+const PROJECTILE_RANGE: float = 600.0
+
+# Cone
+const CONE_ANGLE_PER_LEVEL: float = 20.0
+const CONE_RANGE_PER_LEVEL: float = 30.0
+const CONE_DAMAGE_PER_LEVEL: float = 2.0
+const BURN_DPS: float = 2.0
+const BURN_DURATION: float = 2.0
+
+# Aura
+const AURA_BASE_RADIUS: float = 80.0
+const AURA_RADIUS_PER_LEVEL: float = 25.0
+const AURA_DAMAGE_PER_LEVEL: float = 0.5
+
+# Crit knife (synergy)
+const CRIT_KNIFE_SPEED: float = 250.0
+const CRIT_KNIFE_LIFETIME: float = 1.0
+
+# Boomerang
+const BOOMERANG_SPEED: float = 280.0
+const BOOMERANG_MAX_COUNT: int = 8
+
 var _controller: Node = null
 
 
@@ -35,7 +60,7 @@ func fire_projectile(data: WeaponData, level: int, player: CharacterBody2D, dmg_
 		damage = data.damage
 		pierce = data.projectile_pierce
 
-	var enemies := _get_enemies(player, 600.0)
+	var enemies := _get_enemies(player, PROJECTILE_RANGE)
 	if enemies.is_empty():
 		return
 
@@ -43,6 +68,7 @@ func fire_projectile(data: WeaponData, level: int, player: CharacterBody2D, dmg_
 		var target: Node2D = enemies[i % enemies.size()]
 		var projectile_scene: PackedScene = preload("res://scenes/projectile.tscn")
 		var proj: Area2D = projectile_scene.instantiate()
+		proj.weapon_id = data.weapon_id
 		proj.setup(
 			player.global_position,
 			target.global_position,
@@ -52,9 +78,13 @@ func fire_projectile(data: WeaponData, level: int, player: CharacterBody2D, dmg_
 			data.color,
 			data.projectile_size
 		)
-		proj.weapon_id = data.weapon_id
 		var proj_damage: float = damage * dmg_bonus
-		if data.weapon_id == "knife" and SynergyManager and SynergyManager.has_synergy("knife_crit"):
+		var is_keen_eye_crit: bool = _controller.notify_weapon_hit(player) if _controller.has_method("notify_weapon_hit") else false
+		if is_keen_eye_crit:
+			proj_damage *= player.crit_damage_mul
+			proj.color = Color(1.0, 0.85, 0.0)
+			proj.is_crit = true
+		elif data.weapon_id == "knife" and SynergyManager and SynergyManager.has_synergy("knife_crit"):
 			if randf() < player.crit_chance:
 				proj_damage *= player.crit_damage_mul
 				proj.color = Color(1.0, 0.85, 0.0)
@@ -77,10 +107,10 @@ func _spawn_crit_knife(player: CharacterBody2D, dmg: float) -> void:
 	var target: Node2D = enemies[0]
 	var proj_scene: PackedScene = preload("res://scenes/projectile.tscn")
 	var knife: Area2D = proj_scene.instantiate()
-	knife.setup(player.global_position, target.global_position, 250.0, dmg, 0, Color(1.0, 0.85, 0.0), 4.0)
+	knife.setup(player.global_position, target.global_position, CRIT_KNIFE_SPEED, dmg, 0, Color(1.0, 0.85, 0.0), 4.0)
 	knife.weapon_id = "crit_boots"
 	knife.is_crit = true
-	knife.lifetime = 1.0
+	knife.lifetime = CRIT_KNIFE_LIFETIME
 	var pm: Node = _get_pm(player)
 	if pm:
 		pm.call_deferred("add_child", knife)
@@ -169,7 +199,11 @@ func fire_lightning(data: WeaponData, level: int, player: CharacterBody2D, dmg_b
 	for i in range(hit_count):
 		var target: Node2D = enemies[i]
 		if target.has_method("take_damage"):
-			target.take_damage(damage, data.weapon_id)
+			var keen_crit: bool = _controller.notify_weapon_hit(player) if _controller.has_method("notify_weapon_hit") else false
+			var lightning_damage: float = damage
+			if keen_crit:
+				lightning_damage *= player.crit_damage_mul
+			target.take_damage(lightning_damage, data.weapon_id, keen_crit)
 		var pm: Node = _get_pm(player)
 		if pm:
 			_get_effects().create_lightning_effect(player.global_position, target.global_position, data.color, pm)
@@ -178,14 +212,14 @@ func fire_lightning(data: WeaponData, level: int, player: CharacterBody2D, dmg_b
 # --- Cone ---
 
 func fire_cone(data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float) -> void:
-	var angle: float = data.cone_angle + (level - 1) * 20.0
-	var range_val: float = data.cone_range + (level - 1) * 30.0
-	var damage: float = (data.damage + (level - 1) * 2.0) * dmg_bonus
+	var angle: float = data.cone_angle + (level - 1) * CONE_ANGLE_PER_LEVEL
+	var range_val: float = data.cone_range + (level - 1) * CONE_RANGE_PER_LEVEL
+	var damage: float = (data.damage + (level - 1) * CONE_DAMAGE_PER_LEVEL) * dmg_bonus
 	var burn: float = 0.0
 	var burn_dur: float = 0.0
 	if level >= 3:
-		burn = 2.0
-		burn_dur = 2.0
+		burn = BURN_DPS
+		burn_dur = BURN_DURATION
 
 	if SynergyManager and SynergyManager.has_synergy("firestaff_armor"):
 		angle += SynergyManager.get_synergy_value("firestaff_armor", "angle", 40.0)
@@ -206,7 +240,11 @@ func fire_cone(data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus:
 		var enemy_angle: float = to_enemy.angle()
 		var angle_diff := absf(wrapf(enemy_angle - dir_angle, -PI, PI))
 		if angle_diff <= half_angle:
-			enemy.take_damage(damage, data.weapon_id)
+			var keen_crit: bool = _controller.notify_weapon_hit(player) if _controller.has_method("notify_weapon_hit") else false
+			var cone_damage: float = damage
+			if keen_crit:
+				cone_damage *= player.crit_damage_mul
+			enemy.take_damage(cone_damage, data.weapon_id, keen_crit)
 			if burn > 0.0 and enemy.has_method("apply_burn"):
 				enemy.apply_burn(burn, burn_dur)
 
@@ -230,9 +268,9 @@ func update_aura(weapon_id: String, data: WeaponData, level: int, player: Charac
 		damage = data.damage * dmg_bonus
 		freeze_pct = data.freeze_pct
 	else:
-		radius = 80.0 + (level - 1) * 25.0
+		radius = AURA_BASE_RADIUS + (level - 1) * AURA_RADIUS_PER_LEVEL
 		slow = 0.3 + (level - 1) * 0.15
-		damage = (1.0 + (level - 1) * 0.5) * dmg_bonus
+		damage = (1.0 + (level - 1) * AURA_DAMAGE_PER_LEVEL) * dmg_bonus
 		freeze_pct = 0.08 if level >= 3 else 0.0
 
 	if SynergyManager and SynergyManager.has_synergy("frost_regen"):
@@ -242,7 +280,11 @@ func update_aura(weapon_id: String, data: WeaponData, level: int, player: Charac
 	var delta: float = _controller.get_process_delta_time()
 	var enemies := _get_enemies(player, radius)
 	for enemy in enemies:
-		enemy.take_damage(damage * delta, weapon_id)
+		var keen_crit: bool = _controller.notify_weapon_hit(player) if _controller.has_method("notify_weapon_hit") else false
+		var aura_damage: float = damage * delta
+		if keen_crit:
+			aura_damage *= player.crit_damage_mul
+		enemy.take_damage(aura_damage, weapon_id, keen_crit)
 		if enemy.has_method("apply_slow"):
 			enemy.apply_slow(slow)
 		if freeze_pct > 0.0 and enemy.has_method("apply_freeze"):
@@ -296,7 +338,7 @@ func fire_boomerang(data: WeaponData, level: int, player: CharacterBody2D, dmg_b
 	var valid_boomerangs := boomerang_instances.filter(func(b): return _controller.is_instance_valid(b))
 
 	for i in range(count):
-		if valid_boomerangs.size() >= 8:
+		if valid_boomerangs.size() >= BOOMERANG_MAX_COUNT:
 			break
 
 		var enemies := _get_enemies(player, 400.0)
@@ -304,7 +346,17 @@ func fire_boomerang(data: WeaponData, level: int, player: CharacterBody2D, dmg_b
 		if not enemies.is_empty():
 			target_dir = player.global_position.direction_to(enemies[i % enemies.size()].global_position)
 
-		var bm: Area2D = _create_boomerang(player.global_position, target_dir, damage, pierce, max_dist, data.boomerang_return_speed, track_angle, data.color, data.projectile_size)
+		var bm: Area2D = _create_boomerang(player.global_position, target_dir, damage, pierce, max_dist, data.boomerang_return_speed, track_angle, data.color, data.projectile_size, data.weapon_id)
+		# Boomerang crit: keen eye (Ranger) then synergy check
+		var is_keen_crit: bool = _controller.notify_weapon_hit(player) if _controller.has_method("notify_weapon_hit") else false
+		if is_keen_crit:
+			bm.damage *= player.crit_damage_mul
+			bm.is_crit = true
+		elif data.weapon_id == "boomerang" and SynergyManager and SynergyManager.has_synergy("boomerang_crit"):
+			if randf() < player.crit_chance:
+				bm.damage *= player.crit_damage_mul
+				bm.is_crit = true
+		bm.weapon_id = data.weapon_id
 		var pm: Node = _get_pm(player)
 		if pm:
 			pm.call_deferred("add_child", bm)
@@ -313,16 +365,17 @@ func fire_boomerang(data: WeaponData, level: int, player: CharacterBody2D, dmg_b
 	return valid_boomerangs
 
 
-func _create_boomerang(pos: Vector2, dir: Vector2, dmg: float, prc: int, max_dist: float, return_spd: float, track_angle: float, col: Color, sz: float) -> Area2D:
+func _create_boomerang(pos: Vector2, dir: Vector2, dmg: float, prc: int, max_dist: float, return_spd: float, track_angle: float, col: Color, sz: float, wpn_id: String = "boomerang") -> Area2D:
 	var bm_scene: PackedScene = preload("res://scenes/projectile.tscn")
 	var bm: Area2D = bm_scene.instantiate()
 	bm.global_position = pos
 	bm.set_script(load("res://scripts/weapons/boomerang.gd"))
 	bm.direction = dir
-	bm.speed = 280.0
+	bm.speed = BOOMERANG_SPEED
 	bm.damage = dmg
 	bm.pierce = prc
 	bm.color = col
 	bm.size = sz
+	bm.weapon_id = wpn_id
 	bm.setup_boomerang(pos, dir, max_dist, return_spd, track_angle)
 	return bm

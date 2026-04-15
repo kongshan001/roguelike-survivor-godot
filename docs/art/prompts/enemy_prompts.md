@@ -110,3 +110,27 @@ blurry, 3d, realistic, photorealistic, text, watermark, complex shading, anti-al
 - **配色指引**：主色 #FF6B6B 亮红
 - **完整 Prompt**：`pixel art, 16-bit, top-down view, game sprite, transparent background, no outline, a tiny glowing red orb projectile with small trail, simple and clean, simple design --ar 1:1`
 - **备注**：ColorRect 回退 Color(0.9, 0.9, 0.9)，4px
+
+---
+
+### 火焰史莱姆 Fire Slime (fire_slime)
+- **用途**：波次系统敌人变体精灵（Swarm 波次后出现）
+- **目标工具**：Stable Diffusion / Midjourney
+- **尺寸规格**：64x64 -> 裁剪到 16x16
+- **主体描述**：An orange-red slime creature with bright yellow flame wisps on top, amorphous blob body, white eyes with dark pupils, wavy bottom edge suggesting liquid movement, top-down view
+- **配色指引**：主色 #FF6622 橙红，辅色 #CC4411 暗橙阴影，强调色 #FFCC00 明黄火焰核心
+- **负面提示词**：blurry, 3d, realistic, text, watermark, solid fire, ice, blue
+- **完整 Prompt**：`pixel art, 16-bit, top-down view, game sprite, transparent background, dark outline #1A1A2E, an orange-red #FF6622 slime creature with yellow #FFCC00 flame wisps burning on top, amorphous blob body, white eyes, dark pupils, wavy bottom, simple design --ar 1:1`
+- **备注**：ColorRect 回退 Color(1.0, 0.4, 0.133) #FF6622 橙红 16px；与僵尸绿色史莱姆形成火焰/自然视觉对立。enemy_id 为 "fire_slime"。
+
+---
+
+### 精英骑士 Elite Knight (elite_knight)
+- **用途**：波次系统敌人变体精灵（Elite/Boss 波次出现）
+- **目标工具**：Stable Diffusion / Midjourney
+- **尺寸规格**：128x128 -> 裁剪到 24x24
+- **主体描述**：A tall dark purple armored knight with horned helmet, glowing purple eyes through visor slit, silver sword on right side, gold belt buckle and sword guard, floating purple aura particles around body, top-down view
+- **配色指引**：主色 #442266 暗紫铠甲，辅色 #33154D 深紫细节，强调色 #8844BB 亮紫高光/眼睛
+- **负面提示词**：blurry, 3d, realistic, text, watermark, red armor, blue armor, no weapon
+- **完整 Prompt**：`pixel art, 16-bit, top-down view, game sprite, transparent background, dark outline #1A1A2E, a tall dark purple #442266 armored knight with horned helmet, glowing purple #8844BB eyes through visor, silver sword, gold accents on belt and sword guard, floating purple aura particles, menacing and elite-looking, larger than normal enemies at 24x24, simple design --ar 1:1`
+- **备注**：ColorRect 回退 Color(0.267, 0.133, 0.4) #442266 暗紫 24px；紫系配色与蝙蝠(#AB47BD)区分--骑士为暗紫，蝙蝠为亮紫。24px 尺寸介于普通敌人(16px)和 Boss(32px)之间体现精英层级。enemy_id 为 "elite_knight"。

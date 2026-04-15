@@ -191,7 +191,7 @@ func test_difficulty_mul_hard():
 	assert_eq(GameManager.get_difficulty_mul("enemy_speed_mul"), 1.3)
 	assert_eq(GameManager.get_difficulty_mul("enemy_dmg_mul"), 1.5)
 	assert_eq(GameManager.get_difficulty_mul("spawn_interval_mul"), 0.7)
-	assert_eq(GameManager.get_difficulty_mul("boss_hp_mul"), 2.0)
+	assert_eq(GameManager.get_difficulty_mul("boss_hp_mul"), 1.8)
 
 
 func test_difficulty_mul_normal():

@@ -40,6 +40,20 @@ func before_each():
 	_wf = load("res://scripts/weapons/weapon_fire.gd").new(_mock_controller)
 
 
+func after_each():
+	# Wait for call_deferred spawns from die() to complete before autofree runs
+	await get_tree().process_frame
+	# Clean up weapon instances to reduce orphan RIDs
+	if is_instance_valid(_mock_controller):
+		_mock_controller.remove_weapon_instances("holywater")
+		_mock_controller.remove_weapon_instances("boomerang")
+		_mock_controller.remove_weapon_instances("thunderang")
+		_mock_controller.remove_weapon_instances("blazerang")
+		_mock_controller._boomerang_instances.clear()
+		_mock_controller._orbit_instances.clear()
+		_mock_controller._weapon_timers.clear()
+
+
 func _create_enemy(pos: Vector2, hp: float = 10.0, is_boss: bool = false) -> CharacterBody2D:
 	var e: CharacterBody2D = load("res://scenes/enemy.tscn").instantiate() as CharacterBody2D
 	var data := EnemyData.new()

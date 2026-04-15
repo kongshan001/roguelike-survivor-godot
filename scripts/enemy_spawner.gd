@@ -1,22 +1,18 @@
 extends Node
 
 ## 5-stage wave progression matching H5 WAVE_PROGRESS
-## Endless mode: boss every 240s with scaling
+## Wave state machine: WARMUP -> ACTIVE -> INTERMISSION -> ... -> VICTORY
+## Endless mode: cycles repeat with scaling
 
 var _spawn_timer: float = 0.0
 var _boss_spawned: bool = false
 var _endless_boss_timer: float = 240.0
 var _endless_cycle: int = 0
 var _camera: Camera2D = null
+var _boss_warning_sent_this_wave: bool = false
 
-# Wave definitions
-const WAVE_STAGES: Array = [
-	{"time": 0, "enemies": ["zombie"]},
-	{"time": 120, "enemies": ["bat"]},
-	{"time": 180, "enemies": ["skeleton", "ghost"]},
-	{"time": 210, "enemies": ["elite_skeleton", "splitter"]},
-	{"time": 270, "enemies": []}  # Boss wave
-]
+# Hard mode spawn interval floor (difficulty-tuning.md Section 3.3)
+const MIN_SPAWN_INTERVAL_HARD: float = 0.7
 
 # Enemy data templates (H5 values)
 const ENEMY_TEMPLATES: Dictionary = {
@@ -66,58 +62,48 @@ func _physics_process(delta: float):
 		return
 
 	GameManager.elapsed_time += delta
-	_spawn_timer -= delta
+	GameManager.update_wave(delta)
 
-	if _spawn_timer <= 0:
-		_spawn_timer = _get_spawn_interval()
-		_spawn_wave_enemies()
+	# Only spawn during ACTIVE wave state
+	if GameManager.wave_state == GameManager.WaveState.ACTIVE:
+		_spawn_timer -= delta
+		if _spawn_timer <= 0:
+			_spawn_timer = _get_spawn_interval()
+			_spawn_wave_enemies()
 
-	# Boss at 270s (normal mode) or endless bosses
+	# Boss warning and spawn logic
 	_process_boss_spawn(delta)
 
 
 func _get_spawn_interval() -> float:
-	var base: float
-	var t: float = GameManager.elapsed_time
-	if t < 30:
-		base = 2.0
-	elif t < 60:
-		base = 1.5
-	elif t < 120:
-		base = 1.2
-	elif t < 180:
-		base = 1.0
-	else:
-		base = 0.8
-	return base * GameManager.get_difficulty_mul("spawn_interval_mul")
+	var def: Dictionary = GameManager._get_current_wave_def()
+	var base: float = def.get("spawn_base", 2.0)
+	var wave_scale: float = GameManager.get_wave_spawn_rate_scale()
+	var interval: float = base * GameManager.get_difficulty_mul("spawn_interval_mul") / wave_scale
+
+	# Hard mode minimum spawn interval floor
+	if GameManager.selected_difficulty == "hard":
+		interval = maxf(MIN_SPAWN_INTERVAL_HARD, interval)
+
+	return interval
 
 
 func _get_spawn_count() -> int:
-	var base: int
+	var def: Dictionary = GameManager._get_current_wave_def()
+	var base: int = def.get("count_base", 1)
+	# Scale count with elapsed time within the wave
 	var t: float = GameManager.elapsed_time
-	if t < 30:
-		base = 1
-	elif t < 60:
-		base = 2
-	elif t < 120:
-		base = 3
-	elif t < 180:
-		base = 4
-	else:
-		base = 5
-	return maxi(1, base + GameManager.get_difficulty_count_mod())
+	var time_bonus: int = 0
+	if t >= 180:
+		time_bonus = 2
+	elif t >= 120:
+		time_bonus = 1
+	return maxi(1, base + GameManager.get_difficulty_count_mod() + time_bonus)
 
 
 func _get_available_types() -> Array:
-	var t: float = GameManager.elapsed_time
-	var types: Array = ["zombie"]
-	if t >= 120:
-		types.append("bat")
-	if t >= 180:
-		types.append_array(["skeleton", "ghost"])
-	if t >= 210:
-		types.append_array(["elite_skeleton", "splitter"])
-	return types
+	var def: Dictionary = GameManager._get_current_wave_def()
+	return def.get("enemies", ["zombie"])
 
 
 func _spawn_wave_enemies() -> void:
@@ -140,11 +126,9 @@ func _spawn_wave_enemies() -> void:
 		data.speed *= GameManager.get_difficulty_mul("enemy_speed_mul")
 		data.damage *= GameManager.get_difficulty_mul("enemy_dmg_mul")
 
-		# Endless scaling
-		if is_endless:
-			var minutes: float = GameManager.elapsed_time / 60.0
-			data.max_hp *= 1.0 + minutes * 0.1
-			data.speed *= 1.0 + minutes * 0.05
+		# Apply wave/cycle scaling
+		data.max_hp *= GameManager.get_wave_hp_scale()
+		data.speed *= GameManager.get_wave_speed_scale()
 
 		_spawn_enemy(data)
 
@@ -153,21 +137,32 @@ var _boss_warning_sent: bool = false
 
 func _process_boss_spawn(delta: float) -> void:
 	var is_endless: bool = GameManager.selected_difficulty == "endless"
+	var def: Dictionary = GameManager._get_current_wave_def()
+	var is_boss_wave: bool = def.get("boss", false)
 
-	# First boss timing scaled by difficulty (hard spawns earlier)
-	var boss_time: float = 270.0 * GameManager.get_difficulty_mul("spawn_interval_mul")
-	boss_time = clampf(boss_time, 120.0, 300.0)
+	# Normal mode: boss on the 5th wave (wave_boss)
+	if not is_endless and is_boss_wave and not _boss_spawned:
+		# Boss warning 15s before end of wave
+		var wave_remaining: float = def["duration"] - GameManager._wave_timer
+		if not _boss_warning_sent_this_wave and wave_remaining <= GameManager.BOSS_WARNING_TIME:
+			_boss_warning_sent_this_wave = true
+			GameManager.boss_warning.emit()
+		# Spawn boss at wave start (timer ~0)
+		if GameManager._wave_timer >= 1.0:
+			_boss_spawned = true
+			_spawn_boss(1.0)
+		return
 
-	# Boss warning 15s before spawn
-	if not _boss_warning_sent and GameManager.elapsed_time >= boss_time - 15.0:
-		_boss_warning_sent = true
-		GameManager.boss_warning.emit()
-
-	if not _boss_spawned and GameManager.elapsed_time >= boss_time:
-		_boss_spawned = true
-		_spawn_boss(1.0)
-		if is_endless:
-			_endless_boss_timer = 240.0
+	# First boss timing for non-wave-based (legacy fallback)
+	if not is_endless and not _boss_spawned:
+		var boss_time: float = 270.0 * GameManager.get_difficulty_mul("spawn_interval_mul")
+		boss_time = clampf(boss_time, 120.0, 300.0)
+		if not _boss_warning_sent and GameManager.elapsed_time >= boss_time - 15.0:
+			_boss_warning_sent = true
+			GameManager.boss_warning.emit()
+		if GameManager.elapsed_time >= boss_time:
+			_boss_spawned = true
+			_spawn_boss(1.0)
 		return
 
 	# Endless mode: boss every 240s
@@ -179,6 +174,16 @@ func _process_boss_spawn(delta: float) -> void:
 			var hp_scale: float = pow(1.5, _endless_cycle)
 			var spd_scale: float = pow(1.1, _endless_cycle)
 			_spawn_boss(hp_scale, spd_scale)
+
+	# Endless mode: first boss also at wave 5
+	if is_endless and not _boss_spawned and is_boss_wave:
+		if not _boss_warning_sent_this_wave:
+			_boss_warning_sent_this_wave = true
+			GameManager.boss_warning.emit()
+		if GameManager._wave_timer >= 1.0:
+			_boss_spawned = true
+			_spawn_boss(1.0)
+			_endless_boss_timer = 240.0
 
 
 func _spawn_boss(hp_scale: float = 1.0, spd_scale: float = 1.0) -> void:

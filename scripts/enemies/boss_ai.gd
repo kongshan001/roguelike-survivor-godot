@@ -57,7 +57,6 @@ func _process_phase2(delta: float, enemy: CharacterBody2D, player: Node2D) -> fl
 	if _charge_timer <= 0:
 		_is_charging = true
 		_charge_timer = _charge_duration
-		_charge_timer = _charge_duration
 		_charge_cooldown = 4.0
 	_charge_cooldown -= delta
 	return 1.0

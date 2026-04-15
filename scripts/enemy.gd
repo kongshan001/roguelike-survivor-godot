@@ -220,66 +220,108 @@ func apply_freeze(duration: float):
 	_freeze_timer = maxf(_freeze_timer, duration)
 
 
-func die():
+func die() -> void:
 	if not is_alive:
 		return
 	is_alive = false
+
+	_handle_kill_rewards()
+	_spawn_xp_gems()
+	_spawn_food_drop()
+	_spawn_crate_drop()
+	_handle_boss_death()
+	_handle_splitter_death()
+
+	queue_free()
+
+
+func _handle_kill_rewards() -> void:
 	GameManager.register_kill()
 	GameManager.score += enemy_data.xp_value
 	GameManager.enemy_count -= 1
-	var gold_amount: int = 3
-	if SaveManager:
-		gold_amount = int(float(gold_amount) * (1.0 + SaveManager.get_gold_bonus()))
-	# Lucky coin passive: +15% gold per stack
-	if SynergyManager:
-		pass  # Lucky coin gold handled via player owned_passives
-	var player_ref = _find_player()
-	if player_ref and player_ref.has_passive("luckycoin"):
-		var lucky_stacks: int = player_ref.owned_passives.get("luckycoin", 0)
-		gold_amount = int(float(gold_amount) * (1.0 + 0.15 * lucky_stacks))
-	# crit_luckycoin synergy: 暴击时双倍金币
-	if SynergyManager and SynergyManager.has_synergy("crit_luckycoin"):
-		gold_amount *= 2
-	# Combo gold bonus: 连击≥5时+1金币/击杀
-	if GameManager.combo_count >= 5:
-		gold_amount += 1
-	GameManager.add_gold(gold_amount)
-	_spawn_xp_gem()
 
-	# magnet_crit synergy: 暴击额外掉落价值+2宝石
-	if SynergyManager and SynergyManager.has_synergy("magnet_crit") and _was_crit:
-		_spawn_bonus_gem(2)
+	var gold_amount: int = _calculate_gold_drop()
+	GameManager.add_gold(gold_amount)
 
 	# holywater_luckycoin synergy: 圣水击杀+1金币
 	if SynergyManager and SynergyManager.has_synergy("holywater_luckycoin"):
 		if _last_hit_by == "holywater":
 			GameManager.add_gold(1)
 
+
+func _calculate_gold_drop() -> int:
+	var gold_amount: int = 3
+	if SaveManager:
+		gold_amount = int(float(gold_amount) * (1.0 + SaveManager.get_gold_bonus()))
+
+	# Lucky coin passive: +15% gold per stack
+	var player_ref: Node2D = _find_player()
+	if player_ref and player_ref.has_passive("luckycoin"):
+		var lucky_stacks: int = player_ref.owned_passives.get("luckycoin", 0)
+		gold_amount = int(float(gold_amount) * (1.0 + 0.15 * lucky_stacks))
+
+	# crit_luckycoin synergy: 暴击时双倍金币
+	if SynergyManager and SynergyManager.has_synergy("crit_luckycoin"):
+		gold_amount *= 2
+
+	# Combo gold bonus: 连击≥5时+1金币/击杀
+	if GameManager.combo_count >= 5:
+		gold_amount += 1
+
+	return gold_amount
+
+
+func _spawn_xp_gems() -> void:
+	_spawn_xp_gem()
+
+	# magnet_crit synergy: 暴击额外掉落价值+2宝石
+	if SynergyManager and SynergyManager.has_synergy("magnet_crit") and _was_crit:
+		_spawn_bonus_gem(2)
+
 	# firestaff_luckycoin synergy: 燃烧击杀+1宝石
 	if SynergyManager and SynergyManager.has_synergy("firestaff_luckycoin"):
 		if _last_hit_by == "firestaff" and _burn_timer > 0:
 			_spawn_bonus_gem(1)
 
-	# Food drop (H5: 10% base, scaled by difficulty)
+
+func _spawn_food_drop() -> void:
 	if randf() < 0.1 * GameManager.get_difficulty_mul("food_drop_mul", 1.0):
 		_spawn_food()
 
+
+func _spawn_crate_drop() -> void:
 	if randf() < enemy_data.drop_chance:
 		_spawn_item_crate()
 
-	# Boss death
-	if enemy_data.is_boss:
-		GameManager.boss_killed = true
-		GameManager.boss_kill_count += 1
-		for i in range(5):
-			_spawn_xp_gem()
 
-	# Splitter death
+func _handle_boss_death() -> void:
+	if not enemy_data.is_boss:
+		return
+
+	GameManager.boss_killed = true
+	GameManager.boss_kill_count += 1
+
+	# Boss bonus gems (all modes)
+	for i in range(5):
+		_spawn_xp_gem()
+
+	# Endless mode boss kill rewards
+	if GameManager.selected_difficulty == "endless":
+		_apply_endless_boss_reward()
+
+
+func _apply_endless_boss_reward() -> void:
+	GameManager.add_gold(50)
+	GameManager.add_xp(30.0)
+	for i in range(5):
+		_spawn_food_at(global_position + Vector2(randf_range(-30, 30), randf_range(-30, 30)))
+	GameManager.boss_kill_reward.emit(50, 30)
+
+
+func _handle_splitter_death() -> void:
 	if enemy_data.is_splitter and not _has_split:
 		_has_split = true
 		_spawn_split_children()
-
-	queue_free()
 
 
 # --- Spawning helpers ---
@@ -304,6 +346,10 @@ func _spawn_item_crate():
 
 
 func _spawn_food():
+	_spawn_food_at(global_position + Vector2(randf_range(-15, 15), randf_range(-15, 15)))
+
+
+func _spawn_food_at(pos: Vector2) -> void:
 	var food: Area2D = Area2D.new()
 	food.collision_mask = 1  # Player layer
 	food.set_script(preload("res://scripts/food_pickup.gd"))
@@ -317,7 +363,7 @@ func _spawn_food():
 	sprite.position = Vector2(-4, -4)
 	sprite.color = Color(0.4, 0.9, 0.3)
 	food.add_child(sprite)
-	food.global_position = global_position + Vector2(randf_range(-15, 15), randf_range(-15, 15))
+	food.global_position = pos
 	get_parent().call_deferred("add_child", food)
 
 

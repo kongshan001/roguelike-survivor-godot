@@ -3,10 +3,23 @@ extends Node2D
 var _shake_amount: float = 0.0
 var _shake_decay: float = 5.0
 var _prev_health: float = -1.0
+var _chest_spawner: Node = null
+var _gold_income_timer: float = 0.0
+
+# Endless mode constants
+const ENDLESS_GOLD_INCOME_INTERVAL: float = 60.0
+const ENDLESS_GOLD_INCOME_AMOUNT: int = 1
 
 
 func _ready():
 	GameManager.reset()
+
+	# Add ChestSpawner
+	_chest_spawner = Node.new()
+	_chest_spawner.set_script(load("res://scripts/chest_spawner.gd"))
+	_chest_spawner.name = "ChestSpawner"
+	add_child(_chest_spawner)
+
 	var player = $Player
 	# Set player stats based on selected character
 	match GameManager.selected_character:
@@ -39,6 +52,12 @@ func _ready():
 	GameManager.health_changed.connect(_on_health_changed_shake)
 	GameManager.combo_changed.connect(_on_combo_changed_shake)
 
+	# Connect retreat signal for endless mode
+	GameManager.retreat_requested.connect(_on_retreat_requested)
+
+	# Connect victory signal for normal/hard mode
+	GameManager.victory_achieved.connect(_on_victory_achieved)
+
 	_draw_grid()
 
 
@@ -53,6 +72,15 @@ func _process(delta):
 		$Camera2D.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * _shake_amount
 	else:
 		$Camera2D.offset = Vector2.ZERO
+
+	# Endless mode passive gold income
+	if GameManager.selected_difficulty == "endless" and not GameManager.is_game_over:
+		_gold_income_timer += delta
+		if _gold_income_timer >= ENDLESS_GOLD_INCOME_INTERVAL:
+			_gold_income_timer -= ENDLESS_GOLD_INCOME_INTERVAL
+			GameManager.add_gold(ENDLESS_GOLD_INCOME_AMOUNT)
+			var minutes: int = int(GameManager.elapsed_time / 60.0)
+			GameManager.milestone_reached.emit(minutes, ENDLESS_GOLD_INCOME_AMOUNT)
 
 
 func screen_shake(amount: float) -> void:
@@ -109,3 +137,23 @@ func _on_player_hurtbox_entered(body: Node2D, player: CharacterBody2D):
 	if body.is_in_group("enemies") and body.is_alive and player.is_alive:
 		var dmg: float = body.enemy_data.damage * GameManager.get_difficulty_mul("enemy_dmg_mul")
 		player.take_damage(dmg)
+
+
+func _on_retreat_requested() -> void:
+	if GameManager.is_game_over:
+		return
+	GameManager.is_game_over = true
+	GameManager.player_died.emit()
+	var tween = create_tween()
+	tween.tween_interval(1.0)
+	tween.tween_callback(func():
+		get_tree().change_scene_to_file("res://scenes/game_over_screen.tscn")
+	)
+
+
+func _on_victory_achieved(_gold_bonus: int) -> void:
+	var tween = create_tween()
+	tween.tween_interval(GameManager.VICTORY_TRANSITION_DELAY)
+	tween.tween_callback(func():
+		get_tree().change_scene_to_file("res://scenes/game_over_screen.tscn")
+	)

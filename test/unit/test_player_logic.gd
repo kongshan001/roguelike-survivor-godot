@@ -8,6 +8,10 @@ var _player: CharacterBody2D
 
 func before_each():
 	GameManager.reset()
+	# Reset SaveManager shop upgrades to prevent HP/speed/dmg bonus leakage
+	if SaveManager:
+		for id in SaveManager.SHOP_UPGRADES:
+			SaveManager.shop_upgrades[id] = 0
 	GameManager.selected_character = ""  # default, no bonus
 	var player_scene = load("res://scenes/player.tscn")
 	_player = player_scene.instantiate()

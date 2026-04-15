@@ -277,10 +277,13 @@ func check_quests_and_achievements() -> void:
 		_check_achievement("synergy_first", syn_count >= 1)
 
 	# All synergies: triggered all 18 synergy effects (cumulative)
-	_check_achievement("all_synergies", synergy_history.size() >= SynergyManager.SYNERGY_DEFINITIONS.size() if SynergyManager else false)
+	_check_achievement("all_synergies", SynergyManager != null and synergy_history.size() >= SynergyManager.SYNERGY_DEFINITIONS.size())
 
-	# Convert 30% gold to soul fragments
-	var soul_reward: int = int(GameManager.gold * 0.3)
+	# Convert gold to soul fragments (normal: 30%, endless: 45% with 1.5x bonus)
+	var soul_rate: float = 0.3
+	if GameManager.selected_difficulty == "endless":
+		soul_rate = 0.45
+	var soul_reward: int = int(GameManager.gold * soul_rate)
 	add_soul_fragments(soul_reward)
 
 	save()
