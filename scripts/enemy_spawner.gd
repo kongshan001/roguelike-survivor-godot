@@ -229,7 +229,7 @@ func _spawn_enemy(data: EnemyData) -> void:
 	enemy.enemy_data = data
 	var spawn_pos: Vector2 = _get_spawn_position()
 	enemy.global_position = spawn_pos
-	get_parent().add_child(enemy)
+	get_parent().call_deferred("add_child", enemy)
 	GameManager.enemy_count += 1
 
 

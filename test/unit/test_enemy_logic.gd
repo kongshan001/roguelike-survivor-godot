@@ -102,6 +102,7 @@ func test_die_drops_xp_gem():
 	var pickup_mgr := _enemy.get_parent().get_node("PickupManager")
 	var initial_children := pickup_mgr.get_child_count()
 	_enemy.take_damage(50.0)
+	await get_tree().process_frame
 	assert_eq(pickup_mgr.get_child_count(), initial_children + 1, "Should spawn 1 XP gem")
 
 
@@ -138,6 +139,7 @@ func test_boss_drops_multiple_xp_gems():
 
 	var pickup_mgr := _enemy.get_parent().get_node("PickupManager")
 	_enemy.take_damage(500.0)
+	await get_tree().process_frame
 	assert_eq(pickup_mgr.get_child_count(), 6, "Boss should drop 6 XP gems")
 	assert_true(GameManager.boss_killed, "Boss killed should be true")
 	assert_eq(GameManager.boss_kill_count, 1, "Boss kill count should be 1")

@@ -189,7 +189,7 @@ func _spawn_bullet(dir: Vector2) -> void:
 	bullet.color = Color(0.9, 0.9, 0.9)
 	bullet.size = 4.0
 	bullet.global_position = global_position
-	get_parent().add_child(bullet)
+	get_parent().call_deferred("add_child", bullet)
 
 
 # --- Combat ---
@@ -291,7 +291,7 @@ func _spawn_xp_gem():
 	gem.xp_value = enemy_data.xp_value
 	var pm: Node = get_parent().get_node_or_null("PickupManager")
 	if pm:
-		pm.add_child(gem)
+		pm.call_deferred("add_child", gem)
 
 
 func _spawn_item_crate():
@@ -300,7 +300,7 @@ func _spawn_item_crate():
 	crate.global_position = global_position
 	var pm: Node = get_parent().get_node_or_null("PickupManager")
 	if pm:
-		pm.add_child(crate)
+		pm.call_deferred("add_child", crate)
 
 
 func _spawn_food():
@@ -343,7 +343,7 @@ func _spawn_split_children():
 		child.enemy_data = child_data
 		var offset: Vector2 = Vector2(randf_range(-20, 20), randf_range(-20, 20))
 		child.global_position = global_position + offset
-		get_parent().add_child(child)
+		get_parent().call_deferred("add_child", child)
 		GameManager.enemy_count += 1
 
 
@@ -354,7 +354,7 @@ func _spawn_bonus_gem(value: int) -> void:
 	gem.xp_value = value
 	var pm: Node = get_parent().get_node_or_null("PickupManager")
 	if pm:
-		pm.add_child(gem)
+		pm.call_deferred("add_child", gem)
 
 
 func _find_player() -> Node2D:

@@ -65,7 +65,7 @@ func fire_projectile(data: WeaponData, level: int, player: CharacterBody2D, dmg_
 			proj.set_status_effects(data.burn_dps, data.burn_duration, data.slow_pct)
 		var pm: Node = _get_pm(player)
 		if pm:
-			pm.add_child(proj)
+			pm.call_deferred("add_child", proj)
 		if SynergyManager and SynergyManager.has_synergy("crit_boots") and proj.is_crit:
 			_spawn_crit_knife(player, proj.damage * 0.5)
 
@@ -83,7 +83,7 @@ func _spawn_crit_knife(player: CharacterBody2D, dmg: float) -> void:
 	knife.lifetime = 1.0
 	var pm: Node = _get_pm(player)
 	if pm:
-		pm.add_child(knife)
+		pm.call_deferred("add_child", knife)
 
 
 # --- Orbit ---
@@ -133,7 +133,7 @@ func update_orbit(weapon_id: String, data: WeaponData, level: int, player: Chara
 	instance.weapon_id = weapon_id
 	var pm: Node = _get_pm(player)
 	if pm:
-		pm.add_child(instance)
+		pm.call_deferred("add_child", instance)
 	instance.global_position = player.global_position
 	orbit_instances[key] = instance
 	return orbit_instances
@@ -307,7 +307,7 @@ func fire_boomerang(data: WeaponData, level: int, player: CharacterBody2D, dmg_b
 		var bm: Area2D = _create_boomerang(player.global_position, target_dir, damage, pierce, max_dist, data.boomerang_return_speed, track_angle, data.color, data.projectile_size)
 		var pm: Node = _get_pm(player)
 		if pm:
-			pm.add_child(bm)
+			pm.call_deferred("add_child", bm)
 			valid_boomerangs.append(bm)
 
 	return valid_boomerangs

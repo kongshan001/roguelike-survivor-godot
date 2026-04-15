@@ -4,6 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-15 | 467 | 1076 | 39个集成测试全部通过（test_integration.gd 39/39, 167断言） + 427已有测试 427/428 (1个预存失败 test_player_logic test_take_damage_with_armor) |
 | 2026-04-12 | 118 | 255 | 全部通过 |
 | 2026-04-12 | 118 | 255 | 全部通过（Phase 4 进化系统） |
 | 2026-04-12 | 141 | 282 | 全部通过（Phase 5 协同效应） |
@@ -39,7 +40,10 @@
 | test_item_crate.gd | 14 | 箱子类型/收集逻辑/概率阈值 |
 | test_enemy_bullet.gd | 15 | 弹幕方向/速度/伤害/生命周期 |
 | test_boss_ai.gd | 22 | Boss三阶段/充能/螺旋/角度 |
-| **合计** | **394** | **21 个测试文件** |
+| test_integration.gd | 39 | 全武器开火/被动应用/核心流程/协同/进化/特效回归 |
+| test_boomerang.gd | 17 | 回旋镖飞行/返回/属性保持 |
+| test_spin_blade.gd | 12 | 旋转刀刃创建/角度/升级缩放 |
+| **合计** | **467** | **24 个测试文件** |
 
 ## 缺陷跟踪
 
@@ -107,3 +111,4 @@ OpenGL API 4.1 INTEL-18.8.16 - Compatibility - Using Device: Intel Inc. - Intel(
 | 2026-04-13 | 394 | 823 | 全部通过（SYNERGIES→SYNERGY_DEFINITIONS修复 + _find_player提取 + shop清理 + 3个新测试文件51项） |
 | 2026-04-13 | 428 | 909 | 全部通过（weapon_registry 17项 + boomerang 17项新测试，player.gd 20处常量提取） |
 | 2026-04-14 | 428 | 910 | 全部通过（ColorRect->Sprite2D像素精灵迁移回归测试 + 视觉验证） |
+| 2026-04-15 | 467 | 1079 | 全部通过（覆盖率分析：33源文件中10个无专门测试文件） |

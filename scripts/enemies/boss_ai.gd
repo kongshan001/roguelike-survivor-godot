@@ -93,4 +93,4 @@ func _spawn_bullet(enemy: CharacterBody2D, angle: float) -> void:
 	bullet.color = Color(1.0, 0.3, 0.2)
 	bullet.size = 5.0
 	bullet.global_position = enemy.global_position
-	enemy.get_parent().add_child(bullet)
+	enemy.get_parent().call_deferred("add_child", bullet)
