@@ -82,7 +82,7 @@ const DIFFICULTY_PRESETS: Dictionary = {
 }
 
 # XP experience table from H5 config (index 0 = level 1→2)
-const EXP_TABLE: Array[float] = [8.0, 12.0, 18.0, 24.0, 32.0, 42.0, 55.0, 70.0, 88.0, 108.0, 132.0, 160.0, 195.0, 240.0]
+const EXP_TABLE: Array[float] = [8.0, 12.0, 18.0, 24.0, 29.0, 38.0, 50.0, 70.0, 88.0, 108.0, 132.0, 160.0, 195.0, 240.0]
 const COMBO_TIMEOUT: float = 3.0
 const COMBO_MILESTONES: Array[int] = [5, 10, 20, 50]
 const COMBO_EXP_RATE: float = 0.05

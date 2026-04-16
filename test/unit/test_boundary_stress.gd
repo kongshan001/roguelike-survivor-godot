@@ -666,18 +666,18 @@ func test_save_manager_spend_more_than_owned():
 
 func test_save_manager_maxed_upgrade_returns_negative_cost():
 	var save_mgr := _create_save_manager()
-	save_mgr.shop_upgrades["maxhp"] = 3  # max_level = 3
+	save_mgr.shop_upgrades["maxhp"] = 4  # max_level = 4 (T4)
 	var cost: int = save_mgr.get_upgrade_cost("maxhp")
 	assert_eq(cost, -1, "Maxed upgrade should return -1 cost")
 
 
 func test_save_manager_purchase_maxed_upgrade_fails():
 	var save_mgr := _create_save_manager()
-	save_mgr.shop_upgrades["maxhp"] = 3
+	save_mgr.shop_upgrades["maxhp"] = 4  # max_level = 4 (T4)
 	save_mgr.soul_fragments = 9999
 	var result: bool = save_mgr.purchase_upgrade("maxhp")
 	assert_false(result, "Should not be able to purchase maxed upgrade")
-	assert_eq(save_mgr.shop_upgrades["maxhp"], 3, "Level should not increase")
+	assert_eq(save_mgr.shop_upgrades["maxhp"], 4, "Level should not increase")
 
 
 # =====================================================================

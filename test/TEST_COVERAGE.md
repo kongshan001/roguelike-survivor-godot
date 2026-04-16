@@ -1,23 +1,41 @@
 # Test Coverage Report
 
-Generated: 2026-04-17 R19
-QA Agent: Task 19 (BUG-273 Verification + Enemy Animation + UI Polish)
+Generated: 2026-04-17 R20
+QA Agent: Task 20 (XP Curve Tuning + Shop T4 + Weapon Mastery)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total test files | 52 |
-| Total test functions | 1398 |
-| Assertions | 3260 |
-| Passing | 1398 |
+| Total test files | 55 |
+| Total test functions | 1520 |
+| Assertions | 3486 |
+| Passing | 1520 |
 | Pending | 0 |
 | Failing | 0 |
 | Orphans | 0 |
 
 ## Test File Inventory
 
-### Enemy Animation Tests (1 file, R19 new)
+### XP Curve Tuning Tests (1 file, R20 new)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_xp_curve_tuning.gd | 31 | Tuned indices 4/5/6 values (3), unchanged indices regression (12), _calculate_xp_needed (5), level-up flow (3), cumulative XP reduction % (2), per-level reduction % (3), multi-level flow (2), reset (1) |
+
+### Shop T4 Tests (1 file, R20 new)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_shop_t4.gd | 39 | max_level=4 (6), T4 cost = 2x T3 (6), specific T4 costs (6), T4 purchase flow (6), T4 bonus effects (7), T3 save compatibility (2), achievement conditions (2), total cost (1), T1-T3 unchanged (3) |
+
+### Weapon Mastery Tests (1 file, R20 new)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_weapon_mastery.gd | 52 | Constants (4), kill tracking (6), tier calculation (11), bonus values (7), evolved attribution (5), persistence (3), shop bonus stacking (2), character passive stacking (3), achievement conditions (3), edge cases (4), achievement methods (5) |
+
+### Enemy Animation Tests (1 file, R19)
 
 | File | Tests | Module Coverage |
 |------|-------|----------------|
@@ -130,7 +148,7 @@ QA Agent: Task 19 (BUG-273 Verification + Enemy Animation + UI Polish)
 | test_integration.gd | 39 | All 7 base weapons fire, 8 evolved weapons fire, all 7 passives apply, core game flow, synergy smoke tests, evolution recipes, visual effects regression |
 | test_comprehensive_coverage.gd | 48 | Character skill E2E (mage elemental burst 6, warrior shield charge 5, ranger arrow rain 4), passive E2E (mana attunement 3, iron will 5, keen eye 5), all 6 weapon types baseline dispatch, synergy E2E effects (10), wave boundary tests (8) |
 | test_endless_mode.gd | 42 | die() refactoring, boss kill bonus, passive gold income, retreat button, soul fragment multiplier, splitter, food drop, game over screen, HUD retreat |
-| test_save_manager.gd | 50 | Save/load, shop upgrades, quests, achievements, history |
+| test_save_manager.gd | 50 | Save/load, shop upgrades, quests, achievements, history (updated: achievements 28->30, max_level 3->4) |
 | test_boss_ai.gd | 24 | Boss 3-phase AI, charge/spiral/angle |
 | test_fire_slime.gd | 12 | Fire slime data, burn aura, normal combat, enemy template |
 | test_chest_system.gd | 36 | Chest spawner timer, max concurrent, gold threshold, rewards, speed buff decay, cleanup |
@@ -250,7 +268,7 @@ QA Agent: Task 19 (BUG-273 Verification + Enemy Animation + UI Polish)
 | Source File | Test File(s) | Status |
 |-------------|-------------|--------|
 | scripts/player.gd | test_player_logic, test_player_dash, test_character_skills, test_comprehensive, test_sprite_migration | Covered |
-| scripts/enemy.gd | test_enemy_logic, test_endless_mode, test_fire_slime, test_weapon_lv3_transforms, test_sprite_migration | Covered |
+| scripts/enemy.gd | test_enemy_logic, test_endless_mode, test_fire_slime, test_weapon_lv3_transforms, test_sprite_migration, test_weapon_mastery | Covered |
 | scripts/enemy_spawner.gd | test_enemy_spawner | Covered |
 | scripts/arena.gd | test_arena_screen_shake, test_chest_system | Covered |
 | scripts/hud.gd | test_hud, test_hud_skill_button, test_hud_toast | Covered |
@@ -261,7 +279,7 @@ QA Agent: Task 19 (BUG-273 Verification + Enemy Animation + UI Polish)
 | scripts/data/passive_data.gd | test_data_resources | Covered |
 | scripts/data/character_data.gd | test_character_data | Covered |
 | scripts/data/difficulty_data.gd | test_difficulty_data | Covered |
-| scripts/autoload/game_manager.gd | test_game_manager, test_wave_system, test_endless_mode, test_enemy_cache | Covered |
+| scripts/autoload/game_manager.gd | test_game_manager, test_wave_system, test_endless_mode, test_enemy_cache, test_xp_curve_tuning | Covered |
 | scripts/autoload/upgrade_pool.gd | test_upgrade_pool, test_integration, test_sentinel_totem, test_weapon_balance | Covered |
 | scripts/autoload/synergy_manager.gd | test_synergy_manager, test_integration | Covered |
 | scripts/weapon_controller.gd | test_weapon_controller, test_integration | Covered |
@@ -274,7 +292,7 @@ QA Agent: Task 19 (BUG-273 Verification + Enemy Animation + UI Polish)
 | scripts/xp_gem.gd | test_xp_gem, test_sprite_migration | Covered |
 | scripts/item_crate.gd | test_item_crate, test_sprite_migration | Covered |
 | scripts/pickup_manager.gd | test_endless_mode (indirect) | Covered |
-| scripts/save_manager.gd | test_save_manager, test_tutorial_system | Covered |
+| scripts/save_manager.gd | test_save_manager, test_tutorial_system, test_shop_t4, test_weapon_mastery | Covered |
 | scripts/enemies/boss_ai.gd | test_boss_ai | Covered |
 | scripts/enemies/enemy_death_effects.gd | test_enemy_animation | Covered (R19) |
 | scripts/enemy.gd (R19 death animation) | test_enemy_animation | Covered (R19) |
@@ -329,13 +347,13 @@ QA Agent: Task 19 (BUG-273 Verification + Enemy Animation + UI Polish)
 
 ## Identified Gaps
 
-1. `scripts/shop.gd` - No dedicated test file (low priority: pure UI)
-2. `scripts/character_select.gd` - No test (low priority: UI navigation, now uses TextureRect)
-3. `scripts/difficulty_select.gd` - No test (low priority: UI navigation)
-4. `scripts/weapon_select.gd` - No test (low priority: UI navigation, now uses TextureRect)
-5. `scripts/game_over_screen.gd` - Tested indirectly via test_endless_mode (4 tests)
-6. `scripts/title_screen.gd` - No test (low priority: minimal logic)
-7. BUG-274: `set_relative(true)` in enemy_death_effects.gd and hud.gd causes 9 Tween animations to silently fail (Critical, pending Programmer fix)
+1. `scripts/character_select.gd` - No test (low priority: UI navigation, now uses TextureRect)
+2. `scripts/difficulty_select.gd` - No test (low priority: UI navigation)
+3. `scripts/weapon_select.gd` - No test (low priority: UI navigation, now uses TextureRect)
+4. `scripts/game_over_screen.gd` - Tested indirectly via test_endless_mode (4 tests)
+5. `scripts/title_screen.gd` - No test (low priority: minimal logic)
+6. BUG-274: `set_relative(true)` in enemy_death_effects.gd and hud.gd causes 9 Tween animations to silently fail (Critical, pending Programmer fix)
+7. BUG-275: `save_manager.gd` Parse Error (indent) at lines 97-98 and 454-456 -- **Fixed** by Programmer during R20
 
 All core game logic files have dedicated test coverage.
 

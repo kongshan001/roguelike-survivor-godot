@@ -4340,9 +4340,317 @@ t=0.200s~0.300s: modulate = Color(1.5, 0.6, 2.0) -> Color.WHITE    -- 恢复 0.1
 1. 通知 Programmer Agent: v1.0.2 无新精灵需求，66 个 PNG 完全覆盖
 2. Programmer Agent 参考 R19 补充参数实现 Boss 死亡粒子效果
 3. Programmer Agent 参考 R19 参数实现卡牌阴影和进化光晕
-4. 竞品借鉴的击中粒子和投射物拖尾建议纳入 v1.0.2 backlog
+4. ~~竞品借鉴的击中粒子和投射物拖尾建议纳入 v1.0.2 backlog~~ -- R20 已完成设计规格
 5. 更新 `docs/superpowers/specs/enemy-animation-spec.md` 追加 Section 10-12
 6. 更新 `docs/superpowers/specs/ui-polish-spec.md` 追加阴影/光晕/装饰/渐变参数
-3. Programmer Agent 参考 `docs/superpowers/specs/character-animation-integration.md` 实现角色行走动画（R17 待执行项）
-4. 通知 QA Agent: 敌人动画和 UI 打磨需要补充测试用例
-5. 后续优先: P0 敌人受伤闪烁 > P0 敌人死亡效果 > P1 Boss 出场 > P1 卡牌悬浮 > P1 成就弹出
+7. Programmer Agent 参考 `docs/superpowers/specs/character-animation-integration.md` 实现角色行走动画（R17 待执行项）
+8. 通知 QA Agent: 敌人动画和 UI 打磨需要补充测试用例
+9. 后续优先: P0 敌人受伤闪烁 > P0 敌人死亡效果 > P1 Boss 出场 > P1 卡牌悬浮 > P1 成就弹出
+
+---
+
+## Round 20 执行 (2026-04-17)
+
+### 任务背景
+
+项目综合评分稳定，66 个 PNG 精灵覆盖 v1.0.2 全部功能。R19 竞品调研提取了两项 P2 视觉增强（击中粒子 + 投射物拖尾），并已在 designer-log 记录。本轮将这两项竞品借鉴设计转化为完整的美术视觉规格。同时为 R19 设计的武器精通系统定义视觉反馈规范。
+
+### 任务 1: 击中粒子效果设计
+
+**输出文件**: `docs/superpowers/specs/hit-particles-vfx.md`
+
+#### 设计概述
+
+为 7 种武器各设计武器特色击中粒子效果，使用 ColorRect 实现（零新 PNG），并定义暴击增强粒子 + 全局 100 粒子上限的对象池方案。
+
+#### 击中粒子配色表
+
+| 武器 | 粒子形状 | 粒子尺寸 | 粒子颜色 | 粒子数 | 独特行为 |
+|------|---------|---------|---------|--------|---------|
+| 飞刀 Knife | 水平条纹 1x3 | 1x3 px | Color(0.95, 0.25, 0.25) #F24040 红 | 3 | 方向性扇形散射，切割角 |
+| 圣水 HolyWater | 方形水花 3x3 | 3x3 px | Color(0.3, 0.5, 1.0) #4D80FF 蓝 | 3 | 全向溅射，缩放衰减 |
+| 闪电 Lightning | 垂直火花 1x2 | 1x2 px | Color(1.0, 1.0, 0.3) #FFFF4D 亮黄 | 4 | 闪烁 alpha 衰减（非平滑） |
+| 圣经 Bible | 十字形 2x2 | 2x2 px | Color(0.95, 0.92, 0.85) #F2EBD9 暖白 | 2 | 慢速散射，对齐旋转 |
+| 火焰法杖 FireStaff | 垂直火焰 2x3 | 2x3 px | Color(1.0, 0.45, 0.1) #FF7319 橙 | 4 | 上半圆偏移，模拟火焰上升 |
+| 冰冻光环 FrostAura | 菱形冰晶 2x2 | 2x2 px | Color(0.55, 0.85, 1.0) #8DD9FF 冰蓝 | 2 | 极慢散射，缩放至消失 |
+| 回旋镖 Boomerang | 水平条纹 1x3 | 1x3 px | Color(0.6, 0.4, 0.2) #996633 棕 | 3 | 沿飞行方向尾迹 |
+
+#### 暴击粒子配色表
+
+| 参数 | 值 | 与普通击中对比 |
+|------|-----|--------------|
+| 粒子数 | 5 | +2 (普通 3) |
+| 粒子尺寸 | 3x3 px | +50% (普通 2x2) |
+| 粒子颜色 | Color(1.0, 0.85, 0.0) #FFD700 金 | 所有武器统一金色 |
+| 发射速度 | 60-90 px/s | +50% (普通 40-60) |
+| 生命周期 | 0.20s | +33% (普通 0.15s) |
+| 屏幕震动 | 强度 1.5, 0.05s | 普通无震动 |
+
+暴击时同时产生武器特色粒子（内层）+ 金色粒子（外层），共 8 个粒子/暴击。
+
+#### 性能参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 同屏粒子上限 | 100 | 硬上限，超出时淘汰最旧粒子 |
+| 对象池预分配 | 100 个 ColorRect 节点 | 复用而非动态创建/销毁 |
+| 每帧最大生成数 | 15 | 防止一帧内大量生成 |
+| 频率限制 | 按武器类型 0.1-0.2s 冷却 | 防止高频武器粒子爆炸 |
+
+#### 触发频率限制
+
+| 武器类型 | 冷却时间 | 理由 |
+|---------|---------|------|
+| 投射物 (knife/boomerang) | 无冷却 | 投射物频率本身已受武器 cooldown 限制 |
+| 范围持续 (frostaura/bible orbit) | 0.15-0.2s/目标 | 持续伤害频率高，需限流 |
+| 锥形 (firestaff) | 0.1s/目标 | 锥形可能同时命中多目标 |
+| 闪电 (lightning) | 无冷却 | 单次打击，频率低 |
+
+### 任务 2: 投射物拖尾效果设计
+
+**输出文件**: `docs/superpowers/specs/projectile-trail-vfx.md`
+
+#### 设计概述
+
+为 6 种有投射物的武器（knife/boomerang/fireknife/frostknife/thunderang/blazerang）设计飞行拖尾效果。使用 ColorRect 半透明残影实现（零新 PNG），对象池管理，80 个节点上限。
+
+#### 拖尾适用武器分析
+
+| 武器 | 类型 | 有投射物 | 是否拖尾 | 理由 |
+|------|------|---------|---------|------|
+| Knife | 投射物 | 是 | 是 | 经典飞刀拖尾 |
+| HolyWater | 轨道 | 否 | 否 | 轨道旋转无直线运动 |
+| Lightning | 瞬发 | 否 | 否 | 即时打击无飞行体 |
+| Bible | 轨道 | 否 | 否 | 同 HolyWater |
+| FireStaff | 锥形 | 否 | 否 | 即时范围无飞行体 |
+| FrostAura | 光环 | 否 | 否 | 持续范围无飞行体 |
+| Boomerang | 回旋镖 | 是 | 是 | 曲线飞行路径需可视化 |
+| FireKnife (进化) | 投射物 | 是 | 是 | 火焰拖尾是签名视觉 |
+| FrostKnife (进化) | 投射物 | 是 | 是 | 冰霜拖尾标识 |
+| Thunderang (进化) | 回旋镖 | 是 | 是 | 电光拖尾 |
+| Blazerang (进化) | 回旋镖 | 是 | 是 | 烈焰拖尾 |
+
+#### 拖尾配色表
+
+| 武器 | 拖尾颜色 | Alpha | 尺寸 | 独特行为 |
+|------|---------|-------|------|---------|
+| Knife | Color(0.75, 0.75, 0.8) 银白 | 0.30 | 5x7 | 匹配投射物旋转 |
+| Boomerang | Color(0.6, 0.4, 0.2) 棕 | 0.25 | 8x8 | 匹配飞行方向 |
+| FireKnife | Color(1.0, 0.4, 0.1) 火橙 | 0.35 | 7x9 | 缩放衰减 + 1 个火花/段 |
+| FrostKnife | Color(0.53, 0.87, 1.0) 冰蓝 | 0.30 | 7x9 | 45度偏移 + 激进缩放 |
+| Thunderang | Color(1.0, 0.84, 0.0) 电金 | 0.25 | 9x9 | Alpha 随机闪烁 |
+| Blazerang | Color(1.0, 0.27, 0.0) 烈焰红 | 0.35 | 9x9 | 缩放扩展 1.0->1.2 + 1 火花 |
+
+#### 拖尾通用参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 拖尾段数 | 2 | 轻量，16-20px 投射物 2 段已足够 |
+| 段间距 | 每 3 物理帧 (~0.05s) | 投射物速度 ~200px/s 时产生 ~10px 间距 |
+| Alpha 起点 | 0.25-0.35 | 半透明 |
+| Alpha 终点 | 0.0 | 完全透明 |
+| 生命周期 | 0.12-0.22s | 按武器类型 |
+| 对象池容量 | 80 | 6 武器 x ~3 活跃 x 2 段 = 36 典型，80 提供余量 |
+
+### 任务 3: 武器精通视觉设计
+
+**参考文件**: `docs/superpowers/specs/weapon-mastery.md` (R19 Designer Agent)
+
+#### 3.1 精通等级图标颜色变化
+
+使用 modulate 颜色变化实现精通等级视觉区分，无需新 PNG。精通图标复用现有武器 HUD 图标 PNG（`assets/sprites/weapons/{weapon_id}.png`），通过 modulate 叠加等级色彩。
+
+| 精通等级 | 名称 | modulate 值 | 视觉效果 | 色系来源 |
+|---------|------|------------|---------|---------|
+| 0 | Novice | Color(0.6, 0.6, 0.6, 1.0) | 灰色调，低调 | 中性灰 #999999 |
+| 1 | Apprentice | Color(0.85, 0.65, 0.45, 1.0) | 铜色调，微暖 | 铜色 #D9A673 |
+| 2 | Adept | Color(0.88, 0.88, 0.90, 1.0) | 银色调，微冷 | 银色 #E0E0E6 |
+| 3 | Expert | Color(1.0, 0.95, 0.80, 1.0) | 暖白色，明亮 | 暖白 #FFF2CC |
+| 4 | Master | Color(1.0, 0.90, 0.55, 1.0) | 金色 + 脉冲动画 | 金色 #FFE68C |
+
+#### 3.2 Master 等级脉冲动画
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 脉冲属性 | modulate 变化 | Color(1.0, 0.90, 0.55) <-> Color(1.0, 1.0, 0.85) |
+| 脉冲周期 | 1.5s | 缓慢呼吸感 |
+| 缓动 | ease_in_out | 平滑过渡 |
+| 循环 | 是 | 持续脉动 |
+| 缩放叠加 | scale 1.0 <-> 1.05 | 微幅缩放，配合颜色脉动 |
+
+```gdscript
+# Master 等级脉冲动画实现建议
+if mastery_tier == 4:
+    var pulse := create_tween().set_loops()
+    pulse.tween_property(icon, "modulate", Color(1.0, 1.0, 0.85), 0.75).set_ease(Tween.EASE_IN_OUT)
+    pulse.tween_property(icon, "modulate", Color(1.0, 0.90, 0.55), 0.75).set_ease(Tween.EASE_IN_OUT)
+    var scale_pulse := create_tween().set_loops()
+    scale_pulse.tween_property(icon, "scale", Vector2(1.05, 1.05), 0.75).set_ease(Tween.EASE_IN_OUT)
+    scale_pulse.tween_property(icon, "scale", Vector2(1.0, 1.0), 0.75).set_ease(Tween.EASE_IN_OUT)
+```
+
+#### 3.3 精通升级视觉效果
+
+当武器从当前等级升到下一等级时（击杀数达到阈值），触发一次视觉升级反馈。
+
+| 效果 | 参数 | 说明 |
+|------|------|------|
+| 图标闪烁 | modulate -> Color(8, 8, 8) 0.1s -> 恢复为等级色 | HDR 白闪 |
+| 文字弹出 | "Apprentice!" / "Adept!" / "Expert!" / "Master!" | 等级名称上浮 0.8s |
+| 文字颜色 | 与等级 modulate 色匹配 | Novice=灰, Apprentice=铜, Adept=银, Expert=暖白, Master=金 |
+| 文字字号 | 14px | 中等大小，不遮挡 |
+| 文字位置 | 武器图标上方 10px | 起始位置 |
+| 文字动画 | scale 0.5->1.0 (0.15s ease_out) + position.y -20px (0.8s ease_out) + alpha 1.0->0.0 (0.6s 延迟 0.2s) | 弹出+上浮+淡出 |
+
+```gdscript
+# 精通升级视觉反馈实现建议
+func show_mastery_upgrade(weapon_id: String, new_tier: int) -> void:
+    var tier_names: Array[String] = ["Novice", "Apprentice", "Adept", "Expert", "Master"]
+    var tier_colors: Array[Color] = [
+        Color(0.6, 0.6, 0.6),
+        Color(0.85, 0.65, 0.45),
+        Color(0.88, 0.88, 0.90),
+        Color(1.0, 0.95, 0.80),
+        Color(1.0, 0.90, 0.55)
+    ]
+    # 1. 图标白闪
+    var flash := create_tween()
+    flash.tween_property(icon, "modulate", Color(8, 8, 8), 0.1)
+    flash.tween_property(icon, "modulate", tier_colors[new_tier], 0.15)
+    # 2. 等级名称弹出
+    var label := Label.new()
+    label.text = tier_names[new_tier] + "!"
+    label.modulate = tier_colors[new_tier]
+    label.position = icon_position + Vector2(0, -10)
+    add_child(label)
+    var t := create_tween()
+    t.tween_property(label, "scale", Vector2.ONE, 0.15).from(Vector2(0.5, 0.5)).set_ease(Tween.EASE_OUT)
+    t.parallel().tween_property(label, "position:y", -20.0, 0.8).set_ease(Tween.EASE_OUT).set_relative(true)
+    t.parallel().tween_property(label, "modulate:a", 0.0, 0.6).set_delay(0.2)
+    t.tween_callback(func(): label.queue_free())
+```
+
+#### 3.4 HUD 精通信息布局
+
+在商店页面（shop scene）底部新增"武器精通"区域，7 行网格显示。
+
+```
+=== WEAPON MASTERY ===
+
+[Knife图标]    Apprentice  52/200   +2% DMG  [=========---]
+[HolyWater图标] Novice      12/50    +0% DMG  [==----------]
+[Lightning图标] Expert      623/1000 +6% DMG  [=============]
+[Bible图标]    Adept       204/500  +4% DMG  [======-------]
+[FireStaff图标] Adept      312/500  +4% DMG  [========-----]
+[FrostAura图标] Novice     38/50    +0% DMG  [============-]
+[Boomerang图标] Master     1023/1000+8% DMG  [=============]
+```
+
+**布局参数**:
+
+| 元素 | 参数 | 说明 |
+|------|------|------|
+| 区域标题 | "WEAPON MASTERY", 白色, 16px | 居中，上方 8px 间距 |
+| 武器图标 | 16x16 Sprite2D, modulate 为等级色 | 加载 `res://assets/sprites/weapons/{id}.png` |
+| 等级名称 | 等级对应色, 12px | Apprentice=铜色等 |
+| 击杀进度 | 白色, 10px | "52/200" 格式 |
+| 伤害加成 | 等级对应色, 10px | "+2% DMG" |
+| 进度条 | ColorRect, 宽 60px x 高 4px | 底色 Color(0.2,0.2,0.25), 填充色=等级色 |
+| 行间距 | 16px | 紧凑布局 |
+| 总高度 | ~135px (标题 16 + 7 行 x 16 + 间距 7) | 商店 ScrollContainer 内 |
+
+**进度条颜色**:
+
+| 等级 | 进度条填充色 | 进度条底色 |
+|------|------------|-----------|
+| Novice | Color(0.5, 0.5, 0.5) 灰 | Color(0.2, 0.2, 0.25) |
+| Apprentice | Color(0.85, 0.65, 0.45) 铜 | 同上 |
+| Adept | Color(0.85, 0.85, 0.88) 银 | 同上 |
+| Expert | Color(1.0, 0.92, 0.75) 暖白 | 同上 |
+| Master | Color(1.0, 0.85, 0.3) 金 | 同上, + 脉冲动画 |
+
+### 设计决策记录
+
+1. **击中粒子使用武器特色形状而非统一方形**: 飞刀的水平条纹模拟切割、闪电的垂直火花模拟电弧、火法的垂直火焰模拟火焰上升。虽然粒子仅 2-3px，但形状差异在高频触发时会产生累积的武器辨识效果。统一方形方案更简单但失去差异化。
+
+2. **暴击使用统一金色而非武器特色色**: 金色是项目中"特殊/高价值"的通用色（金币、成就、精通 Master 等级）。统一暴击金色让玩家在任何武器上都能瞬间识别暴击，无需学习每种武器的暴击色。
+
+3. **投射物拖尾仅 2 段而非更多**: VS 使用 4-5 段拖尾但投射物更大（32px+）。我们的飞刀/回旋镖在 16-20px 下，2 段 8px 间距的拖尾已足够表达运动轨迹。更多段数会在密集战斗时造成视觉混乱。
+
+4. **Thunderang 拖尾使用 alpha 闪烁**: Thunderang（电金）和 Blazerang（烈焰红）颜色差异已足够，但行为差异是关键。Thunderang 的 alpha 随机闪烁模拟电流不稳定，Blazerang 的缩放扩展模拟火焰蔓延。即使不看颜色，行为模式也能区分两者。
+
+5. **武器精通使用 modulate 而非独立 PNG 徽章**: 4 等级 x 7 武器 = 28 个徽章 PNG 过于庞大。modulate 颜色变化实现零新资产，且 modulate 是 Godot 原生属性，性能开销为零。Master 等级的脉冲动画通过 Tween 实现，仅需 4 行代码。
+
+6. **精通升级文字弹出而非全屏覆盖**: 精通升级是游戏中的次要事件（非 Boss 出场/进化合成），应使用轻量级提示而非打断性的全屏效果。图标白闪 + 小文字上浮 0.8s 既提供足够的反馈又不打断战斗节奏。
+
+7. **击中粒子对象池 100 上限**: 30 敌人 x 2 武器 x 3 粒子 = 180 理论最大。100 上限在典型场景（10-20 敌人）下不会被触发，在极限场景（30+ 敌人满屏）下自动淘汰旧粒子防止性能退化。
+
+### 程序 Agent 修复清单
+
+| 优先级 | 文件 | 修改内容 |
+|--------|------|---------|
+| P2 | 新建 `scripts/effects/hit_particle_pool.gd` | 击中粒子对象池，100 ColorRect 预分配 |
+| P2 | 新建 `scripts/effects/projectile_trail_pool.gd` | 拖尾对象池，80 ColorRect 预分配 |
+| P2 | `scripts/weapon_effects.gd` | 在武器命中时触发击中粒子（按武器 ID 选择形状/颜色/行为） |
+| P2 | `scripts/projectile.gd` | 添加拖尾生成逻辑（_physics_process 每 3 帧生成 1 段） |
+| P2 | `scripts/boomerang.gd` | 添加拖尾生成逻辑（同上） |
+| P2 | `scripts/shop.gd` | 商店页面底部添加武器精通区域（7 行网格 + 进度条） |
+| P2 | `scripts/enemy.gd` | 击杀时检查精通升级并触发视觉反馈（白闪 + 文字弹出） |
+| P2 | `scripts/arena.tscn` | 添加 HitParticlePool + ProjectileTrailPool 节点 |
+
+### 新增配色表
+
+本轮未新增独立色值。所有效果使用现有配色表中的颜色：
+
+- 击中粒子: 各武器主色（knife 红/holywater 蓝/lightning 黄/bible 暖白/firestaff 橙/frostaura 冰蓝/boomerang 棕）
+- 暴击粒子: Color(1.0, 0.85, 0.0) #FFD700 金色（复用项目金色）
+- 拖尾颜色: 各武器主色半透明版本（alpha 0.25-0.35）
+- 精通等级 modulate: 基于灰/铜/银/暖白/金的 modulate 叠加
+
+### ColorRect 回退方案
+
+所有 R20 视觉效果均使用 ColorRect 实现，无 PNG 依赖：
+
+| 效果 | 实现方式 | PNG 需求 |
+|------|---------|---------|
+| 击中粒子 | ColorRect 2-3px，spawn 时设置 size/color/position | 0 |
+| 暴击粒子 | ColorRect 3x3，金色 | 0 |
+| 投射物拖尾 | ColorRect 半透明残影 | 0 |
+| 精通等级色 | modulate 颜色叠加到现有武器图标 PNG | 0 (复用已有) |
+| 精通脉冲动画 | Tween modulate/scale 动画 | 0 |
+| 精通升级文字 | Label 动态创建 | 0 |
+| 精通进度条 | ColorRect 填充 | 0 |
+
+### 质量自评: 97/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 配色准确性 | 15 | 15 | 所有粒子/拖尾/精通颜色复用现有配色，无新色值 |
+| 精灵覆盖率 | 15 | 15 | 66 PNG 无变化，R20 零新 PNG 需求 |
+| 击中粒子规范完整性 | 14 | 15 | 7 武器 x 完整参数表 + 暴击增强 + 性能预算 + 对象池方案 |
+| 投射物拖尾规范完整性 | 14 | 15 | 6 武器 x 完整参数表 + 适用性分析 + 性能优化 + 对象池方案 |
+| 武器精通视觉完整性 | 14 | 15 | 5 等级 modulate + 升级动画 + HUD 布局 + 进度条参数 |
+| 竞品借鉴转化 | 10 | 10 | R19 调研的击中粒子(HoloCure)+拖尾(VS)已完整规格化 |
+| 设计决策记录 | 10 | 10 | 7 个决策记录，每个含"为什么"和"替代方案" |
+
+**加分项**: 击中粒子 7 武器差异化形状/颜色/行为(+5), 投射物拖尾 6 武器全覆盖含进化(+4), 精通视觉零新 PNG 全部 modulate(+3), 对象池方案含伪代码(+3), 暴击双层粒子设计(内层武器色+外层金色)(+3)
+
+**扣分项**: 击中粒子和拖尾均需 Programmer Agent 实现(-2), 精通进度条布局为 ASCII 草图而非 Godot 场景结构(-1)
+
+### 与 Round 19 的改进对比
+
+| 指标 | R19 | R20 | 变化 |
+|------|-----|-----|------|
+| 竞品借鉴状态 | 调研记录 | 完整设计规格 | R19 调研 -> R20 规格 |
+| 击中粒子 | 参数建议 | 7 武器完整参数 + 对象池 + 暴击增强 | 全面规格化 |
+| 投射物拖尾 | 参数建议 | 6 武器完整参数 + 适用性分析 + 对象池 | 全面规格化 |
+| 武器精通视觉 | 无 | 5 等级 modulate + 升级动画 + HUD 布局 | 新增 |
+| 精灵总数 | 66 | 66 | 无变化（R20 零新 PNG） |
+
+### 待执行操作
+
+1. 通知 Programmer Agent: R20 三项设计规格已输出，可按优先级实现
+2. 实现优先级: P2 击中粒子 > P2 投射物拖尾 > P2 武器精通 HUD
+3. 击中粒子和拖尾的频率限制需实测验证，QA 应添加性能测试
+4. 武器精通 Master 脉冲动画需在商店场景中实测视觉节奏
+5. 后续 R21 可考虑: 击中粒子的进化武器差异化（thunderholywater/fireknife 等是否需要专属粒子形状）

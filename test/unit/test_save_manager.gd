@@ -79,8 +79,8 @@ func test_get_upgrade_cost_level0():
 
 
 func test_get_upgrade_cost_maxed():
-	_mgr.shop_upgrades["maxhp"] = 3
-	assert_eq(_mgr.get_upgrade_cost("maxhp"), -1, "Maxed should return -1")
+	_mgr.shop_upgrades["maxhp"] = 4
+	assert_eq(_mgr.get_upgrade_cost("maxhp"), -1, "Maxed should return -1 (T4 max)")
 
 
 func test_purchase_upgrade_success():
@@ -99,10 +99,10 @@ func test_purchase_upgrade_insufficient():
 
 
 func test_purchase_upgrade_maxed():
-	_mgr.shop_upgrades["maxhp"] = 3
+	_mgr.shop_upgrades["maxhp"] = 4
 	_mgr.add_soul_fragments(1000)
 	var result: bool = _mgr.purchase_upgrade("maxhp")
-	assert_eq(result, false, "Should fail purchase at max level")
+	assert_eq(result, false, "Should fail purchase at max level (T4 max)")
 
 
 func test_get_upgrade_level():
@@ -192,7 +192,7 @@ func test_quest_count():
 
 
 func test_achievement_count():
-	assert_eq(_mgr.ACHIEVEMENTS.size(), 28, "Should have 28 achievements")
+	assert_eq(_mgr.ACHIEVEMENTS.size(), 30, "Should have 30 achievements (28 original + 2 mastery)")
 
 
 func test_shop_upgrade_count():

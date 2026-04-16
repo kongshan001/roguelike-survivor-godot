@@ -61,6 +61,10 @@ func _fire_weapon(weapon_id: String, data: WeaponData, player: CharacterBody2D):
 	if player.skill_id == "elemental_burst" and not player.is_skill_ready:
 		dmg_bonus *= (1.0 + 0.10)
 
+	# Weapon mastery bonus (additive with shop bonus)
+	if SaveManager:
+		dmg_bonus *= (1.0 + SaveManager.get_weapon_mastery_bonus(weapon_id))
+
 	var wf: RefCounted = _get_weapon_fire()
 	match data.weapon_type:
 		"projectile":

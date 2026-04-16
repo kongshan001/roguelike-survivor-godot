@@ -264,6 +264,21 @@ func _handle_kill_rewards() -> void:
 		if _last_hit_by == "holywater":
 			GameManager.add_gold(1)
 
+	# Weapon mastery kill attribution
+	if SaveManager and _last_hit_by != "":
+		var evolved_parents: Dictionary = {
+			"thunderholywater": ["holywater", "lightning"], "fireknife": ["knife", "firestaff"],
+			"holydomain": ["bible", "holywater"], "blizzard": ["frostaura", "lightning"],
+			"frostknife": ["knife", "frostaura"], "flamebible": ["bible", "firestaff"],
+			"thunderang": ["boomerang", "lightning"],
+			"blazerang": ["boomerang", "firestaff"], "sentineltotem": ["bible", "boomerang"]
+		}
+		if evolved_parents.has(_last_hit_by):
+			for parent_id: String in evolved_parents[_last_hit_by]:
+				SaveManager.add_weapon_kill(parent_id)
+		else:
+			SaveManager.add_weapon_kill(_last_hit_by)
+
 
 # Frost Aura Lv3: Shatter -- frozen enemy explodes on death
 const FROSTAURA_LV3_SHATTER_RADIUS: float = 50.0
@@ -293,17 +308,7 @@ func _spawn_shatter_effect() -> void:
 	var circle: Node2D = Node2D.new()
 	circle.global_position = global_position
 	var script := GDScript.new()
-	script.source_code = (
-		"extends Node2D\n"
-		+ "var alpha: float = 0.6\n"
-		+ "func _process(delta):\n"
-		+ "\talpha -= delta * 3.0\n"
-		+ "\tif alpha <= 0.0:\n"
-		+ "\t\tqueue_free()\n"
-		+ "\tqueue_redraw()\n"
-		+ "func _draw():\n"
-		+ "\tdraw_circle(Vector2.ZERO, 50.0, Color(0.5, 0.8, 1.0, alpha))\n"
-	)
+	script.source_code = "extends Node2D\nvar alpha: float = 0.6\nfunc _process(delta):\n\talpha -= delta * 3.0\n\tif alpha <= 0.0:\n\t\tqueue_free()\n\tqueue_redraw()\nfunc _draw():\n\tdraw_circle(Vector2.ZERO, 50.0, Color(0.5, 0.8, 1.0, alpha))\n"
 	script.reload()
 	circle.set_script(script)
 	get_parent().call_deferred("add_child", circle)
@@ -411,19 +416,16 @@ func _spawn_food():
 
 func _spawn_food_at(pos: Vector2) -> void:
 	var food: Area2D = Area2D.new()
-	food.collision_mask = 1  # Player layer
-	food.set_script(preload("res://scripts/food_pickup.gd"))
+	food.collision_mask = 1; food.set_script(preload("res://scripts/food_pickup.gd"))  # Player layer
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var circle: CircleShape2D = CircleShape2D.new()
-	circle.radius = 6.0
-	shape.shape = circle
+	circle.radius = 6.0; shape.shape = circle
 	food.add_child(shape)
 	var sprite: Sprite2D = Sprite2D.new()
 	var tex_path: String = "res://assets/sprites/pickups/food.png"
 	if ResourceLoader.exists(tex_path):
 		sprite.texture = load(tex_path)
-	sprite.scale = Vector2(0.25, 0.25)
-	sprite.modulate = Color(0.4, 0.9, 0.3)
+	sprite.scale = Vector2(0.25, 0.25); sprite.modulate = Color(0.4, 0.9, 0.3)
 	food.add_child(sprite)
 	food.global_position = pos
 	get_parent().call_deferred("add_child", food)

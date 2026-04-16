@@ -113,10 +113,10 @@ func _on_back() -> void:
 
 func _get_effect_text(id: String) -> String:
 	match id:
-		"maxhp": return "+1/+2/+3 HP"
-		"speed": return "+5%/+10%/+15% Speed"
-		"pickup": return "+5/+10/+15 Pickup Range"
-		"expbonus": return "+5%/+10%/+15% EXP"
-		"weapondmg": return "+3%/+6%/+10% Weapon DMG"
-		"gold": return "+10%/+20%/+30% Gold"
+		"maxhp": return "+1/+2/+3/+5 HP"
+		"speed": return "+5%/+10%/+15%/+20% Speed"
+		"pickup": return "+5/+10/+15/+20 Pickup Range"
+		"expbonus": return "+5%/+10%/+15%/+20% EXP"
+		"weapondmg": return "+3%/+6%/+10%/+15% Weapon DMG"
+		"gold": return "+10%/+20%/+30%/+40% Gold"
 		_: return ""

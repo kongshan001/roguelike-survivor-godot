@@ -4,6 +4,9 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-17 R20 | 1520 | 3486 | 1520 通过, 0 失败, 0 pending, 0 orphan, 122项新测试(XP曲线31+T4商店39+武器精通52), 2项已有测试适配(max_level 3->4, achievements 28->30), BUG-275 已修复 |
+| 2026-04-17 R16 | 1191 | 2935 | 1191 通过, 0 失败, 0 pending, 0 orphan, 79项边界压力测试新增 |
+| 2026-04-17 R15 | 1112 | 2697 | 1110 通过, 0 失败, 2 pending (chest.png), 42项精灵迁移验证新增 |
 | 2026-04-17 R16 | 1191 | 2935 | 1191 通过, 0 失败, 0 pending, 0 orphan, 79项边界压力测试新增 |
 | 2026-04-17 R15 | 1112 | 2697 | 1110 通过, 0 失败, 2 pending (chest.png), 42项精灵迁移验证新增 |
 | 2026-04-16 R8 | 822 | 2072 | 820 通过, 0 失败, 2 pending |
@@ -36,7 +39,91 @@
 | 2026-04-14 | 428 | 910 | 全部通过（ColorRect->Sprite2D像素精灵迁移回归测试 + 视觉验证） |
 | 2026-04-15 | 467 | 1079 | 全部通过（覆盖率分析：33源文件中10个无专门测试文件） |
 
-## 测试文件覆盖
+## R20 QA 测试报告
+
+### 任务完成状态
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 任务1: XP曲线微调测试 | 完成 | test_xp_curve_tuning.gd 31项测试 |
+| 任务2: 商店T4测试 | 完成 | test_shop_t4.gd 39项测试 |
+| 任务3: 武器精通系统测试 | 完成 | test_weapon_mastery.gd 52项测试 |
+| 任务4: 全回归测试 | 受阻 | BUG-275 Parse Error 导致 9 测试失败 |
+
+### 新增测试文件 (3 files, 122 tests)
+
+| 文件 | 测试数 | 覆盖模块 |
+|------|--------|----------|
+| test_xp_curve_tuning.gd | 31 | EXP_TABLE索引4/5/6验证(3), 未修改索引回归(12), _calculate_xp_needed(5), 升级流程(3), 累积XP减少百分比(2), 每级减少百分比(3), 多级流程(2), 重置(1) |
+| test_shop_t4.gd | 39 | max_level=4(6), T4成本=2xT3(6), T4具体成本值(6), T4购买流程(6), T4效果(7), T3存档兼容(2), 成就条件(2), 总成本验证(1), T1-T3不变(3) |
+| test_weapon_mastery.gd | 52 | 常量初始化(4), 击杀追踪(6), 精通等级计算(11), 精通加成(7), 进化武器击杀归因(5), SaveManager持久化(3), 商店加成叠加(2), 角色被动叠加(3), 成就条件(3), 边缘案例(4), 成就方法(5) |
+
+### 已有测试适配 (2 tests updated)
+
+| 文件 | 原断言 | 新断言 | 原因 |
+|------|--------|--------|------|
+| test_save_manager.gd | ACHIEVEMENTS.size() = 28 | = 30 | +2 mastery成就(mastery_first, mastery_all) |
+| test_save_manager.gd | maxhp level 3 = maxed | level 4 = maxed | max_level 从 3 变为 4 |
+| test_boundary_stress.gd | maxhp level 3 = maxed | level 4 = maxed | max_level 从 3 变为 4 |
+
+### 缺陷报告
+
+| ID | 严重度 | 模块 | 描述 | 状态 | 指派 |
+|----|--------|------|------|------|------|
+| BUG-275 | Critical | save_manager.gd | Parse Error: 第97-98行 ACHIEVEMENTS 精通成就缩进多1级tab; 第454-456行 load_save() 精通加载缩进多1级tab | 已修复 | Programmer |
+| BUG-276 | Medium | test_boundary_stress.gd | max_level=3 断言需适配为 4 (已在本次QA修复) | 已修复 | QA |
+
+### BUG-275 详细分析
+
+**症状**: `SCRIPT ERROR: Parse Error: Expected statement, found "Indent" instead. at: GDScript::reload (res://scripts/autoload/save_manager.gd:455)`
+
+**根因**: Programmer R20 实现精通系统和T4商店时, save_manager.gd 有两处缩进错误:
+
+1. **第97-98行** ACHIEVEMENTS 数组内新增的 mastery_first 和 mastery_all 条目缩进多了一个 tab
+2. **第454-456行** load_save() 函数内新增的精通加载代码缩进多了一个 tab
+
+**影响范围**: SaveManager autoload 无法加载, 所有依赖 SaveManager 的测试失败, 游戏无法启动
+
+**修复**: Programmer 已在 QA 测试期间修复两处缩进错误, 最终 1520 测试全部通过
+
+**Programmer 实现验证** (除 BUG-275 外):
+
+| 功能 | 实现状态 | 验证方式 |
+|------|----------|----------|
+| EXP_TABLE [29,38,50] | 已实现 | git diff game_manager.gd 确认 |
+| SHOP_UPGRADES max_level=4 | 已实现 | git diff save_manager.gd 确认 |
+| T4 costs = 2x T3 | 已实现 | [20,40,80,160] 等确认 |
+| T4 bonus arrays | 已实现 | [0,1,2,3,5] HP, [0,0.05,...,0.20] speed 等确认 |
+| shop.gd effect text | 已实现 | "+1/+2/+3/+5 HP" 等确认 |
+| MASTERY_THRESHOLDS/BONUSES/BASE_WEAPONS | 已实现 | 常量定义确认 |
+| add_weapon_kill/get_weapon_kill_count | 已实现 | 函数签名确认 |
+| get_weapon_mastery_tier/get_weapon_mastery_bonus | 已实现 | 函数逻辑确认 |
+| check_mastery_achievements | 已实现 | mastery_first/mastery_all 确认 |
+| enemy.gd evolved_parents 归因 | 已实现 | 9种进化武器父级映射确认 |
+| weapon_kills save/load/reset | 已实现 | save/load/reset 代码确认 |
+| 2 new achievements (mastery_first, mastery_all) | 已实现 | ACHIEVEMENTS 数组新增确认 |
+
+### 测试结果 (BUG-275 修复后验证)
+
+| 指标 | 值 |
+|------|-----|
+| 总测试文件 | 55 |
+| 总测试函数 | 1520 |
+| 总断言 | 3486 |
+| 通过 | 1520 |
+| 失败 | 0 |
+| Pending | 0 |
+| Orphan | 0 |
+
+### QA 自评分数: 95/100
+
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| XP曲线测试 | 25 | 25 | 31项测试覆盖索引验证/回归/升级流程/累积百分比 |
+| T4商店测试 | 25 | 25 | 39项测试覆盖max_level/成本/购买/效果/兼容/成就 |
+| 武器精通测试 | 30 | 30 | 52项测试覆盖击杀/等级/归因/持久化/叠加/成就方法 |
+| 全回归测试 | 15 | 20 | 1520测试全部通过, 0失败, 0 orphan, -5 因 BUG-275 初始阻断(已修复) |
+
 
 | 文件 | 测试数 | 覆盖模块 |
 |------|--------|----------|

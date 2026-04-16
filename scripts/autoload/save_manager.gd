@@ -7,7 +7,7 @@ signal achievement_unlocked(achievement_id: String)
 signal quest_completed(quest_id: String)
 
 var soul_fragments: int = 0
-var shop_upgrades: Dictionary = {}  # id -> level (0-3)
+var shop_upgrades: Dictionary = {}  # id -> level (0-4)
 var completed_quests: Dictionary = {}
 var completed_achievements: Dictionary = {}
 var total_kills: int = 0
@@ -21,17 +21,24 @@ var synergy_history: Dictionary = {}    # synergy_id -> true
 # Tutorial progress: 0=not started, 1-5=steps completed, tutorial_completed=all done
 var tutorial_step: int = 0
 var tutorial_completed: bool = false
+# Weapon mastery kill counts (base weapons only)
+var weapon_kills: Dictionary = {}  # weapon_id -> kill count
 
 const SAVE_PATH: String = "user://save.cfg"
 
+# Weapon mastery constants
+const MASTERY_THRESHOLDS: Array[int] = [0, 50, 200, 500, 1000]
+const MASTERY_BONUSES: Array[float] = [0.0, 0.02, 0.04, 0.06, 0.08]
+const BASE_WEAPONS: Array[String] = ["knife", "holywater", "lightning", "bible", "firestaff", "frostaura", "boomerang"]
+
 # Shop upgrade definitions
 const SHOP_UPGRADES: Dictionary = {
-	"maxhp": {"name": "生命强化", "icon": "❤️", "costs": [20, 40, 80], "max_level": 3},
-	"speed": {"name": "速度训练", "icon": "👟", "costs": [20, 40, 80], "max_level": 3},
-	"pickup": {"name": "拾取精通", "icon": "📡", "costs": [15, 30, 60], "max_level": 3},
-	"expbonus": {"name": "知识汲取", "icon": "📚", "costs": [25, 50, 100], "max_level": 3},
-	"weapondmg": {"name": "武器精通", "icon": "⚔️", "costs": [30, 60, 120], "max_level": 3},
-	"gold": {"name": "贪婪之心", "icon": "💰", "costs": [15, 30, 60], "max_level": 3},
+	"maxhp": {"name": "生命强化", "icon": "❤️", "costs": [20, 40, 80, 160], "max_level": 4},
+	"speed": {"name": "速度训练", "icon": "👟", "costs": [20, 40, 80, 160], "max_level": 4},
+	"pickup": {"name": "拾取精通", "icon": "📡", "costs": [15, 30, 60, 120], "max_level": 4},
+	"expbonus": {"name": "知识汲取", "icon": "📚", "costs": [25, 50, 100, 200], "max_level": 4},
+	"weapondmg": {"name": "武器精通", "icon": "⚔️", "costs": [30, 60, 120, 240], "max_level": 4},
+	"gold": {"name": "贪婪之心", "icon": "💰", "costs": [15, 30, 60, 120], "max_level": 4},
 }
 
 # Quest definitions
@@ -90,6 +97,9 @@ const ACHIEVEMENTS: Array = [
 	# 隐藏(2)
 	{"id": "fast_boss", "name": "速杀", "desc": "3分钟内击败Boss", "reward": 200},
 	{"id": "pacifist_1min", "name": "和平主义者", "desc": "开局1分钟不杀敌", "reward": 60},
+	# 武器精通(2)
+	{"id": "mastery_first", "name": "初窥门径", "desc": "任意武器达到学徒等级", "reward": 30},
+	{"id": "mastery_all", "name": "万物精通", "desc": "全部7把武器达到宗师等级", "reward": 500},
 ]
 
 
@@ -105,6 +115,8 @@ func _init_data() -> void:
 		completed_quests[q["id"]] = false
 	for a: Dictionary in ACHIEVEMENTS:
 		completed_achievements[a["id"]] = false
+	for weapon_id: String in BASE_WEAPONS:
+		weapon_kills[weapon_id] = 0
 
 
 # --- Soul Fragments ---
@@ -153,32 +165,32 @@ func get_upgrade_level(upgrade_id: String) -> int:
 
 func get_hp_bonus() -> int:
 	var level: int = shop_upgrades.get("maxhp", 0)
-	return [0, 1, 2, 3][level]
+	return [0, 1, 2, 3, 5][level]
 
 
 func get_speed_bonus() -> float:
 	var level: int = shop_upgrades.get("speed", 0)
-	return [0.0, 0.05, 0.10, 0.15][level]
+	return [0.0, 0.05, 0.10, 0.15, 0.20][level]
 
 
 func get_pickup_bonus() -> float:
 	var level: int = shop_upgrades.get("pickup", 0)
-	return [0.0, 5.0, 10.0, 15.0][level]
+	return [0.0, 5.0, 10.0, 15.0, 20.0][level]
 
 
 func get_exp_bonus() -> float:
 	var level: int = shop_upgrades.get("expbonus", 0)
-	return [0.0, 0.05, 0.10, 0.15][level]
+	return [0.0, 0.05, 0.10, 0.15, 0.20][level]
 
 
 func get_weapon_dmg_bonus() -> float:
 	var level: int = shop_upgrades.get("weapondmg", 0)
-	return [0.0, 0.03, 0.06, 0.10][level]
+	return [0.0, 0.03, 0.06, 0.10, 0.15][level]
 
 
 func get_gold_bonus() -> float:
 	var level: int = shop_upgrades.get("gold", 0)
-	return [0.0, 0.10, 0.20, 0.30][level]
+	return [0.0, 0.10, 0.20, 0.30, 0.40][level]
 
 
 # --- Quest/Achievement Checking ---
@@ -289,6 +301,9 @@ func check_quests_and_achievements() -> void:
 	var soul_reward: int = int(GameManager.gold * soul_rate)
 	add_soul_fragments(soul_reward)
 
+	# Mastery achievements
+	check_mastery_achievements()
+
 	save()
 
 
@@ -328,6 +343,47 @@ func _check_shop_achievements() -> void:
 	_check_achievement("shop_max_all", all_maxed)
 
 
+# --- Weapon Mastery ---
+
+func add_weapon_kill(weapon_id: String) -> void:
+	if weapon_id in BASE_WEAPONS:
+		weapon_kills[weapon_id] = weapon_kills.get(weapon_id, 0) + 1
+
+
+func get_weapon_kill_count(weapon_id: String) -> int:
+	return weapon_kills.get(weapon_id, 0)
+
+
+func get_weapon_mastery_tier(weapon_id: String) -> int:
+	var kills: int = get_weapon_kill_count(weapon_id)
+	var tier: int = 0
+	for i in range(MASTERY_THRESHOLDS.size() - 1, -1, -1):
+		if kills >= MASTERY_THRESHOLDS[i]:
+			tier = i
+			break
+	return tier
+
+
+func get_weapon_mastery_bonus(weapon_id: String) -> float:
+	var tier: int = get_weapon_mastery_tier(weapon_id)
+	if tier < MASTERY_BONUSES.size():
+		return MASTERY_BONUSES[tier]
+	return 0.0
+
+
+func check_mastery_achievements() -> void:
+	var max_tier: int = 0
+	var all_master: bool = true
+	for weapon_id: String in BASE_WEAPONS:
+		var tier: int = get_weapon_mastery_tier(weapon_id)
+		if tier > max_tier:
+			max_tier = tier
+		if tier < 4:
+			all_master = false
+	_check_achievement("mastery_first", max_tier >= 1)
+	_check_achievement("mastery_all", all_master)
+
+
 # --- Save/Load ---
 
 func save() -> void:
@@ -352,6 +408,9 @@ func save() -> void:
 
 	config.set_value("tutorial", "step", tutorial_step)
 	config.set_value("tutorial", "completed", tutorial_completed)
+
+	for weapon_id in weapon_kills:
+		config.set_value("mastery", weapon_id, weapon_kills[weapon_id])
 
 	config.save(SAVE_PATH)
 
@@ -391,6 +450,10 @@ func load_save() -> void:
 	tutorial_step = config.get_value("tutorial", "step", 0)
 	tutorial_completed = config.get_value("tutorial", "completed", false)
 
+	# Load weapon mastery
+	for weapon_id: String in BASE_WEAPONS:
+		weapon_kills[weapon_id] = config.get_value("mastery", weapon_id, 0)
+
 
 func reset_save() -> void:
 	soul_fragments = 0
@@ -400,6 +463,7 @@ func reset_save() -> void:
 	characters_cleared = {}
 	evolution_history = {}
 	synergy_history = {}
+	weapon_kills.clear()
 	tutorial_step = 0
 	tutorial_completed = false
 	_init_data()

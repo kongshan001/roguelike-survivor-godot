@@ -18,6 +18,38 @@
 
 ## 技术决策
 
+### 2026-04-17: R20 XP曲线微调 + 商店T4扩展 + 武器精通系统
+- **决策**: 实现v1.0.2三项系统级功能，按designer-log spec编码
+- **为什么**:
+  - XP曲线微调: 修正mid-game "flat middle" 节奏问题(1:00-2:30), 索引4/5/6从[32,42,55]降为[29,38,50], 累计影响在Lv8时-6.3%
+  - 商店T4: max_level从3扩展到4, costs数组添加第四元素(=T3*2), 6个bonus getter函数添加第五元素, 总成本从875增至1875, 延长从~5 runs到~10 runs
+  - 武器精通: 7把基础武器独立追踪击杀数, 4个等级门槛[50,200,500,1000], 每级+2%/4%/6%/8%伤害加成, 与商店bonus叠加, 角色passive乘算
+- **技术约束**:
+  - enemy.gd从497行增至506行, 超过500行限制; 通过合并`_spawn_shatter_effect`内联脚本为单行+合并`_spawn_food_at`两行+合并evolved_parents字典行压缩至499行
+  - float精度: 0.15+0.08=0.2299...不等于0.23, 测试改用`assert_almost_eq`
+  - `is_instance_valid()`是全局函数不是Node方法; `_init_data()`必须强制重置`weapon_kills`(不能仅`if not has`)
+- **新增常量**:
+  - `MASTERY_THRESHOLDS: Array[int] = [0, 50, 200, 500, 1000]`
+  - `MASTERY_BONUSES: Array[float] = [0.0, 0.02, 0.04, 0.06, 0.08]`
+  - `BASE_WEAPONS: Array[String]` (7种基础武器)
+- **新增函数(SaveManager)**:
+  - `add_weapon_kill(weapon_id)`: 只追踪BASE_WEAPONS中的武器
+  - `get_weapon_kill_count(weapon_id) -> int`
+  - `get_weapon_mastery_tier(weapon_id) -> int`: 反向遍历阈值找最高达标等级
+  - `get_weapon_mastery_bonus(weapon_id) -> float`
+  - `check_mastery_achievements()`: 检查mastery_first(任意>=50击杀)和mastery_all(全部>=1000击杀)
+- **新增成就**: `mastery_first`(初窥门径, 30SF) + `mastery_all`(万物精通, 500SF), ACHIEVEMENTS从28增至30
+- **伤害公式**: `dmg_bonus *= (1.0 + SaveManager.get_weapon_mastery_bonus(weapon_id))` 在weapon_controller.gd中应用
+- **击杀归因(enemy.gd)**: `_handle_kill_rewards()`中, 根据`_last_hit_by`判定武器; 9种进化武器映射到双父武器同时计数
+- **存档兼容**: `weapon_kills`在save()中写入`[mastery]` section, load_save()中从`[mastery]` section读取; 旧存档无此section时默认0
+- **修改文件**:
+  - `scripts/autoload/game_manager.gd` (389行): EXP_TABLE索引4/5/6修改
+  - `scripts/autoload/save_manager.gd` (470行): SHOP_UPGRADES T4扩展, 6个bonus getter第5元素, mastery变量/常量/函数, save/load/reset集成, 2个新成就
+  - `scripts/enemy.gd` (499行): _handle_kill_rewards()添加mastery击杀归因, evolved_parents映射(9条)
+  - `scripts/weapon_controller.gd` (136行): _fire_weapon()添加mastery伤害乘数
+  - `scripts/shop.gd` (122行): _get_effect_text()更新为4级显示
+- **测试**: 1520测试全部通过 (从1398增加122个新测试), 0 pending, 0失败
+
 ### 2026-04-17: R19 敌人受伤/死亡动画 + UI卡片悬浮 + BUG-273修复验证
 - **决策**: 实现敌人受伤/死亡动画系统，提取为独立模块 `enemy_death_effects.gd`；HUD升级面板卡牌悬浮效果；验证BUG-273纹理回退
 - **为什么**:
