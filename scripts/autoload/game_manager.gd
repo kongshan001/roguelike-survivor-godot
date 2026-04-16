@@ -40,10 +40,10 @@ const WAVE_DEFS: Array = [
 	 "enemies": ["zombie", "bat", "skeleton", "ghost"], "spawn_base": 1.2, "count_base": 3,
 	 "color": [1.0, 0.57, 0.0]},
 	{"id": "wave_elite", "name": "Elite", "duration": 57.0,
-	 "enemies": ["zombie", "bat", "skeleton", "ghost", "elite_skeleton", "splitter"],
+	 "enemies": ["zombie", "bat", "skeleton", "ghost", "elite_skeleton", "splitter", "fire_slime"],
 	 "spawn_base": 1.0, "count_base": 4, "color": [0.94, 0.33, 0.31]},
 	{"id": "wave_boss", "name": "Boss", "duration": 57.0,
-	 "enemies": ["zombie", "bat", "skeleton", "ghost", "elite_skeleton", "splitter"],
+	 "enemies": ["zombie", "bat", "skeleton", "ghost", "elite_skeleton", "splitter", "fire_slime"],
 	 "spawn_base": 0.8, "count_base": 5, "color": [1.0, 0.09, 0.17], "boss": true}
 ]
 

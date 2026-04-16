@@ -202,13 +202,13 @@ func test_types_wave_4_elite():
 	var types: Array = _spawner._get_available_types()
 	assert_has(types, "elite_skeleton", "Wave 4 should have elite_skeleton")
 	assert_has(types, "splitter", "Wave 4 should have splitter")
-	assert_eq(types.size(), 6, "Wave 4 should have 6 types (fire_slime pending WAVE_DEFS update)")
+	assert_eq(types.size(), 7, "Wave 4 should have 7 types (including fire_slime)")
 
 
 func test_types_wave_5_boss():
 	GameManager.current_wave = 5
 	var types: Array = _spawner._get_available_types()
-	assert_eq(types.size(), 6, "Wave 5 (boss wave) should have 6 types (fire_slime pending WAVE_DEFS update)")
+	assert_eq(types.size(), 7, "Wave 5 (boss wave) should have 7 types (including fire_slime)")
 
 
 # --- Boss spawn time ---
