@@ -2,6 +2,7 @@ extends Node2D
 
 var _shake_amount: float = 0.0
 var _shake_decay: float = 5.0
+var _shake_cooldown: float = 0.0
 var _prev_health: float = -1.0
 var _chest_spawner: Node = null
 var _gold_income_timer: float = 0.0
@@ -66,6 +67,10 @@ func _process(delta):
 	if player and is_instance_valid(player):
 		$Camera2D.global_position = player.global_position
 
+	# Screen shake cooldown (prevent continuous shake from burn DOT)
+	if _shake_cooldown > 0:
+		_shake_cooldown -= delta
+
 	# Screen shake
 	if _shake_amount > 0:
 		_shake_amount = maxf(0, _shake_amount - _shake_decay * delta)
@@ -88,9 +93,10 @@ func screen_shake(amount: float) -> void:
 
 
 func _on_health_changed_shake(cur: float, _max: float) -> void:
-	# Only shake on damage, not healing
-	if _prev_health >= 0.0 and cur < _prev_health:
+	# Only shake on damage, not healing, with cooldown to prevent burn DOT spam
+	if _prev_health >= 0.0 and cur < _prev_health and _shake_cooldown <= 0:
 		screen_shake(3.0)
+		_shake_cooldown = 0.5
 	_prev_health = cur
 
 

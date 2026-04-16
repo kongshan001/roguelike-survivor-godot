@@ -31,7 +31,7 @@ func _register_base_weapons() -> void:
 	# 1. Holy Water
 	var hw := WeaponData.new()
 	hw.weapon_name = "圣水"; hw.weapon_id = "holywater"; hw.weapon_type = "orbit"
-	hw.damage = 1.5; hw.cooldown = 999.0; hw.orbit_count = 1; hw.orbit_radius = 50.0
+	hw.damage = 1.5; hw.cooldown = 1.0; hw.orbit_count = 1; hw.orbit_radius = 50.0
 	hw.orbit_speed = 3.0; hw.description = "环绕旋转"; hw.color = Color(0.3, 0.5, 1.0); hw.projectile_size = 8.0
 	register_weapon("holywater", hw)
 	# 2. Knife
@@ -49,7 +49,7 @@ func _register_base_weapons() -> void:
 	# 4. Bible
 	var bb := WeaponData.new()
 	bb.weapon_name = "圣经"; bb.weapon_id = "bible"; bb.weapon_type = "orbit"
-	bb.damage = 1.0; bb.cooldown = 999.0; bb.orbit_count = 1; bb.orbit_radius = 80.0
+	bb.damage = 1.0; bb.cooldown = 1.0; bb.orbit_count = 1; bb.orbit_radius = 80.0
 	bb.orbit_speed = 3.0; bb.description = "范围旋转"; bb.color = Color(0.9, 0.85, 0.7); bb.projectile_size = 20.0
 	register_weapon("bible", bb)
 	# 5. Fire Staff
@@ -61,7 +61,7 @@ func _register_base_weapons() -> void:
 	# 6. Frost Aura
 	var fa := WeaponData.new()
 	fa.weapon_name = "冰冻光环"; fa.weapon_id = "frostaura"; fa.weapon_type = "aura"
-	fa.damage = 1.0; fa.cooldown = 999.0; fa.aoe_radius = 80.0; fa.slow_pct = 0.3
+	fa.damage = 1.0; fa.cooldown = 0.0; fa.aoe_radius = 80.0; fa.slow_pct = 0.3
 	fa.description = "范围减速"; fa.color = Color(0.5, 0.8, 1.0)
 	register_weapon("frostaura", fa)
 	# 7. Boomerang
@@ -77,7 +77,7 @@ func _register_evolved_weapons() -> void:
 	# 1. 雷暴圣水
 	var thw := WeaponData.new()
 	thw.weapon_name = "雷暴圣水"; thw.weapon_id = "thunderholywater"; thw.weapon_type = "orbit"
-	thw.damage = 1.5; thw.cooldown = 999.0; thw.orbit_count = 3; thw.orbit_radius = 60.0
+	thw.damage = 1.5; thw.cooldown = 1.0; thw.orbit_count = 3; thw.orbit_radius = 60.0
 	thw.orbit_speed = 3.5; thw.color = Color(0.2, 0.4, 1.0); thw.projectile_size = 10.0
 	thw.is_evolved = true; thw.description = "旋转+链式闪电"
 	register_weapon("thunderholywater", thw)
@@ -92,14 +92,14 @@ func _register_evolved_weapons() -> void:
 	# 3. 圣光领域
 	var hd := WeaponData.new()
 	hd.weapon_name = "圣光领域"; hd.weapon_id = "holydomain"; hd.weapon_type = "orbit"
-	hd.damage = 2.5; hd.cooldown = 999.0; hd.orbit_count = 4; hd.orbit_radius = 130.0
+	hd.damage = 2.5; hd.cooldown = 1.0; hd.orbit_count = 4; hd.orbit_radius = 130.0
 	hd.orbit_speed = 4.0; hd.color = Color(1.0, 1.0, 0.8); hd.projectile_size = 14.0
 	hd.is_evolved = true; hd.description = "超大范围+圣光脉冲"
 	register_weapon("holydomain", hd)
 	# 4. 暴风雪
 	var bz := WeaponData.new()
 	bz.weapon_name = "暴风雪"; bz.weapon_id = "blizzard"; bz.weapon_type = "aura"
-	bz.damage = 3.0; bz.cooldown = 999.0; bz.aoe_radius = 160.0; bz.slow_pct = 0.7
+	bz.damage = 3.0; bz.cooldown = 0.0; bz.aoe_radius = 160.0; bz.slow_pct = 0.7
 	bz.freeze_pct = 0.15; bz.color = Color(0.3, 0.6, 1.0); bz.is_evolved = true
 	bz.description = "大范围暴风雪+闪电链"
 	register_weapon("blizzard", bz)
@@ -114,7 +114,7 @@ func _register_evolved_weapons() -> void:
 	# 6. 烈焰经文
 	var fb := WeaponData.new()
 	fb.weapon_name = "烈焰经文"; fb.weapon_id = "flamebible"; fb.weapon_type = "orbit"
-	fb.damage = 5.0; fb.cooldown = 999.0; fb.orbit_count = 1; fb.orbit_radius = 140.0
+	fb.damage = 5.0; fb.cooldown = 1.0; fb.orbit_count = 1; fb.orbit_radius = 140.0
 	fb.orbit_speed = 4.0; fb.burn_dps = 3.0; fb.burn_duration = 2.0
 	fb.color = Color(1.0, 0.3, 0.1); fb.projectile_size = 28.0; fb.is_evolved = true
 	fb.description = "旋转灼烧+火焰脉冲"
