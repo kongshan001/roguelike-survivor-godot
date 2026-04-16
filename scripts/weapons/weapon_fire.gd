@@ -143,7 +143,7 @@ func update_orbit(weapon_id: String, data: WeaponData, level: int, player: Chara
 		return orbit_instances
 
 	var key: String = weapon_id
-	if orbit_instances.has(key) and _controller.is_instance_valid(orbit_instances[key]):
+	if orbit_instances.has(key) and is_instance_valid(orbit_instances[key]):
 		var existing: Node2D = orbit_instances[key]
 		if existing.orbit_count != orbit_count or existing.orbit_radius != radius:
 			existing.queue_free()
@@ -335,7 +335,7 @@ func fire_boomerang(data: WeaponData, level: int, player: CharacterBody2D, dmg_b
 
 	weapon_timers[data.weapon_id] = maxf(cooldown, 0.5)
 
-	var valid_boomerangs := boomerang_instances.filter(func(b): return _controller.is_instance_valid(b))
+	var valid_boomerangs := boomerang_instances.filter(func(b): return is_instance_valid(b))
 
 	for i in range(count):
 		if valid_boomerangs.size() >= BOOMERANG_MAX_COUNT:
