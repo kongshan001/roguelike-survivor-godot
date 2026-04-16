@@ -6,6 +6,7 @@ var _shake_cooldown: float = 0.0
 var _prev_health: float = -1.0
 var _chest_spawner: Node = null
 var _gold_income_timer: float = 0.0
+var _tutorial_manager: Node = null
 
 # Endless mode constants
 const ENDLESS_GOLD_INCOME_INTERVAL: float = 60.0
@@ -60,6 +61,13 @@ func _ready():
 	GameManager.victory_achieved.connect(_on_victory_achieved)
 
 	_draw_grid()
+
+	# Tutorial system
+	_tutorial_manager = Node.new()
+	_tutorial_manager.set_script(load("res://scripts/tutorial_manager.gd"))
+	_tutorial_manager.name = "TutorialManager"
+	add_child(_tutorial_manager)
+	_tutorial_manager.setup(self)
 
 
 func _process(delta):

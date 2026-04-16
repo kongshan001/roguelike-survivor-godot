@@ -90,7 +90,7 @@ func _update_boomerangs(_delta: float):
 
 func _get_enemies_in_range(player: Node2D, range_val: float) -> Array:
 	var enemies: Array = []
-	var all_enemies := get_tree().get_nodes_in_group("enemies")
+	var all_enemies: Array = GameManager.get_cached_enemies() if GameManager else get_tree().get_nodes_in_group("enemies")
 	for enemy in all_enemies:
 		if is_instance_valid(enemy) and enemy.is_alive:
 			var dist := player.global_position.distance_to(enemy.global_position)

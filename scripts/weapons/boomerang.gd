@@ -121,7 +121,7 @@ func _physics_process(delta):
 
 
 func _get_nearest_enemy_in_cone() -> Node2D:
-	var enemies = get_tree().get_nodes_in_group("enemies")
+	var enemies: Array = GameManager.get_cached_enemies() if GameManager else get_tree().get_nodes_in_group("enemies")
 	var closest: Node2D = null
 	var closest_dist: float = 200.0
 	for enemy in enemies:

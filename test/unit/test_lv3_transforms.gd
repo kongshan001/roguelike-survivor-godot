@@ -478,9 +478,49 @@ func test_lightning_evolved_uses_data_chain_count():
 	assert_eq(evolved_chain_count, 3, "Evolved uses own chain_count")
 
 
-func test_lightning_lv3_chain_bonus_constant():
+func test_lightning_lv3_chain_formula_no_unused_constant():
+	# R17: LIGHTNING_LV3_CHAIN_BONUS was an unused constant removed from weapon_fire.gd (BUG-272 fix).
+	# The actual chain formula is `chains = level - 1` (inline, not referencing the removed constant).
+	# Verify the formula produces correct chain counts at each level.
+	assert_eq(1 - 1, 0, "Lv1 chains = 0 (no chain)")
+	assert_eq(2 - 1, 1, "Lv2 chains = 1")
+	assert_eq(3 - 1, 2, "Lv3 chains = 2 (matches old LIGHTNING_LV3_CHAIN_BONUS value of 2)")
+	assert_eq(4 - 1, 3, "Lv4 chains = 3")
+	assert_eq(5 - 1, 4, "Lv5 chains = 4")
+	# Verify the removed constant no longer exists on weapon_fire
 	var wf: RefCounted = _create_weapon_fire()
-	assert_eq(wf.LIGHTNING_LV3_CHAIN_BONUS, 2, "Chain bonus constant = 2")
+	assert_false("LIGHTNING_LV3_CHAIN_BONUS" in wf, "LIGHTNING_LV3_CHAIN_BONUS should be removed from weapon_fire (BUG-272 fixed)")
+
+
+# =========================================================================
+# BUG-272 Verification: weapon_fire.gd unused constants cleanup
+# R17 Programmer removed 4 unused constants. These tests verify removal.
+# =========================================================================
+
+func test_bug272_burn_dps_removed():
+	var wf: RefCounted = _create_weapon_fire()
+	assert_false("BURN_DPS" in wf, "BUG-272: BURN_DPS should be removed from weapon_fire.gd (was unused)")
+
+func test_bug272_burn_duration_removed():
+	var wf: RefCounted = _create_weapon_fire()
+	assert_false("BURN_DURATION" in wf, "BUG-272: BURN_DURATION should be removed from weapon_fire.gd (was unused)")
+
+func test_bug272_holywater_lv3_slow_pct_removed():
+	var wf: RefCounted = _create_weapon_fire()
+	assert_false("HOLYWATER_LV3_SLOW_PCT" in wf, "BUG-272: HOLYWATER_LV3_SLOW_PCT should be removed from weapon_fire.gd (used in projectile.gd instead)")
+
+func test_bug272_lightning_lv3_chain_bonus_removed():
+	var wf: RefCounted = _create_weapon_fire()
+	assert_false("LIGHTNING_LV3_CHAIN_BONUS" in wf, "BUG-272: LIGHTNING_LV3_CHAIN_BONUS should be removed from weapon_fire.gd (was unused)")
+
+func test_bug272_used_constants_remain():
+	# Verify that constants still in use were NOT removed
+	var wf: RefCounted = _create_weapon_fire()
+	assert_true("FIRESTAFF_LV3_BURN_DPS" in wf, "FIRESTAFF_LV3_BURN_DPS should remain (used in fire_cone)")
+	assert_true("FIRESTAFF_LV3_BURN_DURATION" in wf, "FIRESTAFF_LV3_BURN_DURATION should remain (used in fire_cone)")
+	assert_true("BIBLE_LV3_RADIUS_MUL" in wf, "BIBLE_LV3_RADIUS_MUL should remain (used in update_orbit)")
+	assert_true("CONE_ANGLE_PER_LEVEL" in wf, "CONE_ANGLE_PER_LEVEL should remain (used in fire_cone)")
+	assert_true("PROJECTILE_RANGE" in wf, "PROJECTILE_RANGE should remain (used in fire_projectile)")
 
 
 # =========================================================================

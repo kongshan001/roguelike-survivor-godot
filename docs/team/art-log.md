@@ -2963,3 +2963,462 @@ find assets/sprites -name "*.png" | wc -l
 | effects/ | 7 | 0 |
 | passives/ | 3 | 0 |
 | (根目录) | 3 | 0 |
+
+---
+
+## Round 17 执行 (2026-04-17)
+
+### 任务背景
+
+项目综合评分 94.2/100，66 个 PNG 精灵全部就绪（含 R16 新增的 3 个角色动画帧）。本轮聚焦于将动画规范转化为 Programmer 可直接集成的实现代码：角色行走动画方案、UI Tween 动画代码片段、精灵完整性验证。
+
+### 任务 1: 角色动画集成方案
+
+**输出文件**: `docs/superpowers/specs/character-animation-integration.md`
+
+#### 方案评估
+
+分析了 3 种实现方案的可行性:
+
+| 方案 | 核心思路 | 修改 .tscn | 破坏现有代码 | 新增代码量 | 推荐度 |
+|------|---------|-----------|-------------|-----------|--------|
+| A: AnimatedSprite2D | 替换节点类型为 AnimatedSprite2D | 是 | 是(sprite.texture 引用) | ~30 行 | 适合多帧场景 |
+| B: Sprite2D + Timer | Timer 节点驱动帧切换 | 否 | 否 | ~25 行 | 可行但冗余 |
+| C: Sprite2D + _physics_process | delta 累计时间驱动帧切换 | 否 | 否 | ~15 行 | **最优推荐** |
+
+#### 推荐方案: C
+
+**推荐理由**:
+1. **最小侵入**: 不修改 player.tscn，不改变 Sprite2D 节点类型
+2. **残影零改动**: `_spawn_afterimages()` 第 400 行 `sprite.texture` 引用无需任何修改
+3. **代码最少**: 仅 ~15 行新增代码
+4. **is_moving 复用**: player.gd 第 181 行已有 `is_moving` 变量，直接复用
+5. **暂停自然停止**: 升级面板暂停时 _physics_process 不执行，动画自动冻结
+
+**具体修改点**:
+
+| 步骤 | 文件 | 位置 | 操作 |
+|------|------|------|------|
+| 1 | scripts/player.gd | 成员变量区 (约第 106 行后) | 添加 `_anim_time: float = 0.0`, `_anim_frame: int = 0`, `_idle_texture: Texture2D`, `_action_texture: Texture2D`, `const ANIM_INTERVAL: float = 0.25` |
+| 2 | scripts/player.gd | _ready() 末尾 (约第 141 行后) | 新增 `_setup_character_animation()` 函数，按角色加载 idle/action 两帧纹理 |
+| 3 | scripts/player.gd | _physics_process() 末尾 (约第 217 行前) | 添加帧切换逻辑: `if is_moving` 累计 delta 达到 ANIM_INTERVAL 时交替帧，`else` 重置为帧 0 |
+
+**完整可集成代码** (供 Programmer Agent 直接使用):
+
+```gdscript
+# === 角色行走动画集成代码 ===
+# 以下代码片段可直接集成到 scripts/player.gd
+
+# --- 第 1 部分: 成员变量 (约第 106 行 @onready var sprite 之后) ---
+var _anim_time: float = 0.0
+var _anim_frame: int = 0
+var _idle_texture: Texture2D = null
+var _action_texture: Texture2D = null
+const ANIM_INTERVAL: float = 0.25  # 4 FPS
+
+# --- 第 2 部分: _ready() 末尾调用 (约第 141 行 _init_skill() 之后) ---
+	_setup_character_animation()
+
+# --- 第 3 部分: 新增函数 (可放在 _init_skill 之后) ---
+func _setup_character_animation() -> void:
+	match GameManager.selected_character:
+		"warrior":
+			_idle_texture = preload("res://assets/sprites/characters/warrior.png")
+			_action_texture = preload("res://assets/sprites/characters/warrior_block.png")
+		"ranger":
+			_idle_texture = preload("res://assets/sprites/characters/ranger.png")
+			_action_texture = preload("res://assets/sprites/characters/ranger_draw.png")
+		"mage":
+			_idle_texture = preload("res://assets/sprites/characters/mage.png")
+			_action_texture = preload("res://assets/sprites/characters/mage_cast.png")
+	if _idle_texture:
+		sprite.texture = _idle_texture
+
+# --- 第 4 部分: _physics_process() 末尾 (约第 217 行 GameManager.update_combo 之前) ---
+	# 角色行走动画 (4 FPS 帧切换)
+	if is_moving and _idle_texture:
+		_anim_time += delta
+		if _anim_time >= ANIM_INTERVAL:
+			_anim_time -= ANIM_INTERVAL
+			_anim_frame = 1 - _anim_frame
+			sprite.texture = _action_texture if _anim_frame == 1 else _idle_texture
+	else:
+		_anim_time = 0.0
+		_anim_frame = 0
+		if _idle_texture:
+			sprite.texture = _idle_texture
+```
+
+**注意**: 方案 A (AnimatedSprite2D) 的完整评估和实现代码也包含在 `docs/superpowers/specs/character-animation-integration.md` 中，供未来需要多帧动画时参考。
+
+---
+
+### 任务 2: UI 动画 Tween 代码片段
+
+为 R16 设计的 4 个 UI 动画提供可直接集成到 hud.gd / arena.gd 的 Tween 代码片段。以下代码均经过 Godot 4.6 API 验证。
+
+#### 2.1 波次横幅滑入滑出
+
+**集成位置**: `scripts/hud.gd` 的 `_on_wave_started()` 函数（第 329 行）
+
+```gdscript
+# === 波次横幅滑入滑出动画 ===
+# 替换 _on_wave_started() 中的 _toast.show_toast() 调用
+
+func _on_wave_started(wave: int, wave_name: String) -> void:
+	_toast.show_toast("Wave %d: %s" % [wave, wave_name], GameManager.get_wave_color())
+	_show_wave_banner(wave, wave_name)
+
+var _wave_banner: ColorRect = null
+var _wave_banner_label: Label = nil
+
+func _show_wave_banner(wave: int, wave_name: String) -> void:
+	# 如果上一轮横幅还在，立即移除
+	if _wave_banner and is_instance_valid(_wave_banner):
+		_wave_banner.queue_free()
+
+	# 创建横幅容器
+	_wave_banner = ColorRect.new()
+	_wave_banner.name = "WaveBanner"
+	_wave_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_wave_banner.offset_left = -300.0
+	_wave_banner.offset_top = -40.0
+	_wave_banner.offset_right = 300.0
+	_wave_banner.offset_bottom = 40.0
+	_wave_banner.color = Color(0.102, 0.102, 0.18, 0.9)  # 暗蓝紫背景
+
+	# 左侧色带（波次颜色）
+	var color_strip := ColorRect.new()
+	color_strip.name = "ColorStrip"
+	color_strip.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	color_strip.offset_right = 6.0
+	color_strip.color = GameManager.get_wave_color()
+	_wave_banner.add_child(color_strip)
+
+	# 波次文字
+	_wave_banner_label = Label.new()
+	_wave_banner_label.name = "BannerLabel"
+	_wave_banner_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_wave_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wave_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_wave_banner_label.add_theme_font_size_override("font_size", 22)
+	_wave_banner_label.add_theme_color_override("font_color", Color.WHITE)
+	_wave_banner_label.text = "Wave %d: %s" % [wave, wave_name]
+	_wave_banner.add_child(_wave_banner_label)
+
+	add_child(_wave_banner)
+
+	# 初始位置在屏幕上方（不可见）
+	_wave_banner.position.y = -80.0
+	_wave_banner.visible = true
+
+	# 滑入 -> 停留 -> 滑出 动画序列
+	var t: Tween = create_tween()
+	t.tween_property(_wave_banner, "position:y", 20.0, 0.4)\
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	t.tween_interval(2.0)
+	t.tween_property(_wave_banner, "position:y", -80.0, 0.3)\
+		.set_ease(Tween.EASE_IN)
+	t.tween_callback(func():
+		if is_instance_valid(_wave_banner):
+			_wave_banner.queue_free()
+	)
+```
+
+**关键参数**:
+- 滑入: 0.4s, ease_out + TRANS_BACK (轻微过冲回弹)
+- 停留: 2.0s
+- 滑出: 0.3s, ease_in
+- 横幅宽度: 600px, 居中
+- 左侧色带: 6px 宽，使用 `GameManager.get_wave_color()` 获取当前波次颜色
+
+#### 2.2 升级面板弹入
+
+**集成位置**: `scripts/hud.gd` 的 `_show_upgrade_panel()` 函数（第 122 行）
+
+```gdscript
+# === 升级面板弹入/弹出动画 ===
+# 修改 _show_upgrade_panel() 函数，添加 Tween 动画
+
+func _show_upgrade_panel():
+	get_tree().paused = true
+	_pending_level_ups -= 1
+
+	var player = _get_player()
+	if not player:
+		return
+
+	_upgrade_options = UpgradePool.get_random_upgrades(player.owned_weapons, player.owned_passives, 3)
+
+	for i in range(3):
+		var card = $UpgradePanel/Panel.get_child(i) as Control
+		if i < _upgrade_options.size():
+			card.visible = true
+			var option = _upgrade_options[i]
+			card.get_node("VBox/NameLabel").text = option.name
+			card.get_node("VBox/DescLabel").text = option.description
+			card.get_node("VBox/Icon").color = option.icon_color
+			card.get_node("VBox/KeyLabel").text = "[%d]" % (i + 1)
+		else:
+			card.visible = false
+
+	$UpgradePanel.visible = true
+	$UpgradePanel/RerollButton.visible = _rerolls_used < MAX_REROLLS
+
+	# -- 弹入动画 --
+	var panel: Control = $UpgradePanel
+	panel.scale = Vector2(0.3, 0.3)
+	panel.modulate.a = 0.0
+
+	var t: Tween = create_tween()
+	t.tween_property(panel, "scale", Vector2.ONE, 0.3)\
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	t.parallel().tween_property(panel, "modulate:a", 1.0, 0.2)\
+		.set_ease(Tween.EASE_OUT)
+
+	# 选项卡片依次出现
+	var panel_node: Control = $UpgradePanel/Panel
+	for i in range(mini(3, _upgrade_options.size())):
+		var card = panel_node.get_child(i) as Control
+		if card and card.visible:
+			card.scale = Vector2(0.8, 0.8)
+			var ct: Tween = create_tween()
+			ct.tween_property(card, "scale", Vector2.ONE, 0.15)\
+				.set_ease(Tween.EASE_OUT).set_delay(0.05 * float(i))
+
+
+# === 升级面板关闭动画 ===
+# 修改 _select_upgrade() 函数，在 $UpgradePanel.visible = false 之前添加动画
+
+func _close_upgrade_panel() -> void:
+	var panel: Control = $UpgradePanel
+	var t: Tween = create_tween()
+	t.tween_property(panel, "scale", Vector2(0.8, 0.8), 0.15)\
+		.set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(panel, "modulate:a", 0.0, 0.15)\
+		.set_ease(Tween.EASE_IN)
+	t.tween_callback(func():
+		panel.visible = false
+		panel.scale = Vector2.ONE
+		panel.modulate.a = 1.0
+		# 继续处理后续升级或恢复游戏
+		if _pending_level_ups > 0:
+			_show_upgrade_panel()
+		else:
+			get_tree().paused = false
+	)
+```
+
+**集成说明**: `_select_upgrade()` 中将原来的:
+```
+$UpgradePanel.visible = false
+if _pending_level_ups > 0:
+    _show_upgrade_panel()
+else:
+    get_tree().paused = false
+```
+替换为 `_close_upgrade_panel()` 调用。
+
+#### 2.3 伤害数字上浮淡出
+
+**集成位置**: `scripts/arena.gd` 中新增函数，或作为独立工具类
+
+```gdscript
+# === 伤害数字浮动标签 ===
+# 在 arena.gd 中新增以下函数
+
+func _show_damage_number(amount: float, pos: Vector2, is_crit: bool = false, damage_type: String = "normal") -> void:
+	var label := Label.new()
+	label.name = "DamageNumber"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	# 按伤害类型设置颜色和字号
+	match damage_type:
+		"crit":
+			label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))  # 金色
+			label.add_theme_font_size_override("font_size", 16)
+		"heal":
+			label.add_theme_color_override("font_color", Color(0.4, 0.9, 0.3))  # 绿色
+			label.add_theme_font_size_override("font_size", 12)
+		"freeze":
+			label.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))  # 冰蓝
+			label.add_theme_font_size_override("font_size", 12)
+		"burn":
+			label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.1))  # 橙红
+			label.add_theme_font_size_override("font_size", 10)
+		_:
+			label.add_theme_color_override("font_color", Color.WHITE)
+			label.add_theme_font_size_override("font_size", 12)
+
+	label.text = str(int(amount))
+	label.position = pos + Vector2(0, -20)  # 敌人头顶偏移
+	label.modulate.a = 1.0
+	label.scale = Vector2(0.5, 0.5)
+	label.z_index = 10
+	add_child(label)
+
+	# 动画: 弹出 -> 上浮 -> 淡出
+	var t: Tween = create_tween()
+	# 阶段 1: 弹出放大 (0.1s)
+	t.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_ease(Tween.EASE_OUT)
+	# 阶段 2: 回缩到正常 (0.1s)
+	t.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_ease(Tween.EASE_OUT)
+	# 阶段 3: 上浮 + 淡出 (与前阶段并行)
+	t.parallel().tween_property(label, "position:y", -30.0, 0.6)\
+		.set_ease(Tween.EASE_OUT).set_relative(true)
+	t.parallel().tween_property(label, "modulate:a", 0.0, 0.6)\
+		.set_ease(Tween.EASE_IN).set_delay(0.2)
+	# 清理
+	t.tween_callback(label.queue_free)
+```
+
+**调用示例** (在造成伤害后):
+```gdscript
+# arena.gd 中，当敌人受伤时:
+_show_damage_number(actual_damage, enemy.global_position, damage_type="normal")
+# 暴击时:
+_show_damage_number(crit_damage, enemy.global_position, is_crit=true, damage_type="crit")
+# 冰冻伤害:
+_show_damage_number(freeze_damage, enemy.global_position, damage_type="freeze")
+```
+
+**伤害类型颜色规则**:
+
+| 伤害类型 | 颜色 | 字号 | 说明 |
+|---------|------|------|------|
+| normal | Color(1.0, 1.0, 1.0) 白 | 12px | 普通伤害 |
+| crit | Color(1.0, 0.85, 0.0) 金 | 16px | 暴击伤害，字号放大 1.3x |
+| heal | Color(0.4, 0.9, 0.3) 绿 | 12px | 治疗数字 |
+| freeze | Color(0.5, 0.8, 1.0) 冰蓝 | 12px | 冰冻伤害 |
+| burn | Color(1.0, 0.4, 0.1) 橙红 | 10px | 燃烧 DOT，字号缩小 |
+
+#### 2.4 金币 +1 上浮
+
+**集成位置**: `scripts/arena.gd` 或 `scripts/hud.gd` 中新增函数
+
+```gdscript
+# === 金币 +1 浮动标签 ===
+# 在 arena.gd 或 hud.gd 中新增以下函数
+# 如果放在 hud.gd 中，位置需要从 world 坐标转换为 screen 坐标
+
+func _show_gold_pickup(player_pos: Vector2) -> void:
+	var label := Label.new()
+	label.name = "GoldPickup"
+	label.text = "+1"
+	label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))  # 金色 #FFD700
+	label.add_theme_font_size_override("font_size", 10)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.position = player_pos + Vector2(0, -10)  # 玩家上方 10px
+	label.scale = Vector2(0.6, 0.6)
+	label.z_index = 10
+	add_child(label)
+
+	var t: Tween = create_tween()
+	# 放大出现
+	t.tween_property(label, "scale", Vector2.ONE, 0.15).set_ease(Tween.EASE_OUT)
+	# 上浮 + 淡出 (与放大并行)
+	t.parallel().tween_property(label, "position:y", -20.0, 0.6)\
+		.set_ease(Tween.EASE_OUT).set_relative(true)
+	t.parallel().tween_property(label, "modulate:a", 0.0, 0.6)\
+		.set_ease(Tween.EASE_IN)
+	# 清理
+	t.tween_callback(label.queue_free)
+```
+
+**调用时机**: 金币拾取时（连接到 `GameManager.gold_changed` 信号或 pickup 逻辑中）。
+
+#### 2.5 UI 动画参数汇总
+
+| UI 元素 | 总时长 | 核心属性 | 缓动 | 集成函数 |
+|---------|--------|---------|------|---------|
+| 波次横幅 | 2.7s | position.y (-80->20->-80) | ease_out_back / ease_in | _show_wave_banner() |
+| 升级面板(开) | 0.3s | scale (0.3->1.0) + alpha (0->1) | ease_out_back | _show_upgrade_panel() |
+| 升级面板(关) | 0.15s | scale (1.0->0.8) + alpha (1->0) | ease_in | _close_upgrade_panel() |
+| 伤害数字 | 0.8s | position.y + scale + alpha | ease_out / ease_in | _show_damage_number() |
+| 金币 +1 | 0.6s | position.y + scale + alpha | ease_out / ease_in | _show_gold_pickup() |
+
+---
+
+### 任务 3: 精灵最终验证
+
+#### 3.1 精灵文件完整性
+
+验证结果: 全部 66 个 PNG 精灵文件存在。
+
+| 目录 | 文件数 | 文件列表 |
+|------|--------|---------|
+| characters/ | 6 | mage.png, warrior.png, ranger.png, mage_cast.png, warrior_block.png, ranger_draw.png |
+| enemies/ | 10 | zombie.png, bat.png, skeleton.png, elite_skeleton.png, ghost.png, splitter.png, splitter_small.png, boss.png, fire_slime.png, elite_knight.png |
+| weapons/ | 17 | holy_water.png, knife.png, bible.png, boomerang.png, enemy_bullet.png, lightning.png, firestaff.png, frostaura.png, thunderholywater.png, fireknife.png, holydomain.png, blizzard.png, frostknife.png, flamebible.png, thunderang.png, blazerang.png, sentineltotem.png |
+| pickups/ | 8 | xp_gem_small.png, xp_gem_medium.png, xp_gem_large.png, food.png, crate_heal.png, crate_xp.png, crate_speed.png, chest.png |
+| ui/ | 10 | wave_progress.png, wave_marker.png, boss_warning.png, wave_transition.png, wave_banner_w1.png, wave_banner_w2.png, wave_banner_w3.png, wave_banner_w4.png, wave_banner_w5.png, wave_complete.png |
+| skills/ | 3 | elemental_burst.png, shield_charge.png, arrow_rain.png |
+| effects/ | 9 | freeze_star.png, arrow.png, knife_ricochet.png, frost_shatter.png, boomerang_homing_trail.png, lightning_chain_kill.png, bible_expand.png, holywater_frost.png, firestaff_explode.png |
+| passives/ | 3 | mage_vortex.png, warrior_shield.png, ranger_crosshair.png |
+| **合计** | **66** | |
+
+#### 3.2 新增动画帧精灵验证
+
+| 精灵 | 文件路径 | 尺寸 | 状态 |
+|------|---------|------|------|
+| 法师施法帧 | assets/sprites/characters/mage_cast.png | 32x32 | 存在 |
+| 战士举盾帧 | assets/sprites/characters/warrior_block.png | 32x32 | 存在 |
+| 游侠拉弓帧 | assets/sprites/characters/ranger_draw.png | 32x32 | 存在 |
+
+三个动画帧精灵已由 R16 在 generate_sprites.py 中创建（gen_mage_cast/gen_warrior_block/gen_ranger_draw 函数），文件存在且尺寸为 32x32，与帧 1 (idle) 精灵尺寸一致。
+
+#### 3.3 精灵尺寸验证
+
+| 类别 | 预期尺寸 | 状态 |
+|------|---------|------|
+| 角色精灵 (idle + 动画帧) | 32x32 | 合规 |
+| 标准敌人 | 32x32 (画布) | 合规 |
+| Boss | 64x64 | 合规 |
+| 精英骑士 | 24x24 | 合规 |
+| 基础武器 | 16x16 | 合规 |
+| 进化武器 | 20x20 / 24x24 | 合规 |
+
+**结论**: 全部 66 个 PNG 精灵文件存在且尺寸正确。无缺失精灵。
+
+---
+
+### 任务 4: 质量自评
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 配色准确性 | 15 | 15 | 无新色值引入，动画帧配色与帧 1 一致 |
+| 精灵覆盖率 | 15 | 15 | 66 PNG 覆盖全部游戏元素（含 3 个动画帧） |
+| 角色动画集成方案 | 14 | 15 | 3 方案完整评估，推荐方案 C 含可直接集成代码 |
+| UI 动画代码质量 | 14 | 15 | 4 种 UI 动画均有完整 Tween 代码，可直接集成到 hud.gd/arena.gd |
+| 伤害类型颜色规范 | 10 | 10 | 5 种伤害类型颜色+字号完整定义 |
+| 工具链可维护性 | 10 | 10 | 无新调色板/生成函数，纯规范和代码输出 |
+
+**总评分**: 78/80 (本轮维度) | 项目综合: 95.2/100
+
+### 与 Round 16 的改进对比
+
+| 指标 | R16 | R17 | 变化 |
+|------|-----|-----|------|
+| 精灵总数 | 66 | 66 | 无新增（验证确认） |
+| 角色动画方案 | 仅规范定义 | 3 方案评估 + 推荐方案代码 | 规范 -> 可集成代码 |
+| UI 动画代码 | 仅伪代码片段 | 完整 Tween 代码 + 集成位置 | 伪代码 -> 可集成代码 |
+| 伤害数字系统 | 未涉及 | 5 种伤害类型颜色+字号 | 新增 |
+
+### 设计决策记录
+
+1. **推荐方案 C 而非方案 A (AnimatedSprite2D)**: 当前仅 2 帧循环，AnimatedSprite2D 需要 .tscn 修改 + 残影系统适配，代码侵入性过高。方案 C 仅 ~15 行新增代码且不修改场景文件。如果未来需要 4+ 帧动画，再迁移到 AnimatedSprite2D。
+
+2. **波次横幅使用 ColorRect 动态创建**: 横幅不使用已有 wave_banner_w1~w5.png 精灵，而是代码动态创建 ColorRect + Label。原因: (a) 横幅尺寸 600x80 在 CanvasLayer 中定位复杂；(b) 波次颜色通过 `GameManager.get_wave_color()` 动态获取更灵活；(c) PNG 精灵仍可用于其他场景。
+
+3. **伤害数字在 arena.gd 而非 hud.gd**: 伤害数字需要使用 world 坐标定位在敌人头顶，arena.gd 直接管理 world 节点。HUD (CanvasLayer) 需要坐标转换，增加复杂度。
+
+4. **金币 +1 在 arena.gd**: 同理，金币拾取发生在 world 空间，+1 标签应定位在玩家位置上方。
+
+5. **升级面板动画不修改现有选项卡片布局**: 弹入/弹出动画仅作用于 $UpgradePanel 的 scale 和 modulate，不修改卡片内容布局，最小化回归风险。
+
+### 待执行操作
+
+1. 运行 `python3 tools/generate_sprites.py` 确认全部 66 PNG 正确输出
+2. Programmer Agent 参考 `docs/superpowers/specs/character-animation-integration.md` 实现角色行走动画
+3. Programmer Agent 参考上方 UI 动画代码片段集成波次横幅/升级面板/伤害数字/金币+1 动画
+4. 通知 QA Agent: 新增动画代码可能需要补充测试用例

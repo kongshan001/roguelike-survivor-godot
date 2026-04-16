@@ -18,6 +18,39 @@
 
 ## 技术决策
 
+### 2026-04-17: R17 新手引导系统实现
+- **决策**: 新建独立 `scripts/tutorial_manager.gd` 管理引导状态机，通过信号监听触发
+- **为什么**: 遵循 spec 设计的 5 步渐进式教程，低侵入性，不修改 player.gd/enemy_spawner.gd
+- **新增文件**: `scripts/tutorial_manager.gd` (~329行), `test/unit/mock_enemy.gd`
+- **修改文件**:
+  - `scripts/autoload/save_manager.gd`: 新增 `tutorial_step`/`tutorial_completed` 持久化字段
+  - `scripts/arena.gd`: 在 `_ready()` 末尾实例化 TutorialManager 并调用 `setup(self)`
+- **引导流程**: 移动(2s静止触发) -> 闪避(敌人200px触发) -> 武器说明(首杀触发) -> 升级选择(level_up触发) -> 技能(冷却完成触发)
+- **持久化**: SaveManager ConfigFile 新增 `[tutorial]` section，跨会话保存进度
+- **视觉**: PanelContainer + Label 气泡，金色文字(1,0.85,0.3)，半透明黑背景(0,0,0,0.7)，Tween 渐入渐出
+- **测试覆盖**: 修复 test_tutorial_system.gd RefCounted 类型错误，新增 10 个单元测试
+
+### 2026-04-17: R17 BUG-272 清理未使用常量
+- **决策**: 从 `weapon_fire.gd` 移除 4 个定义但未使用的常量
+- **为什么**: QA R16 报告的死代码，影响代码可读性和维护
+- **移除常量**:
+  - `BURN_DPS` / `BURN_DURATION`: Cone 武器的 burn 使用 `FIRESTAFF_LV3_BURN_DPS`/`FIRESTAFF_LV3_BURN_DURATION`，原常量未被引用
+  - `HOLYWATER_LV3_SLOW_PCT`: 仅 `projectile.gd` 使用同名自有常量，weapon_fire.gd 中重复定义
+  - `LIGHTNING_LV3_CHAIN_BONUS`: Lightning chain 公式使用 `chains = level - 1`，此常量从未被引用
+- **验证**: 所有 1267 测试通过，无回归
+
+### 2026-04-17: R17 性能优化 -- Enemy Cache
+- **决策**: 在 GameManager 中维护 `_enemy_cache` 数组，替代全场景 `get_nodes_in_group("enemies")` 调用
+- **为什么**: Reviewer 指出 get_nodes_in_group("enemies") 每帧被 4-5 处调用（weapon_controller, spin_blade, xp_gem, boomerang），70+ 敌人时全组遍历开销大
+- **实现**:
+  - `GameManager.register_enemy(enemy)`: enemy._ready() 时调用
+  - `GameManager.unregister_enemy(enemy)`: enemy.die() 时调用
+  - `GameManager.get_cached_enemies()`: 返回清理了 stale 条目的有效数组
+  - 8 处 get_nodes_in_group 调用替换为 `GameManager.get_cached_enemies() if GameManager else get_tree().get_nodes_in_group("enemies")`
+- **降级兼容**: 保留 `get_tree().get_nodes_in_group("enemies")` 作为 GameManager 不可用时的 fallback
+- **修改文件**: `game_manager.gd`, `enemy.gd`, `weapon_controller.gd`, `spin_blade.gd`, `xp_gem.gd`, `boomerang.gd`, `projectile.gd`, `skill_effects.gd`
+- **测试**: 新增 `test/unit/test_enemy_cache.gd` (10 测试) + `test/unit/mock_enemy.gd`
+
 ### 2026-04-12: 项目架构
 - **决策**: 采用 Godot 4.6 场景驱动架构，Resource 子类定义数据
 - **为什么**: Godot 原生模式，利于编辑器集成和测试

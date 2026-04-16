@@ -10,8 +10,6 @@ const PROJECTILE_RANGE: float = 600.0
 const CONE_ANGLE_PER_LEVEL: float = 20.0
 const CONE_RANGE_PER_LEVEL: float = 30.0
 const CONE_DAMAGE_PER_LEVEL: float = 2.0
-const BURN_DPS: float = 2.0
-const BURN_DURATION: float = 2.0
 
 # Aura
 const AURA_BASE_RADIUS: float = 80.0
@@ -27,15 +25,9 @@ const CRIT_KNIFE_LIFETIME: float = 1.0
 # Bible Lv3: Expanding Radius
 const BIBLE_LV3_RADIUS_MUL: float = 1.5
 
-# Holy Water Lv3: Frost Blessing (slow)
-const HOLYWATER_LV3_SLOW_PCT: float = 0.3
-
 # Fire Staff Lv3: Burst Burn
 const FIRESTAFF_LV3_BURN_DPS: float = 3.0
 const FIRESTAFF_LV3_BURN_DURATION: float = 2.0
-
-# Lightning Lv3: Chain Boost
-const LIGHTNING_LV3_CHAIN_BONUS: int = 2
 
 var _controller: Node = null
 var _boomerang_fire: RefCounted = null

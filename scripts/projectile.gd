@@ -95,7 +95,7 @@ func _on_body_entered(body: Node2D):
 
 
 func _spawn_ricochet(primary_target: Node2D) -> void:
-	var enemies := get_tree().get_nodes_in_group("enemies")
+	var enemies: Array = GameManager.get_cached_enemies() if GameManager else get_tree().get_nodes_in_group("enemies")
 	var best_enemy: Node2D = null
 	var best_dist: float = KNIFE_LV3_RICOCHET_RANGE
 	for enemy in enemies:

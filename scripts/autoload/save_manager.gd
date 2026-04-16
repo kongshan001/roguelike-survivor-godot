@@ -18,6 +18,9 @@ var characters_cleared: Dictionary = {}
 # Track cumulative evolution/synergy history across sessions
 var evolution_history: Dictionary = {}  # evo_id -> true
 var synergy_history: Dictionary = {}    # synergy_id -> true
+# Tutorial progress: 0=not started, 1-5=steps completed, tutorial_completed=all done
+var tutorial_step: int = 0
+var tutorial_completed: bool = false
 
 const SAVE_PATH: String = "user://save.cfg"
 
@@ -347,6 +350,9 @@ func save() -> void:
 	for syn_id in synergy_history:
 		config.set_value("syn_history", syn_id, true)
 
+	config.set_value("tutorial", "step", tutorial_step)
+	config.set_value("tutorial", "completed", tutorial_completed)
+
 	config.save(SAVE_PATH)
 
 
@@ -381,6 +387,10 @@ func load_save() -> void:
 			if config.get_value("syn_history", key, false):
 				synergy_history[key] = true
 
+	# Load tutorial progress
+	tutorial_step = config.get_value("tutorial", "step", 0)
+	tutorial_completed = config.get_value("tutorial", "completed", false)
+
 
 func reset_save() -> void:
 	soul_fragments = 0
@@ -390,5 +400,7 @@ func reset_save() -> void:
 	characters_cleared = {}
 	evolution_history = {}
 	synergy_history = {}
+	tutorial_step = 0
+	tutorial_completed = false
 	_init_data()
 	save()

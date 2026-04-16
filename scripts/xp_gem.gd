@@ -65,7 +65,7 @@ func _check_frostaura_luckycoin() -> void:
 		return
 	# Expand pickup range if any nearby enemy is frozen
 	var bonus: float = SynergyManager.get_synergy_value("frostaura_luckycoin", "value", 30.0)
-	var enemies = get_tree().get_nodes_in_group("enemies")
+	var enemies: Array = GameManager.get_cached_enemies() if GameManager else get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
 		if is_instance_valid(enemy) and enemy.has("_freeze_timer") and enemy._freeze_timer > 0:
 			var dist = global_position.distance_to(enemy.global_position)

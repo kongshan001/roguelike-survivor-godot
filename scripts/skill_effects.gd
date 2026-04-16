@@ -197,7 +197,7 @@ func _arrow_impact(arrow: ColorRect, pos: Vector2, damage: float, arena: Node) -
 
 func _get_enemies_in_radius(arena: Node, center: Vector2, radius: float) -> Array:
 	var result: Array = []
-	var all_enemies := arena.get_tree().get_nodes_in_group("enemies")
+	var all_enemies: Array = GameManager.get_cached_enemies() if GameManager else arena.get_tree().get_nodes_in_group("enemies")
 	for enemy in all_enemies:
 		if is_instance_valid(enemy) and enemy.is_alive:
 			var dist: float = center.distance_to(enemy.global_position)
@@ -208,7 +208,7 @@ func _get_enemies_in_radius(arena: Node, center: Vector2, radius: float) -> Arra
 
 func _get_enemies_in_path(arena: Node, start: Vector2, end: Vector2, width: float) -> Array:
 	var result: Array = []
-	var all_enemies := arena.get_tree().get_nodes_in_group("enemies")
+	var all_enemies: Array = GameManager.get_cached_enemies() if GameManager else arena.get_tree().get_nodes_in_group("enemies")
 	var path_dir: Vector2 = end - start
 	var path_len: float = path_dir.length()
 	if path_len < 1.0:
@@ -234,7 +234,7 @@ func _find_arrow_rain_target(player: CharacterBody2D) -> Vector2:
 
 	# Find closest enemies and compute center of mass of up to 5
 	var enemies: Array = []
-	var all_enemies := arena.get_tree().get_nodes_in_group("enemies")
+	var all_enemies: Array = GameManager.get_cached_enemies() if GameManager else arena.get_tree().get_nodes_in_group("enemies")
 	for enemy in all_enemies:
 		if is_instance_valid(enemy) and enemy.is_alive:
 			var dist: float = player.global_position.distance_to(enemy.global_position)

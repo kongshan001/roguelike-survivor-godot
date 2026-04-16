@@ -36,7 +36,7 @@ func _physics_process(delta):
 
 	queue_redraw()
 
-	var all_enemies = get_tree().get_nodes_in_group("enemies")
+	var all_enemies: Array = GameManager.get_cached_enemies() if GameManager else get_tree().get_nodes_in_group("enemies")
 	for i in range(orbit_count):
 		var blade_angle = _angle + (TAU * i / orbit_count)
 		var blade_pos = Vector2(cos(blade_angle), sin(blade_angle)) * orbit_radius

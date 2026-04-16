@@ -115,6 +115,9 @@ var gold: int = 0
 var boss_killed: bool = false
 var boss_kill_count: int = 0
 
+	# Enemy cache (performance optimization: avoids repeated get_nodes_in_group)
+var _enemy_cache: Array = []
+
 # Combo system
 var combo_count: int = 0
 var combo_timer: float = 0.0
@@ -137,6 +140,26 @@ var enemy_count: int = 0:
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
+
+
+# --- Enemy cache management ---
+
+func register_enemy(enemy: Node2D) -> void:
+	_enemy_cache.append(enemy)
+
+
+func unregister_enemy(enemy: Node2D) -> void:
+	_enemy_cache.erase(enemy)
+
+
+## Get a snapshot of the cached enemy list with stale entries removed.
+func get_cached_enemies() -> Array:
+	var valid: Array = []
+	for enemy in _enemy_cache:
+		if is_instance_valid(enemy) and enemy.is_alive:
+			valid.append(enemy)
+	_enemy_cache = valid
+	return valid
 
 
 func reset():
@@ -165,6 +188,7 @@ func reset():
 	_wave_timer = 0.0
 	_intermission_timer = 0.0
 	_wave_time_accumulator = 0.0
+	_enemy_cache.clear()
 
 
 func add_xp(amount: float):

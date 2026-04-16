@@ -37,6 +37,8 @@ func _ready():
 	if enemy_data:
 		current_hp = enemy_data.max_hp
 		add_to_group("enemies")
+		if GameManager:
+			GameManager.register_enemy(self)
 		_setup_visual()
 		_setup_collision()
 
@@ -234,6 +236,8 @@ func die() -> void:
 	if not is_alive:
 		return
 	is_alive = false
+	if GameManager:
+		GameManager.unregister_enemy(self)
 
 	_handle_kill_rewards()
 	_handle_shatter()
@@ -275,7 +279,7 @@ func _handle_shatter() -> void:
 		return
 	if player.owned_weapons["frostaura"] < 3:
 		return  # Not Lv3 yet
-	var all_enemies := get_tree().get_nodes_in_group("enemies")
+	var all_enemies: Array = GameManager.get_cached_enemies() if GameManager else get_tree().get_nodes_in_group("enemies")
 	for enemy in all_enemies:
 		if is_instance_valid(enemy) and enemy.is_alive and enemy != self:
 			var dist := global_position.distance_to(enemy.global_position)
