@@ -2824,3 +2824,272 @@ fire-slime-design.md Section 5.2 的敌人对比表:
 **加分项**: 发现 player.apply_burn() 方法缺失是火焰史莱姆功能链路中唯一的断裂点 -- 数据层和检测逻辑都已就位, 仅缺 5 行入口方法。这一发现阻止了一个会在运行时崩溃的 bug 进入测试。
 
 **待改进**: 未评估 9E (美术) 和 9F (QA) 的执行状态; boomerang 暴击金色视觉反馈问题已继承 3 轮仍未推动解决。
+
+---
+
+## Round 10 审核报告 (2026-04-16)
+
+### 审核范围
+
+- R9 遗留审计: 验证 R9 标记的 P0/P1 bug 和未完成任务
+- R10 新增变更审核 (等待其他 Agent 完成后)
+- 跨模块一致性检查
+
+### 审核时间线
+
+1. **R9 遗留审计**: 首先完成
+2. **等待 90 秒**: 检查 R10 Agent 变更
+3. **R10 审核**: 基于已确认存在的文件
+
+---
+
+### 任务 1: R9 遗留审计
+
+#### 1.1 R9 P0 Bug 修复状态
+
+| Bug | 状态 | 验证 |
+|-----|------|------|
+| C1: player.apply_burn() 缺失 | **已修复** | player.gd:310-312, `_burn_dps`/`_burn_timer` 变量 (行 95-96) + `_physics_process` 燃烧逻辑 (行 198-210) 完整 |
+| BUG-008: shield_charge apply_freeze | **未修复** | skill_effects.gd:114-115 仍然调用 `enemy.apply_freeze(WARRIOR_SKILL_STUN_DURATION)` 而非 `enemy.apply_stun()` |
+
+**C1 apply_burn 验证通过**: player.gd 行 310-312 定义了 `apply_burn(dps, duration)` 方法，使用 `maxf` 保护叠加逻辑。行 198-210 在 `_physics_process` 中处理燃烧 DOT，包括 health_changed 信号发射和 die() 死亡判定。逻辑完整且与 enemy.gd 的 `apply_burn` 实现模式一致。
+
+**BUG-008 仍未修复**: skill_effects.gd:114-115 使用 `apply_freeze` 而非 `apply_stun`。虽然 enemy.gd 当前 `apply_stun` 和 `apply_freeze` 实现相同 (都写 `_freeze_timer`)，但这是语义错误 -- 未来如果 stun/freeze 行为分化，此处将成为真实 bug。从 R8 发现至今已跨越 3 轮未修复。
+
+#### 1.2 R9 未完成计划遗留状态
+
+| Phase | 任务 | 状态 | 验证 |
+|-------|------|------|------|
+| 9A | 火焰史莱姆实现 | **已完成** | enemy_data.gd (burn_aura 字段), enemy_spawner.gd (fire_slime 模板), enemy.gd:126-130 (burn_aura 检测逻辑), player.gd:310-312 (apply_burn), WAVE_DEFS 包含 fire_slime |
+| 9B | hud_skill_button.gd 拆分 | **部分完成** | hud_skill_button.gd 存在 (100行) 且被 hud.gd:71-72 引用, 但 hud.gd:393-482 仍有 90 行重复死代码未删除 |
+| 9C | 常量统一 | **未执行** | player.gd:39-49 仍独立声明 11 个常量, skill_effects.gd:6-40 仍独立声明 35 个常量, 无一处引用 SkillData |
+| 9D | 进化路线扩展 | **已完成** | docs/superpowers/specs/evolution-expansion.md 存在 (560行, 4 新武器类型完整设计) |
+
+#### 1.3 R9 测试文件审计
+
+**test_fire_slime.gd (37个测试)**:
+
+发现一个编译错误:
+
+- **行 280-281**: `assert_eq(data.burn_aura_dps, 2.0, ...)` 和 `assert_eq(data.burn_aura_duration, 1.5, ...)` 引用了未定义变量 `data`。该函数 (`test_fire_slime_create_enemy_data_passes_burn_fields`) 中只定义了 `template` 变量, 没有 `data`。这在运行时会报 "Identifier 'data' not declared" 错误。正确做法应该是先通过 `_create_enemy_data("fire_slime")` 创建 EnemyData 实例, 或者将断言改为检查 template 字典。
+
+其余 22 个测试函数逻辑合理, 覆盖了: 数据层 (4), burn_aura 字段 (4), burn 行为 (3), 正常战斗 (4), spawner 模板 (2)。
+
+#### 1.4 R9 代码质量总结
+
+**fire_slime 实现链路完整**:
+1. enemy_data.gd: burn_aura 字段 (行 35-37) -- OK
+2. enemy_spawner.gd: fire_slime ENEMY_TEMPLATES (行 53-58) -- OK, 字段传递完整
+3. enemy_spawner.gd: _create_enemy_data 传递 burn_aura 字段 (行 233-235) -- OK
+4. enemy.gd: burn_aura 接触检测 (行 126-130) -- OK, 距离阈值 = size + 16.0
+5. player.gd: apply_burn 方法 (行 310-312) -- OK, maxf 叠加
+6. game_manager.gd: WAVE_DEFS 包含 fire_slime (wave 4, wave 5) -- OK
+
+**发现的代码质量问题**:
+
+| 严重度 | 问题 | 文件:行号 | 描述 |
+|--------|------|-----------|------|
+| **Medium** | test_fire_slime 编译错误 | test_fire_slime.gd:280-281 | 引用未定义变量 `data`, 运行时必定报错 |
+| Low | hud.gd 90 行死代码 | hud.gd:393-482 | 技能按钮代码已被 hud_skill_button.gd 替代但旧代码未删除 |
+| Low | hud.gd 仍超行数目标 | hud.gd: 482行 | 删除死代码后应为 ~392 行, 达标 |
+
+---
+
+### 任务 2: R10 变更审核 (等待后检查)
+
+等待 90 秒后检查 R10 期间其他 Agent 的变更产出。
+
+#### 2.1 Programmer 变更检查
+
+| 预期任务 | 状态 | 验证 |
+|----------|------|------|
+| 10A: hud_skill_button.gd 进一步拆分 | **需验证** | hud_skill_button.gd 已存在 (100行), 但 hud.gd 死代码未删 |
+| 10B: 常量统一 (SkillData 引用) | **未执行** | player.gd 和 skill_effects.gd 均未引用 SkillData |
+| 10C: BUG-008 修复 | **未修复** | skill_effects.gd:114-115 仍用 apply_freeze |
+
+**Programmer R10 产出评估**: R10 计划的 3 项任务 (10A/10B/10C) 均未观察到变更。hud.gd 482 行与 R9 相同, player.gd 和 skill_effects.gd 常量未引用 SkillData, BUG-008 未修复。
+
+#### 2.2 Designer 变更检查
+
+| 预期任务 | 状态 | 验证 |
+|----------|------|------|
+| 10D: Sentry 类型简化方案 | **不存在** | docs/superpowers/specs/ 下无 sentry 相关文件 |
+
+**注意**: evolution-expansion.md 已包含完整的 sentinel 设计 (行 145-192), 包括简化方案。Designer 可能在评估后认为不需要额外简化文档。但 PM 明确要求 "Sentry 类型简化方案", 建议 Designer 补充说明是否需要在实现前简化。
+
+#### 2.3 QA 变更检查
+
+| 预期任务 | 状态 | 验证 |
+|----------|------|------|
+| 常量统一回归测试 | **已完成** | test/unit/test_skill_data_constants.gd 存在 (330行, 34个常量覆盖, 3源一致性验证) |
+| BUG-008 测试 | **不存在** | 无 test_bug_008 文件或 shield_charge stun 相关测试 |
+
+test_skill_data_constants.gd 质量评估:
+- 34 个常量逐个验证 -- 优秀
+- 3 源一致性检查 (SkillData vs player.gd vs skill_effects.gd) -- 正确策略
+- 使用 `extends GutTest` (行 1) -- 需确认 GUT v9.6.0 是否支持此简写
+- 测试结构清晰, 8 个分类组
+
+#### 2.4 Art 变更检查
+
+无新增精灵文件或 generate_sprites.py 执行记录。PM R10 计划 10E (运行 generate_sprites.py) 未执行。
+
+---
+
+### 任务 3: 跨模块一致性审核
+
+#### 3.1 常量重复声明 (继承问题, R8->R9->R10 未解决)
+
+42 个技能相关常量在 3 个文件中独立声明:
+
+| 文件 | 独立声明常量数 | 行范围 |
+|------|---------------|--------|
+| scripts/data/skill_data.gd | 34 | 8-46 |
+| scripts/player.gd | 11 | 39-49 |
+| scripts/skill_effects.gd | 35 | 6-40 |
+
+所有三处数值目前一致 (QA 已通过 test_skill_data_constants.gd 验证)。但维护风险高 -- 修改一处数值时, 如果忘记同步其他两处, 回归测试才能捕获。应将 player.gd 和 skill_effects.gd 的常量改为引用 `SkillData.XXX`。
+
+#### 3.2 hud.gd 死代码问题
+
+hud.gd 存在两套技能按钮实现:
+- **活跃代码**: hud.gd:71-72 通过 `_skill_btn = hud_skill_button.gd` 委托
+- **死代码**: hud.gd:393-482 重复了 hud_skill_button.gd 的全部逻辑
+
+`_setup_skill_button()` 和 `_update_skill_display()` 在 hud.gd 中从未被调用 (无 `_setup_skill_button()` 调用, `_update_skill_display()` 无调用), 但声明了 4 个实例变量 (`_skill_bg` 等) 与 `_skill_btn` 委托变量共存。这不影响运行时行为, 但:
+1. 增加 90 行无用代码
+2. hud.gd 保持 482 行, 超过 <400 行目标
+3. 新开发者可能误用旧函数
+
+删除后 hud.gd 应为 ~392 行, 达标。
+
+#### 3.3 apply_stun vs apply_freeze 语义问题
+
+enemy.gd 中两个方法实现完全相同:
+
+```gdscript
+func apply_freeze(duration: float):
+    _freeze_timer = maxf(_freeze_timer, duration)
+
+func apply_stun(duration: float) -> void:
+    _freeze_timer = maxf(_freeze_timer, duration)
+```
+
+虽然当前行为一致, 但 stun (眩晕) 和 freeze (冰冻) 是不同概念:
+- freeze 应该让敌人停止移动 + 可以有冰霜视觉效果
+- stun 应该让敌人停止移动 + 可以有不同的视觉效果 (如眩晕星星)
+
+建议未来版本分离实现, 但当前不阻塞。
+
+---
+
+### 任务 4: 审核结论与建议
+
+#### 按严重度分类的问题清单
+
+**Critical (必须修复)**:
+
+| ID | 问题 | 文件 | 影响 |
+|----|------|------|------|
+| -- | (无 Critical) | -- | -- |
+
+**Medium (应修复)**:
+
+| ID | 问题 | 文件 | 影响 |
+|----|------|------|------|
+| M1 | test_fire_slime.gd:280-281 引用未定义变量 `data` | test/unit/test_fire_slime.gd:280-281 | 该测试运行时必定报错, test_fire_slime_create_enemy_data_passes_burn_fields 失败 |
+| M2 | BUG-008: shield_charge 使用 apply_freeze 而非 apply_stun | scripts/skill_effects.gd:114-115 | 语义错误, stun/freeze 未来分化后成为真实 bug |
+| M3 | 常量 42+ 个在 3 处独立声明未统一 | player.gd:39-49, skill_effects.gd:6-40, skill_data.gd:8-46 | 维护成本高, 修改一处需同步两处 |
+
+**Low (建议优化)**:
+
+| ID | 问题 | 文件 | 影响 |
+|----|------|------|------|
+| L1 | hud.gd 90 行技能按钮死代码未删除 | scripts/hud.gd:393-482 | 文件膨胀 482 行, 超目标 82 行 |
+| L2 | apply_stun 与 apply_freeze 实现完全相同 | scripts/enemy.gd:225-230 | 语义混淆, 未来分化风险 |
+| L3 | test_skill_data_constants.gd 使用 `extends GutTest` | test/unit/test_skill_data_constants.gd:1 | 其他测试文件统一使用 `extends "res://addons/gut/test.gd"`, 风格不一致 |
+| L4 | PM R10 计划 10D (sentry 简化方案) 无明确产出 | docs/superpowers/specs/ | 设计意图不明 |
+
+#### 按角色分类的建议
+
+**Programmer**:
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P0 | 修复 test_fire_slime.gd:280-281 未定义变量 | 将 `data.burn_aura_dps` 改为先创建 EnemyData 实例再断言, 或改用 template 字段断言 |
+| P1 | 修复 BUG-008: skill_effects.gd:115 改用 apply_stun | 将 `enemy.apply_freeze(WARRIOR_SKILL_STUN_DURATION)` 改为 `enemy.apply_stun(WARRIOR_SKILL_STUN_DURATION)` |
+| P1 | 删除 hud.gd:393-482 死代码 | 删除 `_setup_skill_button()` 和 `_update_skill_display()` 及相关常量和变量声明 |
+| P2 | 将 player.gd:39-49 和 skill_effects.gd:6-40 的常量改为引用 SkillData | 例: `const MAGE_SKILL_COOLDOWN: float = SkillData.MAGE_SKILL_COOLDOWN` |
+
+**Designer**:
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P1 | 明确 sentinel (守护图腾) 是否需要简化方案 | evolution-expansion.md 已有完整设计 (16x16 totem, 2 concurrent, 8s lifetime), 但 PM 要求 "简化方案"。如果认为当前设计已足够简化, 在 designer-log.md 说明理由。 |
+| P2 | knife 有 4 条进化路径可能过于强势 | 进化扩展后 knife 可进化为 fireknife/frostknife/frostvortex/thunderbeam 4 种, 比其他武器多。需关注平衡性。 |
+
+**QA**:
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P0 | 确认 test_fire_slime.gd:280-281 是否在 GUT 运行时失败 | 如果 `data` 未定义导致测试脚本加载失败, 该文件所有测试都不会执行 |
+| P1 | 补充 BUG-008 测试: 验证 shield_charge 对敌人调用 apply_stun 而非 apply_freeze | 当前无测试覆盖 warrior shield_charge 的状态效果类型 |
+| P2 | test_skill_data_constants.gd 风格统一 | 将 `extends GutTest` 改为 `extends "res://addons/gut/test.gd"` 与项目其他测试一致 |
+
+**Art**:
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P2 | 运行 generate_sprites.py 验证所有新精灵可正确生成 | PM R10 计划 10E 未执行, 继承自 R9 |
+
+---
+
+### R9 PM 计划执行状态更新
+
+| Phase | 负责角色 | 任务 | R9 状态 | R10 状态 | 变化 |
+|-------|---------|------|---------|----------|------|
+| 9A | Programmer | 实现火焰史莱姆 | 部分完成 | **已完成** | player.apply_burn + burn_aura 逻辑完整 |
+| 9B | Programmer | hud_skill_button.gd 拆分 | 未执行 | **部分完成** | hud_skill_button.gd 存在且活跃, 但旧代码未删 |
+| 9C | Programmer | 常量统一 | 未执行 | **未执行** | 无变化 |
+| 9D | Designer | 进化路线扩展 | N/A | **已完成** | evolution-expansion.md 完整 |
+| 9E | Art | 技能精灵 + 波次转场 | 未评估 | **未执行** | generate_sprites.py 未运行 |
+| 9F | QA | 火焰史莱姆测试 + 常量回归 | 未评估 | **部分完成** | fire_slime 测试存在 (有编译错误), 常量测试完整 |
+
+**R10 计划完成度评估**:
+
+| Phase | 负责角色 | 任务 | 状态 |
+|-------|---------|------|------|
+| 10A | Programmer | hud_skill_button.gd 拆分进一步 | 需验证 -- 死代码未删 |
+| 10B | Programmer | 常量统一 (SkillData 引用) | 未执行 |
+| 10C | Programmer | BUG-008 修复 | 未修复 |
+| 10D | Designer | Sentry 简化方案 | 无明确产出 |
+| 10E | Art | 运行 generate_sprites.py | 未执行 |
+| 10F | QA | 常量统一回归测试 | 已完成 |
+
+---
+
+### 技术债务更新
+
+| 优先级 | 描述 | 状态 | 新增/继承 |
+|--------|------|------|-----------|
+| P1 | BUG-008: shield_charge apply_freeze -> apply_stun | 未修复 (R8->R9->R10, 3轮) | 继承 |
+| P1 | 常量 3 处重复声明未统一 | 未修复 (R8->R9->R10, 3轮) | 继承 |
+| P1 | test_fire_slime.gd 编译错误 | 未修复 | **新增** |
+| P2 | hud.gd 90 行死代码 | 未修复 (R9->R10, 2轮) | 继承 |
+| P2 | generate_sprites.py 未运行验证 | 未执行 (R9->R10, 2轮) | 继承 |
+
+---
+
+### 审核人自评: 85/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| R9 遗留追踪 | 23 | 25 | 逐条验证: C1 (已修), BUG-008 (未修), 9B/9C (未变), 9A (已完) |
+| R10 变更审核 | 18 | 25 | R10 Programmer 无产出导致审核范围有限; 常量测试覆盖良好 |
+| 跨模块一致性 | 20 | 20 | 发现 test_fire_slime 编译错误 + hud 死代码 + apply_stun/freeze 语义问题 |
+| 技术债务维护 | 14 | 15 | 更新 5 项债务状态, 新增 1 项 |
+| 时序遵守 | 10 | 15 | 先做 R9 遗留, 等待后检查 R10, 无 Critical 误报 |
+
+**加分项**: 发现 test_fire_slime.gd:280-281 编译错误是影响测试套件完整性的真实问题。识别出 hud.gd 死代码的精确行范围 (393-482) 使删除操作可直接执行。
+
+**扣分说明**: R10 产出较少 (Programmer 无变更), 审核深度受限。常量重复和 BUG-008 已是第 3 轮继承, 作为 Reviewer 未能推动修复, 仅能记录。

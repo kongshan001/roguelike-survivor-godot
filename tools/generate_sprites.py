@@ -110,7 +110,10 @@ def ensure_dirs():
 
 
 def new_img(w, h):
-    return Image.new("RGBA", (w, h), (0, 0, 0, 0)), ImageDraw.Draw.__new__(ImageDraw)
+    """Deprecated -- use draw_img() instead."""
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    return img, draw
 
 
 def rgba(color_name, alpha=255):
@@ -1811,9 +1814,7 @@ def gen_flamebible():
     yellow = rgba("thunder_yellow")
     white = rgba("white")
     # Book body (centered rectangle)
-    for py in range(4, 16):
-        for px in range(3, 17):
-            d.point((px, py), fill=bible_c)
+    d.rectangle([(3, 4), (16, 15)], fill=bible_c)
     # Book outline
     _draw_outline_rect(d, 3, 4, 14, 12, outline)
     # Spine line (center vertical)
@@ -2008,26 +2009,23 @@ def gen_wave_progress():
     """Wave progress bar background (128x8).
     Dark bar with subtle center highlight for use as HUD wave progress track.
     Colors: #1A1A2E dark bg, #2A2A3E center highlight.
+    Uses d.rectangle/d.line for fast fills.
     """
     img, d = draw_img(128, 8)
     bg_c = rgba("wave_bg")        # #1A1A2E
     mid_c = rgba("wave_bg_mid")   # #2A2A3E
 
-    # Full background fill (dark)
-    for y in range(8):
-        for x in range(128):
-            d.point((x, y), fill=bg_c)
+    # Full background fill (single rectangle)
+    d.rectangle([(0, 0), (127, 7)], fill=bg_c)
 
     # Center highlight strip (y=3,4 -- middle 2 rows)
-    for x in range(128):
-        d.point((x, 3), fill=mid_c)
-        d.point((x, 4), fill=mid_c)
+    d.line([(0, 3), (127, 3)], fill=mid_c, width=1)
+    d.line([(0, 4), (127, 4)], fill=mid_c, width=1)
 
     # Top and bottom edge highlight (slightly brighter)
     edge_c = (0x3A, 0x3A, 0x5E, 180)
-    for x in range(128):
-        d.point((x, 0), fill=edge_c)
-        d.point((x, 7), fill=edge_c)
+    d.line([(0, 0), (127, 0)], fill=edge_c, width=1)
+    d.line([(0, 7), (127, 7)], fill=edge_c, width=1)
 
     save(img, "ui", "wave_progress.png")
 
@@ -2787,40 +2785,33 @@ def gen_wave_transition():
     """Wave transition banner (1280x80, gradient bar).
     Horizontal banner for wave start/end announcements.
     Dark indigo background with subtle gradient and edge highlights.
+    Uses d.rectangle() for row-level fills (much faster than per-pixel).
     """
     img, d = draw_img(1280, 80)
     bg_c = rgba("wave_banner_bg")      # #1A1A2E
-    mid_c = rgba("wave_banner_mid")    # #2A2A4E
     edge_c = rgba("wave_banner_edge")  # #3A3A5E
 
-    # Background fill (dark)
-    for y in range(80):
-        for x in range(1280):
-            d.point((x, y), fill=bg_c)
+    # Background fill (single rectangle, fast)
+    d.rectangle([(0, 0), (1279, 79)], fill=bg_c)
 
     # Gradient: center is lighter, edges are darker
-    # Vertical gradient (brighter in center rows y=30..50)
+    # Vertical gradient (brighter in center rows y=25..54)
     for y in range(25, 55):
-        # Calculate brightness factor based on distance from center
         dist_from_center = abs(y - 40)
         factor = 1.0 - (dist_from_center / 20.0)
         factor = max(0.0, min(1.0, factor))
-        for x in range(1280):
-            # Blend between bg_c and mid_c based on factor
-            r = int(PALETTE["wave_banner_bg"][0] + (PALETTE["wave_banner_mid"][0] - PALETTE["wave_banner_bg"][0]) * factor)
-            g = int(PALETTE["wave_banner_bg"][1] + (PALETTE["wave_banner_mid"][1] - PALETTE["wave_banner_bg"][1]) * factor)
-            b = int(PALETTE["wave_banner_bg"][2] + (PALETTE["wave_banner_mid"][2] - PALETTE["wave_banner_bg"][2]) * factor)
-            d.point((x, y), fill=(r, g, b, 255))
+        r = int(PALETTE["wave_banner_bg"][0] + (PALETTE["wave_banner_mid"][0] - PALETTE["wave_banner_bg"][0]) * factor)
+        g = int(PALETTE["wave_banner_bg"][1] + (PALETTE["wave_banner_mid"][1] - PALETTE["wave_banner_bg"][1]) * factor)
+        b = int(PALETTE["wave_banner_bg"][2] + (PALETTE["wave_banner_mid"][2] - PALETTE["wave_banner_bg"][2]) * factor)
+        d.line([(0, y), (1279, y)], fill=(r, g, b, 255), width=1)
 
     # Top edge highlight (2px line)
-    for x in range(1280):
-        d.point((x, 0), fill=edge_c)
-        d.point((x, 1), fill=(*PALETTE["wave_banner_edge"][:3], 180))
+    d.line([(0, 0), (1279, 0)], fill=edge_c, width=1)
+    d.line([(0, 1), (1279, 1)], fill=(*PALETTE["wave_banner_edge"][:3], 180), width=1)
 
     # Bottom edge highlight (2px line)
-    for x in range(1280):
-        d.point((x, 79), fill=edge_c)
-        d.point((x, 78), fill=(*PALETTE["wave_banner_edge"][:3], 180))
+    d.line([(0, 79), (1279, 79)], fill=edge_c, width=1)
+    d.line([(0, 78), (1279, 78)], fill=(*PALETTE["wave_banner_edge"][:3], 180), width=1)
 
     # Horizontal accent lines (thin bright stripes at y=5 and y=75)
     for x in range(0, 1280, 3):  # dashed pattern
@@ -2846,48 +2837,28 @@ def gen_wave_banner():
     Gradient banner background for wave transition announcements.
     Each wave has its own color: green/yellow/orange/red/deep-red.
     Outline: #1A1A2E 2px border. Gradient: wave_color alpha fades top->bottom.
+    Uses d.line() for row-level fills (much faster than per-pixel).
     """
     outline_c = rgba("dark_outline")
     for palette_key, filename in WAVE_BANNER_COLORS:
         wave_c = PALETTE[palette_key]
         img, d = draw_img(600, 80)
 
-        # -- Fill with vertical alpha gradient --
+        # -- Fill with vertical alpha gradient (one line per row) --
         for y in range(80):
-            # Alpha gradient: top=0.9, center=1.0, bottom=0.5
             if y < 40:
                 alpha_factor = 0.9 + 0.1 * (y / 40.0)
             else:
                 alpha_factor = 1.0 - 0.5 * ((y - 40) / 40.0)
             alpha = int(255 * alpha_factor)
-            for x in range(600):
-                d.point((x, y), fill=(*wave_c, alpha))
+            d.line([(0, y), (599, y)], fill=(*wave_c, alpha), width=1)
 
         # -- 2px outline border --
-        # Top edge
-        for x in range(600):
-            d.point((x, 0), fill=outline_c)
-            d.point((x, 1), fill=outline_c)
-        # Bottom edge
-        for x in range(600):
-            d.point((x, 78), fill=outline_c)
-            d.point((x, 79), fill=outline_c)
-        # Left edge
-        for y in range(80):
-            d.point((0, y), fill=outline_c)
-            d.point((1, y), fill=outline_c)
-        # Right edge
-        for y in range(80):
-            d.point((598, y), fill=outline_c)
-            d.point((599, y), fill=outline_c)
+        d.rectangle([(0, 0), (599, 79)], outline=outline_c, width=2)
 
-        # -- Center highlight stripe (y=38,39,40,41) --
+        # -- Center highlight stripe (y=38..41) --
         bright = (*wave_c, 255)
-        for x in range(2, 598):
-            d.point((x, 38), fill=bright)
-            d.point((x, 39), fill=bright)
-            d.point((x, 40), fill=bright)
-            d.point((x, 41), fill=bright)
+        d.rectangle([(2, 38), (597, 41)], fill=bright)
 
         # -- Dashed accent lines at y=6 and y=73 --
         accent_alpha = (*wave_c, 120)

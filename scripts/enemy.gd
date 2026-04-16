@@ -226,6 +226,10 @@ func apply_freeze(duration: float):
 	_freeze_timer = maxf(_freeze_timer, duration)
 
 
+func apply_stun(duration: float) -> void:
+	_freeze_timer = maxf(_freeze_timer, duration)
+
+
 func die() -> void:
 	if not is_alive:
 		return

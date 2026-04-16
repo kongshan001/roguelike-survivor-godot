@@ -1,45 +1,46 @@
 extends Node
 # SkillEffects -- Visual and gameplay effects for character active skills.
 # Each method creates Area2D-based effects, deals damage, and applies status.
+# All skill/passive constants are referenced from SkillData (canonical source).
 
-# --- Mage: Elemental Burst ---
-const MAGE_SKILL_DAMAGE: float = 15.0
-const MAGE_SKILL_RADIUS: float = 150.0
-const MAGE_SKILL_FREEZE_DURATION: float = 1.5
-const MAGE_SKILL_EXPAND_TIME: float = 0.2
-const MAGE_SKILL_SCREENSHAKE: float = 4.0
-const MAGE_SKILL_SCREENSHAKE_DUR: float = 0.15
+# --- Mage: Elemental Burst (from SkillData) ---
+const MAGE_SKILL_DAMAGE: float = SkillData.MAGE_SKILL_DAMAGE
+const MAGE_SKILL_RADIUS: float = SkillData.MAGE_SKILL_RADIUS
+const MAGE_SKILL_FREEZE_DURATION: float = SkillData.MAGE_SKILL_FREEZE_DURATION
+const MAGE_SKILL_EXPAND_TIME: float = SkillData.MAGE_SKILL_EXPAND_TIME
+const MAGE_SKILL_SCREENSHAKE: float = SkillData.MAGE_SKILL_SCREENSHAKE
+const MAGE_SKILL_SCREENSHAKE_DUR: float = SkillData.MAGE_SKILL_SCREENSHAKE_DUR
 
-# --- Warrior: Shield Charge ---
-const WARRIOR_SKILL_DAMAGE: float = 10.0
-const WARRIOR_SKILL_DISTANCE: float = 160.0
-const WARRIOR_SKILL_DURATION: float = 0.25
-const WARRIOR_SKILL_WIDTH: float = 40.0
-const WARRIOR_SKILL_STUN_DURATION: float = 2.0
-const WARRIOR_SKILL_SCREENSHAKE: float = 3.0
-const WARRIOR_SKILL_SCREENSHAKE_DUR: float = 0.1
+# --- Warrior: Shield Charge (from SkillData) ---
+const WARRIOR_SKILL_DAMAGE: float = SkillData.WARRIOR_SKILL_DAMAGE
+const WARRIOR_SKILL_DISTANCE: float = SkillData.WARRIOR_SKILL_DISTANCE
+const WARRIOR_SKILL_DURATION: float = SkillData.WARRIOR_SKILL_DURATION
+const WARRIOR_SKILL_WIDTH: float = SkillData.WARRIOR_SKILL_WIDTH
+const WARRIOR_SKILL_STUN_DURATION: float = SkillData.WARRIOR_SKILL_STUN_DURATION
+const WARRIOR_SKILL_SCREENSHAKE: float = SkillData.WARRIOR_SKILL_SCREENSHAKE
+const WARRIOR_SKILL_SCREENSHAKE_DUR: float = SkillData.WARRIOR_SKILL_SCREENSHAKE_DUR
 
-# --- Ranger: Arrow Rain ---
-const RANGER_SKILL_DAMAGE_PER_ARROW: float = 5.0
-const RANGER_SKILL_ARROW_COUNT: int = 12
-const RANGER_SKILL_RADIUS: float = 100.0
-const RANGER_SKILL_TARGET_RANGE: float = 300.0
-const RANGER_SKILL_FALL_DURATION: float = 0.5
-const RANGER_SKILL_ARROW_WIDTH: float = 4.0
-const RANGER_SKILL_ARROW_HEIGHT: float = 12.0
-const RANGER_SKILL_WARNING_TIME: float = 0.3
-const RANGER_SKILL_SCREENSHAKE: float = 2.0
-const RANGER_SKILL_SCREENSHAKE_DUR: float = 0.08
+# --- Ranger: Arrow Rain (from SkillData) ---
+const RANGER_SKILL_DAMAGE_PER_ARROW: float = SkillData.RANGER_SKILL_DAMAGE_PER_ARROW
+const RANGER_SKILL_ARROW_COUNT: int = SkillData.RANGER_SKILL_ARROW_COUNT
+const RANGER_SKILL_RADIUS: float = SkillData.RANGER_SKILL_RADIUS
+const RANGER_SKILL_TARGET_RANGE: float = SkillData.RANGER_SKILL_TARGET_RANGE
+const RANGER_SKILL_FALL_DURATION: float = SkillData.RANGER_SKILL_FALL_DURATION
+const RANGER_SKILL_ARROW_WIDTH: float = SkillData.RANGER_SKILL_ARROW_WIDTH
+const RANGER_SKILL_ARROW_HEIGHT: float = SkillData.RANGER_SKILL_ARROW_HEIGHT
+const RANGER_SKILL_WARNING_TIME: float = SkillData.RANGER_SKILL_WARNING_TIME
+const RANGER_SKILL_SCREENSHAKE: float = SkillData.RANGER_SKILL_SCREENSHAKE
+const RANGER_SKILL_SCREENSHAKE_DUR: float = SkillData.RANGER_SKILL_SCREENSHAKE_DUR
 
-# --- Passive constants ---
-const MAGE_PASSIVE_DAMAGE_BONUS: float = 0.10
-const WARRIOR_PASSIVE_ARMOR_BONUS: int = 3
-const WARRIOR_PASSIVE_HP_THRESHOLD: float = 0.30
-const WARRIOR_PASSIVE_DURATION: float = 3.0
-const WARRIOR_PASSIVE_COOLDOWN: float = 30.0
-const RANGER_PASSIVE_HIT_COUNT: int = 5
+# --- Passive constants (from SkillData) ---
+const MAGE_PASSIVE_DAMAGE_BONUS: float = SkillData.MAGE_PASSIVE_DAMAGE_BONUS
+const WARRIOR_PASSIVE_ARMOR_BONUS: int = SkillData.WARRIOR_PASSIVE_ARMOR_BONUS
+const WARRIOR_PASSIVE_HP_THRESHOLD: float = SkillData.WARRIOR_PASSIVE_HP_THRESHOLD
+const WARRIOR_PASSIVE_DURATION: float = SkillData.WARRIOR_PASSIVE_DURATION
+const WARRIOR_PASSIVE_COOLDOWN: float = SkillData.WARRIOR_PASSIVE_COOLDOWN
+const RANGER_PASSIVE_HIT_COUNT: int = SkillData.RANGER_PASSIVE_HIT_COUNT
 
-# --- Visual constants ---
+# --- Visual constants (local to skill_effects) ---
 const WARRIOR_AFTERIMAGE_COUNT: int = 3
 const WARRIOR_AFTERIMAGE_ALPHA: float = 0.4
 
@@ -111,8 +112,8 @@ func shield_charge(player: CharacterBody2D, direction: Vector2, damage_bonus: fl
 	for enemy in enemies:
 		if is_instance_valid(enemy) and enemy.is_alive:
 			enemy.take_damage(dmg, "shield_charge")
-			if enemy.has_method("apply_freeze"):
-				enemy.apply_freeze(WARRIOR_SKILL_STUN_DURATION)
+			if enemy.has_method("apply_stun"):
+				enemy.apply_stun(WARRIOR_SKILL_STUN_DURATION)
 
 	# Screen shake
 	_screen_shake(arena, WARRIOR_SKILL_SCREENSHAKE)

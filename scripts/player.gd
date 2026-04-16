@@ -35,18 +35,18 @@ const AFTERIMAGE_ALPHA: float = 0.3
 const AFTERIMAGE_DELAY: float = 0.03
 const AFTERIMAGE_FADE_DURATION: float = 0.2
 
-# Skill cooldown constants (from character-skills.md)
-const MAGE_SKILL_COOLDOWN: float = 20.0
-const WARRIOR_SKILL_COOLDOWN: float = 15.0
-const RANGER_SKILL_COOLDOWN: float = 18.0
+# Skill cooldown constants (canonical source: SkillData)
+const MAGE_SKILL_COOLDOWN: float = SkillData.MAGE_SKILL_COOLDOWN
+const WARRIOR_SKILL_COOLDOWN: float = SkillData.WARRIOR_SKILL_COOLDOWN
+const RANGER_SKILL_COOLDOWN: float = SkillData.RANGER_SKILL_COOLDOWN
 
-# Passive constants (from character-skills.md)
-const MAGE_PASSIVE_DAMAGE_BONUS: float = 0.10
-const WARRIOR_PASSIVE_ARMOR_BONUS: int = 3
-const WARRIOR_PASSIVE_HP_THRESHOLD: float = 0.30
-const WARRIOR_PASSIVE_DURATION: float = 3.0
-const WARRIOR_PASSIVE_COOLDOWN: float = 30.0
-const RANGER_PASSIVE_HIT_COUNT: int = 5
+# Passive constants (canonical source: SkillData)
+const MAGE_PASSIVE_DAMAGE_BONUS: float = SkillData.MAGE_PASSIVE_DAMAGE_BONUS
+const WARRIOR_PASSIVE_ARMOR_BONUS: int = SkillData.WARRIOR_PASSIVE_ARMOR_BONUS
+const WARRIOR_PASSIVE_HP_THRESHOLD: float = SkillData.WARRIOR_PASSIVE_HP_THRESHOLD
+const WARRIOR_PASSIVE_DURATION: float = SkillData.WARRIOR_PASSIVE_DURATION
+const WARRIOR_PASSIVE_COOLDOWN: float = SkillData.WARRIOR_PASSIVE_COOLDOWN
+const RANGER_PASSIVE_HIT_COUNT: int = SkillData.RANGER_PASSIVE_HIT_COUNT
 
 @export var move_speed: float = 160.0
 @export var max_health: float = 8.0
