@@ -1747,3 +1747,204 @@ R16 的 `test_lightning_lv3_chain_bonus_constant` 访问 `wf.LIGHTNING_LV3_CHAIN
 
 - 扣分 -3 (BUG-273: 角色动作纹理未导入, 导致 3 项测试 pending)
 - 扣分 -2 (test_enemy_cache.gd 中 wait_frames 使用已弃用 API, 应改为 wait_physics_frames)
+
+## 第十九轮执行 (2026-04-17)
+
+### 任务概要
+
+1. **BUG-273 修复验证** -- Programmer 在 R18 添加了 `_load_texture_safe()` 方法到 `player.gd`，该方法在 `ResourceLoader.exists()` 失败时使用 `Image -> ImageTexture` 回退加载原始 PNG 文件。QA 验证 3 个动作纹理 (mage_cast/warrior_block/ranger_draw) 现在可以通过 Image 回退成功加载。更新 `test_character_animation.gd` 中 3 项 pending 测试为硬断言，验证 `FileAccess.file_exists(global_path)` 和 `_action_texture != null`。
+2. **敌人动画测试** -- 新建 `test/unit/test_enemy_animation.gd` (51 项测试)，覆盖 R19 Programmer 新增的 `enemy_death_effects.gd` 模块：打击反馈常量(9)、死亡动画分派(12)、死亡最大持续时间(7)、死亡动画集成(5)、死亡效果模块结构(3)、死亡时间轴验证(6)、动画状态变量(9)。
+3. **UI 打磨测试** -- 新建 `test/unit/test_ui_polish.gd` (28 项测试)，覆盖 R19 Programmer 新增的卡牌悬浮效果：悬浮常量(5)、默认状态(3)、悬浮/取消悬浮方法(3)、重置卡牌状态(2)、场景结构(3)、鼠标事件(3)、规格值回归(4)、悬浮守卫(2)、源码验证(3)。
+4. **发现 Critical BUG-274** -- `enemy_death_effects.gd` 和 `hud.gd` 共 9 处使用 `PropertyTweener.set_relative(true)`，该函数在 Godot 4.6 中不存在，导致 `SCRIPT ERROR: Invalid call. Nonexistent function 'set_relative' in base 'PropertyTweener'`。虽然 GDScript 错误不阻止执行流（测试仍通过），但动画效果不会生效。
+5. **全量回归测试** -- 1398 测试全部通过 (0 失败, 0 orphan)。
+
+### 任务1: BUG-273 修复验证详情
+
+**修改文件**: `test/unit/test_character_animation.gd`
+
+**变更内容**:
+- `test_mage_action_texture_file_on_disk`: 移除 `pending()` 守卫，改为验证 `FileAccess.file_exists(global_path)` + `_action_texture != null`
+- `test_warrior_action_texture_file_on_disk`: 同上
+- `test_ranger_action_texture_file_on_disk`: 同上
+
+**验证结果**:
+- 3 个 PNG 文件存在于磁盘: `mage_cast.png` (504 bytes), `warrior_block.png` (510 bytes), `ranger_draw.png` (635 bytes)
+- 3 个 PNG 文件缺少 `.import` 文件: `ResourceLoader.exists()` 返回 false
+- `_load_texture_safe()` 通过 `Image -> ImageTexture` 回退成功加载所有 3 个纹理
+- **BUG-273 状态更新**: 纹理加载功能已正常工作（通过 Image 回退），`.import` 文件缺失不再影响游戏功能
+
+### 任务2: 敌人动画测试详情
+
+**新建文件**: `test/unit/test_enemy_animation.gd` (51 项)
+
+| 类别 | 测试数 | 覆盖内容 |
+|------|--------|----------|
+| 打击反馈常量 | 9 | HIT_FLASH_COLOR(8,8,8), HIT_FLASH_DURATION(0.1), SHAKE_STRENGTH(2.0), SHAKE_STEP_DURATION(0.03), SHAKE_RETURN_DURATION(0.02), Elite骨架/骑士颜色持续时间 |
+| 死亡动画分派 | 12 | play_death_animation/play_hit_feedback 方法, 10 种 enemy_id 分派, _play_default_death 回退 |
+| 死亡最大持续时间 | 7 | skeleton(0.45), boss(0.85), ghost(0.4), splitter(0.25), elite_skeleton(0.45), fire_slime(0.4) |
+| 死亡动画集成 | 5 | die()标记死亡, 缓存注销, 动画后释放, 双重死亡保护, 物理处理禁用 |
+| 模块结构 | 3 | RefCounted 类型, 死亡方法集, Elite 方法集 |
+| 死亡时间轴 | 6 | Boss 4 阶段, Zombie 变褐, Bat 旋转, Splitter 膨胀, Fire Slime 熄灭, Ghost 上浮 |
+| 动画状态变量 | 9 | _death_fx, _get_death_effects, _play_death_animation_and_free, _get_death_max_duration, _has_split, _boss_ai 等 |
+
+**代码审查发现**:
+
+**enemy_death_effects.gd (215 行)**:
+- extends RefCounted (非 Node, 无场景树依赖)
+- `play_hit_feedback()`: HDR 白色闪光 + Tween 位置抖动 + Elite 特殊颜色
+- `play_death_animation()`: 10 种 enemy_id 分派, 每种独特动画
+- 默认死亡: 缩小至 0 + 淡出 (0.15s)
+- Boss 死亡: 4 阶段 (膨胀 -> 抖动 x3 -> 爆炸 -> 金色闪光 -> 消失), 0.85s
+- Zombie: 变褐 -> 压扁 + 淡出
+- Bat: 旋转 + 缩小 + 坠落
+- Skeleton: 压缩 + 变灰 + 坠落 + 淡出
+- Ghost: 上浮 + 缩小 + 淡出
+- Splitter: 膨胀 -> 闪白 -> 爆裂
+- Fire Slime: 熄灭 (变黑) -> 压扁
+- Elite Knight: 倾斜 + 下沉 + 暗紫
+- Elite Skeleton: 膨胀 -> 缩小 + 旋转 + 暗红
+
+**enemy.gd R19 变更**:
+- `_flash_timer` 移除 (闪光逻辑迁移到 enemy_death_effects.gd)
+- `_physics_process` 中移除 flash modulate 逻辑
+- 新增 `_death_effects: RefCounted` 懒加载字段
+- `take_damage()` 调用 `_get_death_effects().play_hit_feedback(self, sprite_node)`
+- `die()` 调用 `_play_death_animation_and_free()` 替代直接 `queue_free()`
+- `_play_death_animation_and_free()`: 禁用物理 -> 播放动画 -> Tween 延迟 queue_free
+- `_get_death_max_duration()`: 按 enemy_id 返回动画总时长 (0.15-0.85s)
+
+### 任务3: UI 打磨测试详情
+
+**新建文件**: `test/unit/test_ui_polish.gd` (28 项)
+
+| 类别 | 测试数 | 覆盖内容 |
+|------|--------|----------|
+| 悬浮常量 | 5 | CARD_HOVER_SCALE=1.08, Y_OFFSET=-4.0, DURATION=0.12, UNHOVER_DURATION=0.1, GLOW=Color(1.1,1.05,0.95) |
+| 默认状态 | 3 | scale=(1,1), modulate=WHITE, panel隐藏 |
+| 悬浮方法 | 3 | _on_card_hover, _on_card_unhover, _reset_card_state |
+| 重置卡牌 | 2 | 重置 scale, 重置 modulate |
+| 场景结构 | 3 | 3张卡片存在, VBox子节点, NameLabel/DescLabel/Icon/KeyLabel |
+| 鼠标事件 | 3 | mouse_entered/mouse_exited 信号, mouse_filter非IGNORE |
+| 规格值回归 | 4 | scale=1.08, Y=-4, 恢复scale=1, 恢复modulate=WHITE |
+| 悬浮守卫 | 2 | panel隐藏时不响应hover, panel隐藏时不响应unhover |
+| 源码验证 | 3 | mouse_entered连接, mouse_exited连接, Tween动画 |
+
+**代码审查发现**:
+
+**hud.gd R19 新增**:
+- `CARD_HOVER_SCALE: float = 1.08` -- 匹配设计规格
+- `CARD_HOVER_Y_OFFSET: float = -4.0` -- 匹配设计规格
+- `CARD_HOVER_DURATION: float = 0.12`
+- `CARD_UNHOVER_DURATION: float = 0.1`
+- `CARD_HOVER_GLOW: Color = Color(1.1, 1.05, 0.95)` -- 暖色调微亮
+- `_on_card_hover(card)`: Tween scale(1.08) + modulate(glow) + position:y(-4 relative)
+- `_on_card_unhover(card)`: Tween scale(1.0) + modulate(white) + position:y(+4 relative)
+- `_reset_card_state(card)`: 直接设置 scale=1.0, modulate=WHITE (即时重置)
+- _ready() 中连接 mouse_entered/mouse_exited 信号到卡牌
+
+### 发现的新缺陷
+
+#### BUG-274: PropertyTweener.set_relative() 不存在于 Godot 4.6 (Critical)
+
+- **文件**: `scripts/enemies/enemy_death_effects.gd` (7 处), `scripts/hud.gd` (2 处)
+- **描述**: 共 9 处代码调用 `PropertyTweener.set_relative(true)`，该函数在 Godot 4.6 的 `PropertyTweener` 类中不存在。运行时产生 `SCRIPT ERROR: Invalid call. Nonexistent function 'set_relative' in base 'PropertyTweener'`。
+- **影响范围**:
+  - `enemy_death_effects.gd`: 打击抖动效果 (3 处), Bat 坠落 (1 处), Skeleton 坠落 (1 处), Ghost 上浮 (1 处), Elite Knight 下沉 (1 处), Boss 抖动 (2 处) -- 所有使用 `set_relative(true)` 的 Tween 动画不生效
+  - `hud.gd`: 卡牌悬浮 Y 偏移 (1 处), 取消悬浮 Y 偏移 (1 处) -- Y 轴浮动效果不生效
+- **根因**: `set_relative()` 是 Godot 4.x 的 `Tweener` 方法，但 Godot 4.6 中 `PropertyTweener` 没有此方法。可能需要使用 `as_relative()` 或手动计算绝对偏移
+- **修复方案**: 将 `set_relative(true)` 替换为 `as_relative()`（Godot 4.6 正确 API），或在 tween 前读取当前值并加上偏移量
+- **状态**: 待处理
+- **指派**: Programmer
+
+### 缺陷跟踪
+
+| ID | 严重度 | 模块 | 描述 | 状态 | 指派 |
+|----|--------|------|------|------|------|
+| BUG-001 | Medium | weapon_controller | `remove_weapon_instances` 中 boomerang 过滤条件无效 | 待处理 | Programmer |
+| BUG-003 | Medium | chest.gd | `_ready()` 加载 `chest.png` 但文件不存在 | 待处理 | Programmer |
+| BUG-005 | Low | test_endless_mode | soul_fragment 浮点精度断言失败 | 待处理 | Programmer |
+| BUG-006 | Low | boomerang.gd | 空 weapon_id 回退逻辑与 projectile.gd 不一致 | 已记录(设计意图) | -- |
+| BUG-007 | Low | game_manager.gd | wave_started 混合类型参数导致 GUT 断言报错 | 已规避 | -- |
+| BUG-008 | Low | skill_effects.gd | Shield Charge 使用 `apply_freeze` 而非 `apply_stun` | 已记录 | Programmer |
+| BUG-272 | Medium | weapon_fire.gd | 4 个未使用常量 | 已修复(R17) | -- |
+| BUG-273 | Medium | assets/sprites/characters | mage_cast/warrior_block/ranger_draw.png 缺少 .import 文件 | **已修复(R18 Image回退)** | -- |
+| **BUG-274** | **Critical** | **enemy_death_effects.gd + hud.gd** | **9 处 `PropertyTweener.set_relative(true)` 在 Godot 4.6 中不存在，导致打击抖动、死亡动画偏移、卡牌 Y 浮动全部不生效** | **待处理** | **Programmer** |
+
+### 测试套件总览
+
+| 日期 | 测试数 | 断言数 | 结果 |
+|------|--------|--------|------|
+| 2026-04-17 R19 | 1398 | 3260 | 1398 通过, 0 失败, 0 pending, **0 orphan** |
+| 2026-04-17 R18 | 1319 | 3142 | 1316 通过, 0 失败, 3 pending |
+
+### 测试文件覆盖 (52 个测试文件)
+
+| 文件 | 测试数 | 覆盖模块 |
+|------|--------|----------|
+| test/unit/test_enemy_animation.gd | 51 | 敌人打击反馈/死亡动画/死亡持续时间/动画分派/状态变量 |
+| test/unit/test_ui_polish.gd | 28 | 卡牌悬浮效果/常量/重置/鼠标事件/守卫 |
+| test/unit/test_wave_system.gd | 63 | 波次状态机/定义/推进/胜利/无尽/缩放/信号/重置 |
+| test/unit/test_lv3_transforms.gd | 59 | Lv3武器变换 + BUG-272验证 |
+| test/unit/test_tutorial_system.gd | 58 | 新手引导常量/触发/文本/消失/跳过/持久化/运行时修复 |
+| test/unit/test_sprite_migration.gd | 42 | Sprite2D迁移: 类型/纹理/缩放/颜色/资产 |
+| test/unit/test_boundary_stress.gd | 56 | 敌人/武器/波次/经济边界压力 |
+| test/unit/test_comprehensive_coverage.gd | 48 | 角色技能E2E/被动E2E/武器基线/协同E2E/波次边界 |
+| test/unit/test_endless_mode.gd | 42 | 无尽模式/die重构/Boss/被动金币/灵魂碎片 |
+| test/unit/test_save_manager.gd | 50 | 存档/商店/任务/成就 |
+| test/unit/test_character_skills.gd | 37 | 技能常量/被动/初始化/冷却/Iron Will/输入映射 |
+| test/unit/test_achievement_screen.gd | 37 | 成就UI场景/标签页/隐藏成就/返回/分类 |
+| test/unit/test_game_manager.gd | 38 | 全局状态/难度/连击/波次 |
+| test/unit/test_enemy_spawner.gd | 36 | 波次定义/模板/间隔/类型/Boss |
+| test/unit/test_chest_system.gd | 36 | 宝箱生成/交互/奖励/清理 |
+| test/unit/test_hud.gd | 33 | HUD信号/升级卡/重投 |
+| test/unit/test_character_animation.gd | 31 | 角色动画常量/纹理/颜色/帧切换/dash/资产(Image回退验证) |
+| test/unit/test_weapon_fire.gd | 31 | 武器数值/协同加成 |
+| test/unit/test_weapon_controller.gd | 29 | 武器定时器/分发/实例追踪 |
+| test/unit/test_enemy_logic.gd | 29 | 敌人行为/状态/Boss |
+| test/unit/test_hud_toast.gd | 27 | Toast容器/创建/限制/自动移除 |
+| test/unit/test_hud_skill_button.gd | 22 | 技能按钮UI/冷却覆盖/图标颜色 |
+| test/unit/test_hud_toast_module.gd | 22 | Toast模块独立常量/容器/排队 |
+| test/unit/test_evolved_weapon_sprites.gd | 20 | 进化精灵加载/回退/资源验证 |
+| test/unit/test_data_resources.gd | 21 | 武器/敌人数据资源 |
+| test/unit/test_skill_data_constants.gd | 34 | SkillData常量回归/三源一致性 |
+| test/unit/test_character_passives.gd | 19 | 角色专属被动注册/常量/应用 |
+| test/unit/test_weapon_evolution.gd | 18 | 进化配方/替换 |
+| test/unit/test_boomerang.gd | 18 | 回旋镖飞行/返回 |
+| test/unit/test_player_logic.gd | 25 | 玩家伤害/武器/被动 |
+| test/unit/test_weapon_registry.gd | 16 | 武器注册表 |
+| test/unit/test_weapon_balance.gd | 16 | DPS平衡回归/全局不变量 |
+| test/unit/test_sentinel_totem.gd | 16 | 守护图腾注册/进化/字段 |
+| test/unit/test_enemy_cache.gd | 16 | 敌人缓存注册/获取/失效/排序/大量重置 |
+| test/unit/test_weapon_lv3_transforms.gd | 17 | Knife弹射/FrostAura碎裂/Boomerang追踪 |
+| test/unit/test_xp_gem.gd | 14 | XP宝石分级/拾取 |
+| test/unit/test_enemy_bullet.gd | 14 | 弹幕方向/速度/伤害 |
+| test/unit/test_item_crate.gd | 13 | 箱子类型/收集/概率 |
+| test/unit/test_spin_blade.gd | 12 | 旋转刀刃创建/角度 |
+| test/unit/test_fire_slime.gd | 12 | Fire Slime 燃烧光环/战斗/模板 |
+| test/unit/test_arena_screen_shake.gd | 11 | 屏幕震动触发/衰减 |
+| test/unit/test_upgrade_pool.gd | 11 | 升级池/被动/进化 |
+| test/unit/test_projectile.gd | 9 | 投射物/燃烧/减速 |
+| test/unit/test_performance_benchmark.gd | 17 | get_nodes_in_group性能基准/缓存一致性 |
+| test/unit/test_player_dash.gd | 7 | Dash冷却/无敌 |
+| test/unit/test_food_pickup.gd | 6 | 食物掉落/拾取 |
+| test/unit/test_character_data.gd | 5 | 角色数据定义 |
+| test/unit/test_difficulty_data.gd | 5 | 难度数据定义 |
+| test/unit/test_wave_boundary.gd | 23 | 波次边缘/无尽数值安全/VICTORY不变量 |
+| test/unit/test_boss_ai.gd | 24 | Boss三阶段/充能/螺旋 |
+| test/unit/test_synergy_manager.gd | 24 | 18种协同检测 |
+| **合计** | **1398** | **52 个测试文件** |
+
+### QA 自评分数: 90/100
+
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| BUG-273 验证 | 18 | 20 | Image回退机制验证, 3项pending转为硬断言, -2 因 .import 文件仍未生成 |
+| 敌人动画测试 | 25 | 25 | 51项测试覆盖死亡效果模块全部常量/分派/时间轴/集成 |
+| UI 打磨测试 | 22 | 25 | 28项测试覆盖卡牌悬浮常量/方法/守卫, -3 因 set_relative BUG 导致 Y 偏移动画不生效 |
+| BUG-274 发现 | 15 | 15 | 发现 Critical 级别 set_relative 兼容性问题, 含精确代码位置和影响分析 |
+| 全量回归测试 | 20 | 25 | 1398测试全部通过, 0失败, 0 orphan, -5 因 set_relative 错误产生大量 SCRIPT ERROR 日志噪音 |
+| 记录完整性 | 0 | 0 | (不计入总分) qa-log + TEST_COVERAGE.md 完整更新 |
+
+- 扣分 -5 (BUG-274 Critical: set_relative 导致 9 处 Tween 动画不生效, 产生大量 SCRIPT ERROR 日志)
+- 扣分 -3 (BUG-003 chest.png 缺失仍存在)
+- 扣分 -2 (test_arena_screen_shake 的 Camera2D ERROR 日志仍存在)

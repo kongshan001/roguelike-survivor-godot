@@ -1,21 +1,33 @@
 # Test Coverage Report
 
-Generated: 2026-04-17 R18
-QA Agent: Task 18 (Tutorial Pending Removal + Character Animation + Enemy Cache Regression)
+Generated: 2026-04-17 R19
+QA Agent: Task 19 (BUG-273 Verification + Enemy Animation + UI Polish)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total test files | 50 |
-| Total test functions | 1319 |
-| Assertions | 3142 |
-| Passing | 1316 |
-| Pending | 3 |
+| Total test files | 52 |
+| Total test functions | 1398 |
+| Assertions | 3260 |
+| Passing | 1398 |
+| Pending | 0 |
 | Failing | 0 |
 | Orphans | 0 |
 
 ## Test File Inventory
+
+### Enemy Animation Tests (1 file, R19 new)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_enemy_animation.gd | 51 | Hit feedback constants (9), death animation dispatch (12), death max duration per type (7), death animation integration (5), death effects module structure (3), death timeline verification (6), animation state variables (9) |
+
+### UI Polish Tests (1 file, R19 new)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_ui_polish.gd | 28 | Card hover constants (5), default state (3), hover/unhover methods (3), reset card state (2), scene structure (3), mouse events (3), spec value regression (4), hover guards (2), source verification (3) |
 
 ### Tutorial System Tests (1 file)
 
@@ -39,7 +51,7 @@ QA Agent: Task 18 (Tutorial Pending Removal + Character Animation + Enemy Cache 
 
 | File | Tests | Module Coverage |
 |------|-------|----------------|
-| test_character_animation.gd | 31 | Animation constants (3), character idle textures (4), action texture load (3), character colors (3), velocity direction (3), frame switching (4), dash behavior (3), texture assets (6), sprite node type (2), animation state vars (2) |
+| test_character_animation.gd | 31 | Animation constants (3), character idle textures (4), action texture load (3), character colors (3), velocity direction (3), frame switching (4), dash behavior (3), texture assets (6), sprite node type (2), animation state vars (2), BUG-273 Image fallback (3) |
 
 ### BUG-272 Verification (added to test_lv3_transforms.gd)
 
@@ -264,6 +276,9 @@ QA Agent: Task 18 (Tutorial Pending Removal + Character Animation + Enemy Cache 
 | scripts/pickup_manager.gd | test_endless_mode (indirect) | Covered |
 | scripts/save_manager.gd | test_save_manager, test_tutorial_system | Covered |
 | scripts/enemies/boss_ai.gd | test_boss_ai | Covered |
+| scripts/enemies/enemy_death_effects.gd | test_enemy_animation | Covered (R19) |
+| scripts/enemy.gd (R19 death animation) | test_enemy_animation | Covered (R19) |
+| scripts/hud.gd (R19 card hover) | test_ui_polish | Covered (R19) |
 
 ## Coverage Matrix: Sprite2D Migration (R15)
 
@@ -320,6 +335,7 @@ QA Agent: Task 18 (Tutorial Pending Removal + Character Animation + Enemy Cache 
 4. `scripts/weapon_select.gd` - No test (low priority: UI navigation, now uses TextureRect)
 5. `scripts/game_over_screen.gd` - Tested indirectly via test_endless_mode (4 tests)
 6. `scripts/title_screen.gd` - No test (low priority: minimal logic)
+7. BUG-274: `set_relative(true)` in enemy_death_effects.gd and hud.gd causes 9 Tween animations to silently fail (Critical, pending Programmer fix)
 
 All core game logic files have dedicated test coverage.
 
@@ -372,3 +388,51 @@ Note: Measurements taken on test environment (Darwin 21.6, Intel HD 6000). Produ
 | FIRESTAFF_LV3_BURN_DPS | KEPT (used in fire_cone) | - |
 | FIRESTAFF_LV3_BURN_DURATION | KEPT (used in fire_cone) | - |
 | BIBLE_LV3_RADIUS_MUL | KEPT (used in update_orbit) | - |
+
+## Coverage Matrix: Enemy Death Effects (R19)
+
+| Enemy Type | Death Animation | Max Duration | test_enemy_animation |
+|------------|----------------|--------------|---------------------|
+| skeleton | compress + gray + drop + fade | 0.45s | X |
+| zombie | darken + flatten + fade | 0.45s | X |
+| bat | spin + shrink + fall + fade | 0.3s | X |
+| elite_skeleton | expand + shrink + rotate + dark red + fade | 0.45s | X |
+| ghost | float up + shrink + fade | 0.4s | X |
+| splitter | expand + flash + pop | 0.25s | X |
+| splitter_small | quick shrink + fade | 0.2s | X |
+| fire_slime | extinguish + flatten + fade | 0.4s | X |
+| elite_knight | tilt + sink + dark purple + fade | 0.55s | X |
+| boss | shock + shake(3x) + explode + gold flash + vanish | 0.85s | X |
+| default | shrink to 0 + fade | 0.15s | X |
+
+## Coverage Matrix: Card Hover Effects (R19)
+
+| Feature | Value | test_ui_polish |
+|---------|-------|---------------|
+| CARD_HOVER_SCALE | 1.08 | X |
+| CARD_HOVER_Y_OFFSET | -4.0 | X |
+| CARD_HOVER_DURATION | 0.12s | X |
+| CARD_UNHOVER_DURATION | 0.1s | X |
+| CARD_HOVER_GLOW | Color(1.1, 1.05, 0.95) | X |
+| _on_card_hover method | exists | X |
+| _on_card_unhover method | exists | X |
+| _reset_card_state method | exists | X |
+| Panel-hidden guard | returns early | X |
+| Mouse entered signal | connected | X |
+| Mouse exited signal | connected | X |
+| Tween animation | create_tween | X |
+
+## Coverage Matrix: BUG-274 Verification (R19)
+
+| Location | set_relative Usage | Impact |
+|----------|--------------------|--------|
+| enemy_death_effects.gd:35 | shake_tween position (relative) | Hit shake animation broken |
+| enemy_death_effects.gd:36 | shake_tween position (relative) | Hit shake animation broken |
+| enemy_death_effects.gd:37 | shake_tween position (relative) | Hit shake return broken |
+| enemy_death_effects.gd:146 | bat death position:y (relative) | Bat fall animation broken |
+| enemy_death_effects.gd:157 | skeleton death position:y (relative) | Skeleton drop animation broken |
+| enemy_death_effects.gd:178 | ghost death position:y (relative) | Ghost float-up animation broken |
+| enemy_death_effects.gd:219 | elite_knight death position:y (relative) | Elite knight sink animation broken |
+| enemy_death_effects.gd:232-233 | boss death position (relative x2) | Boss shake animation broken |
+| hud.gd:398 | card hover position:y (relative) | Card Y float broken |
+| hud.gd:409 | card unhover position:y (relative) | Card Y restore broken |

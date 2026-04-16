@@ -18,6 +18,24 @@
 
 ## 技术决策
 
+### 2026-04-17: R19 敌人受伤/死亡动画 + UI卡片悬浮 + BUG-273修复验证
+- **决策**: 实现敌人受伤/死亡动画系统，提取为独立模块 `enemy_death_effects.gd`；HUD升级面板卡牌悬浮效果；验证BUG-273纹理回退
+- **为什么**:
+  - 敌人动画按 `enemy_id` 分10种差异化死亡效果，每种有独特的 scale/modulate/rotation/position Tween 组合
+  - 从 enemy.gd (468行) 提取死亡动画到 enemy_death_effects.gd (249行)，避免 enemy.gd 超过500行限制
+  - 受伤反馈从手动 `_flash_timer` + `fmod` 闪烁改为 Tween 驱动的 HDR白闪 + 位置抖动，更精确可控
+  - 精英敌人 (elite_skeleton/elite_knight) 受伤后额外残留变色（泛红/紫电弧）
+  - 卡牌悬浮使用 scale + modulate Tween，放弃 Y偏移（HBoxContainer 控制子节点位置，直接改 position 无效）
+  - BUG-273: `_load_texture_safe()` 的 Image->ImageTexture 回退机制验证正常工作，3个pending测试改写为assert_not_null断言后全部通过
+- **发现的技术约束**:
+  - Godot 4.x `PropertyTweener` 没有 `set_relative()` 方法，必须用绝对坐标值（`base_pos + offset`）
+  - HBoxContainer 子节点不能直接修改 `position`（由容器管理布局），卡牌Y偏移无法实现
+- **新增文件**: `scripts/enemies/enemy_death_effects.gd` (249行)
+- **修改文件**:
+  - `scripts/enemy.gd` (468 -> 497行): 移除 `_flash_timer`，添加 `_death_effects`/`_get_death_effects()`/`_play_death_animation_and_free()`/`_get_death_max_duration()`；die() 改为动画后延迟 queue_free；take_damage() 使用 Tween 受击反馈
+  - `scripts/hud.gd` (374 -> 410行): 添加卡牌悬浮/取消悬浮 Tween 效果 (`_on_card_hover`/`_on_card_unhover`/`_reset_card_state`)，卡牌 mouse_entered/exited 信号连接，`_show_upgrade_panel` 中重置卡牌状态
+- **测试**: 1398 测试全部通过 (从 1319 增加 79 个新测试)，0 pending，0 失败
+
 ### 2026-04-17: R18 角色动画帧集成 (Method C)
 - **决策**: 采用 Method C (Sprite2D + _physics_process) 实现角色行走动画，不修改 player.tscn
 - **为什么**: 最小侵入性方案 -- 保持 Sprite2D 节点不变，残影系统零改动，不破坏 200+ 测试中的 sprite.texture 引用

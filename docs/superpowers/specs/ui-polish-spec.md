@@ -480,3 +480,209 @@ func _show_wave_banner(wave: int, wave_name: String) -> void:
 | P1 | scripts/hud.gd 或新建 achievement_toast.gd | 成就弹出动画 + 队列 |
 | P2 | scripts/hud.gd _show_wave_banner() | 暗幕 + 扫光 + Boss 特殊横幅 |
 | P2 | scripts/save_manager.gd | 成就解锁信号连接到 toast |
+
+---
+
+## 10. 卡牌悬浮阴影 (R19 补充)
+
+### 10.1 阴影参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 阴影类型 | 底部偏移 ColorRect | 像素风硬边阴影，无模糊 |
+| 阴影颜色 | Color(0.0, 0.0, 0.0, 0.3) | 半透明黑色 |
+| 阴影尺寸 | 卡片尺寸 + Vector2(4, 4) | 略大于卡片 |
+| 阴影偏移 | Vector2(2, 3) | 右下偏移 |
+| 阴影层级 | z_index = 卡片 z_index - 1 | 在卡片后方 |
+| 出现时机 | 与 hover 动画同步 | 0.12s |
+| 消失时机 | 与 unhover 动画同步 | 0.1s |
+
+### 10.2 hover 时阴影变化
+
+| 状态 | 阴影偏移 | 阴影 alpha | 说明 |
+|------|---------|-----------|------|
+| 默认 | Vector2(2, 3) | 0.3 | 轻微阴影 |
+| hover | Vector2(3, 5) | 0.3 | 偏移增大，模拟卡片"升起"后阴影变长 |
+| unhover | Vector2(2, 3) | 0.3 | 恢复默认 |
+
+### 10.3 实现代码
+
+```gdscript
+# hud.gd 中，为每张升级选项卡创建阴影:
+var shadow := ColorRect.new()
+shadow.name = "CardShadow"
+shadow.color = Color(0.0, 0.0, 0.0, 0.3)
+shadow.size = card.size + Vector2(4, 4)
+shadow.position = Vector2(2, 3)
+shadow.z_index = -1
+card.add_child(shadow)
+
+# hover 时阴影偏移微调:
+func _on_card_hover(card: Control) -> void:
+    var shadow := card.get_node("CardShadow")
+    var t := create_tween()
+    t.tween_property(card, "scale", Vector2(1.08, 1.08), 0.12).set_ease(Tween.EASE_OUT)
+    t.parallel().tween_property(card, "modulate", Color(1.1, 1.05, 0.95), 0.12)
+    t.parallel().tween_property(card, "position:y", -4.0, 0.12).set_relative(true)
+    t.parallel().tween_property(shadow, "position", Vector2(3, 5), 0.12)
+
+func _on_card_unhover(card: Control) -> void:
+    var shadow := card.get_node("CardShadow")
+    var t := create_tween()
+    t.tween_property(card, "scale", Vector2.ONE, 0.1).set_ease(Tween.EASE_IN)
+    t.parallel().tween_property(card, "modulate", Color.WHITE, 0.1)
+    t.parallel().tween_property(card, "position:y", 4.0, 0.1).set_relative(true)
+    t.parallel().tween_property(shadow, "position", Vector2(2, 3), 0.1)
+```
+
+---
+
+## 11. 进化光晕双层参数 (R19 补充)
+
+### 11.1 光晕层级
+
+| 层级 | 尺寸偏移 | alpha 范围 | 颜色 | 说明 |
+|------|---------|-----------|------|------|
+| 内层 | 卡片边缘 0px | 0.5 <-> 0.9 | Color(1.0, 0.84, 0.0) 金 | 贴卡片边缘发光 |
+| 外层 | 卡片边缘 +2px | 0.2 <-> 0.5 | Color(1.0, 0.84, 0.0, 0.35) 金半透明 | 模拟光晕扩散 |
+
+### 11.2 脉动参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 脉动周期 | 1.0s (0.5s 增亮 + 0.5s 减暗) | 与 R18 定义一致 |
+| 缓动 | ease_in_out | 平滑脉动无顿挫 |
+| 内层 alpha | 0.5 -> 0.9 -> 0.5 (循环) | 较强发光 |
+| 外层 alpha | 0.2 -> 0.5 -> 0.2 (循环) | 较弱扩散 |
+
+### 11.3 实现代码
+
+```gdscript
+func _setup_evolution_glow(card: Control) -> void:
+    # 内层光晕
+    var inner_glow := ColorRect.new()
+    inner_glow.name = "EvolveInnerGlow"
+    inner_glow.color = Color(1.0, 0.84, 0.0, 0.7)
+    inner_glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+    inner_glow.z_index = -1
+    card.add_child(inner_glow)
+
+    # 外层光晕 (+2px)
+    var outer_glow := ColorRect.new()
+    outer_glow.name = "EvolveOuterGlow"
+    outer_glow.color = Color(1.0, 0.84, 0.0, 0.35)
+    outer_glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+    outer_glow.offset_left = -2.0
+    outer_glow.offset_top = -2.0
+    outer_glow.offset_right = 2.0
+    outer_glow.offset_bottom = 2.0
+    outer_glow.z_index = -2
+    card.add_child(outer_glow)
+
+    # 脉动动画
+    var glow_t := create_tween().set_loops()
+    glow_t.tween_property(inner_glow, "color:a", 0.9, 0.5).set_ease(Tween.EASE_IN_OUT)
+    glow_t.tween_property(inner_glow, "color:a", 0.5, 0.5).set_ease(Tween.EASE_IN_OUT)
+
+    var outer_t := create_tween().set_loops()
+    outer_t.tween_property(outer_glow, "color:a", 0.5, 0.5).set_ease(Tween.EASE_IN_OUT)
+    outer_t.tween_property(outer_glow, "color:a", 0.2, 0.5).set_ease(Tween.EASE_IN_OUT)
+```
+
+---
+
+## 12. 成就弹窗背景装饰 (R19 补充)
+
+### 12.1 弹窗结构
+
+| 元素 | 规格 | 说明 |
+|------|------|------|
+| 弹窗尺寸 | 260 x 50 px | R18 已定义 |
+| 背景色 | Color(0.08, 0.08, 0.12, 0.9) 暗底 | R18 已定义 |
+| 顶部装饰条 | 3px 高, 类型色, 全宽 | 弹窗顶部颜色标识 |
+| 图标区域 | 16x16, 左侧, 距左 4px 居中 | 成就类型图标位置 |
+| 图标底色 | 类型暗色 20x20 | 图标背景衬托 |
+
+### 12.2 成就图标底色
+
+| 类型 | 图标底色 | ColorRect 图标色 | 图标形状 |
+|------|---------|----------------|---------|
+| 战斗 (combat) | Color(0.4, 0.1, 0.1) #661A1A 暗红 | Color(1.0, 0.3, 0.2) 红 | 12x12 方形 |
+| 收集 (collect) | Color(0.3, 0.25, 0.05) #4D400D 暗金 | Color(1.0, 0.84, 0.0) 金 | 12x12 菱形 |
+| 生存 (survive) | Color(0.1, 0.3, 0.1) #1A4D1A 暗绿 | Color(0.3, 0.9, 0.4) 绿 | 12x12 十字 |
+| 特殊 (special) | Color(0.15, 0.1, 0.3) #261A4D 暗紫 | Color(0.5, 0.3, 0.9) 紫 | 12x12 圆形 |
+
+### 12.3 弹窗顶部装饰条实现
+
+```gdscript
+# 成就弹窗中添加顶部装饰条:
+var top_strip := ColorRect.new()
+top_strip.name = "TopStrip"
+top_strip.set_anchors_preset(Control.PRESET_TOP_WIDE)
+top_strip.offset_bottom = 3.0
+top_strip.color = border_color  # 类型色
+toast.add_child(top_strip)
+```
+
+---
+
+## 13. 波次横幅渐变配色表 (R19 补充)
+
+### 13.1 渐变方向
+
+从左到右，左端为波次色(饱和)，右端渐暗至暗蓝紫底色。线性水平渐变。
+
+### 13.2 渐变端点色值
+
+| 波次 | 左端色 (饱和) | 中间过渡 | 右端色 (暗化) |
+|------|-------------|---------|-------------|
+| Wave 1 | Color(0.30, 0.69, 0.31) #4CAF50 绿 | Color(0.20, 0.45, 0.25) | Color(0.10, 0.10, 0.18) #1A1A2E 底色 |
+| Wave 2 | Color(1.0, 0.84, 0.31) #FFD64F 黄 | Color(0.65, 0.55, 0.25) | Color(0.10, 0.10, 0.18) 底色 |
+| Wave 3 | Color(1.0, 0.57, 0.0) #FF9100 橙 | Color(0.65, 0.38, 0.0) | Color(0.10, 0.10, 0.18) 底色 |
+| Wave 4 | Color(0.94, 0.33, 0.31) #F0544F 红 | Color(0.60, 0.22, 0.20) | Color(0.10, 0.10, 0.18) 底色 |
+| Wave 5 | Color(1.0, 0.09, 0.17) #FF172B 深红 | Color(0.65, 0.06, 0.11) | Color(0.10, 0.10, 0.18) 底色 |
+
+### 13.3 代码动态渐变实现 (3 层 ColorRect)
+
+```gdscript
+# 横幅渐变使用 3 层 ColorRect 堆叠:
+# 层1: 饱和色 (左半, alpha=0.9)
+# 层2: 过渡色 (中段, alpha=0.5)
+# 层3: 底色 (全宽, alpha=0.9)
+
+func _create_gradient_banner(wave: int) -> ColorRect:
+    var banner := ColorRect.new()
+    banner.size = Vector2(600, 80)
+
+    # 底色层 (全宽)
+    var bg := ColorRect.new()
+    bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+    bg.color = Color(0.10, 0.10, 0.18, 0.9)
+    banner.add_child(bg)
+
+    # 过渡层 (中段)
+    var mid := ColorRect.new()
+    mid.set_anchors_preset(Control.PRESET_FULL_RECT)
+    mid.offset_right = -200.0  # 右侧留出底色
+    mid.color = _get_wave_mid_color(wave)
+    banner.add_child(mid)
+
+    # 饱和层 (左端)
+    var saturated := ColorRect.new()
+    saturated.set_anchors_preset(Control.PRESET_FULL_RECT)
+    saturated.offset_right = -400.0  # 仅左侧 1/3
+    saturated.color = _get_wave_saturated_color(wave)
+    banner.add_child(saturated)
+
+    return banner
+```
+
+### 13.4 波次预告图标点
+
+| 预告敌人 | 图标颜色 | 图标形状 | 波次 |
+|---------|---------|---------|------|
+| 僵尸 | Color(0.30, 0.69, 0.31) 绿 | 3px 圆点 x3 | Wave 1 |
+| 蝙蝠 | Color(0.67, 0.28, 0.74) 紫 | 3px 圆点 x2 | Wave 2 |
+| 骷髅 + 幽灵 | Color(0.88, 0.88, 0.88) 白 + 灰白 | 3px 圆点组合 | Wave 3 |
+| 精英 | Color(0.72, 0.11, 0.11) 红 | 5px 圆点 x1 (更大) | Wave 4 |
+| Boss | Color(0.96, 0.26, 0.21) 红 | 8px 圆点或 boss_warning.png | Wave 5 |

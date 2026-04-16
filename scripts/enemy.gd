@@ -4,8 +4,10 @@ extends CharacterBody2D
 
 var current_hp: float
 var is_alive: bool = true
-var _flash_timer: float = 0.0
 var _player: Node2D = null
+
+# Death effects module (loaded lazily)
+var _death_effects: RefCounted = null
 
 # Status effects
 var _burn_dps: float = 0.0
@@ -131,12 +133,6 @@ func _physics_process(delta: float):
 		if dist < enemy_data.size + 16.0:
 			_player.apply_burn(enemy_data.burn_aura_dps, enemy_data.burn_aura_duration)
 
-	# Flash effect
-	if _flash_timer > 0:
-		_flash_timer -= delta
-		var sprite: Sprite2D = $Sprite as Sprite2D
-		if sprite:
-			sprite.modulate = Color(8, 8, 8) if fmod(_flash_timer, 0.1) > 0.05 else Color.WHITE
 
 
 # --- Ghost behavior ---
@@ -209,7 +205,10 @@ func take_damage(amount: float, source: String = "", was_crit: bool = false):
 		_last_hit_by = source
 	_was_crit = was_crit
 	current_hp -= amount
-	_flash_timer = 0.2
+	# Play hit feedback (flash + shake) via death effects module
+	var sprite_node: Sprite2D = $Sprite as Sprite2D
+	if sprite_node and is_instance_valid(sprite_node):
+		_get_death_effects().play_hit_feedback(self, sprite_node)
 	if current_hp <= 0:
 		die()
 
@@ -236,6 +235,7 @@ func die() -> void:
 	if not is_alive:
 		return
 	is_alive = false
+	remove_from_group("enemies")
 	if GameManager:
 		GameManager.unregister_enemy(self)
 
@@ -247,7 +247,8 @@ func die() -> void:
 	_handle_boss_death()
 	_handle_splitter_death()
 
-	queue_free()
+	# Play death animation then free
+	_play_death_animation_and_free()
 
 
 func _handle_kill_rewards() -> void:
@@ -466,3 +467,31 @@ func _spawn_bonus_gem(value: int) -> void:
 
 func _find_player() -> Node2D:
 	return GameManager.find_player()
+
+
+# --- Death animation helpers ---
+
+func _get_death_effects() -> RefCounted:
+	if _death_effects == null:
+		_death_effects = load("res://scripts/enemies/enemy_death_effects.gd").new()
+	return _death_effects
+
+
+func _play_death_animation_and_free() -> void:
+	var sprite_node: Sprite2D = $Sprite as Sprite2D
+	if sprite_node and is_instance_valid(sprite_node):
+		# Stop physics processing during death animation
+		set_physics_process(false)
+		_get_death_effects().play_death_animation(self, sprite_node)
+		# Wait for animation to finish before freeing
+		var max_duration: float = _get_death_max_duration()
+		var t: Tween = create_tween()
+		t.tween_interval(max_duration)
+		t.tween_callback(queue_free)
+	else:
+		queue_free()
+
+
+func _get_death_max_duration() -> float:
+	var eid: String = enemy_data.enemy_id if enemy_data else ""
+	return _get_death_effects().get_death_duration(eid)

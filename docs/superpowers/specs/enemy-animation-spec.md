@@ -399,3 +399,132 @@ func _enter_phase(phase: int) -> void:
 | P1 | scripts/boss_ai.gd die() | Boss 多阶段死亡 + 屏幕震动 |
 | P1 | scripts/enemy.gd _ready() | 精英骑士披风飘动循环 + 精英骷髅眼脉动 |
 | P2 | scripts/enemy.gd _ready() | Boss 光环脉动 + 胸甲闪光 |
+| P2 | scripts/boss_ai.gd die() | Boss 死亡粒子效果 (12个ColorRect碎片) |
+
+---
+
+## 10. 受伤闪烁帧时序 (R19 补充)
+
+### 10.1 通用受伤帧 (全部 10 种敌人)
+
+```
+t=0.000s: modulate = Color(8, 8, 8)            -- HDR 白闪开始
+t=0.000s: sprite.position.x += shake_dir.x     -- 击退偏移 (+/-2px)
+t=0.030s: sprite.position.x -= shake_dir.x*0.5 -- 回弹 (-/+1px)
+t=0.050s: sprite.position = Vector2.ZERO        -- 归位
+t=0.100s: modulate = Color(1, 1, 1)            -- 恢复正常
+```
+
+`shake_dir = Vector2(2.0 if randi()%2==0 else -2.0, 0.0)`
+
+总帧时长: 0.10s
+
+### 10.2 精英骷髅受伤帧 (elite_skeleton)
+
+```
+t=0.000s~0.100s: 同通用帧
+t=0.100s~0.180s: modulate = Color(8,8,8) -> Color(1.5, 0.8, 0.7)  -- 泛红 0.08s
+t=0.180s~0.250s: modulate = Color(1.5, 0.8, 0.7) -> Color.WHITE    -- 恢复 0.07s
+```
+
+总帧时长: 0.25s
+
+### 10.3 精英骑士受伤帧 (elite_knight)
+
+```
+t=0.000s~0.100s: 同通用帧
+t=0.100s~0.200s: modulate = Color(8,8,8) -> Color(1.5, 0.6, 2.0)  -- 紫电弧 0.10s
+t=0.200s~0.300s: modulate = Color(1.5, 0.6, 2.0) -> Color.WHITE    -- 恢复 0.10s
+```
+
+总帧时长: 0.30s
+
+### 10.4 受伤闪烁强度分级
+
+| 敌人类别 | HDR 值 | 闪白时长 | 残留帧 | 总时长 | 说明 |
+|---------|--------|---------|--------|--------|------|
+| 普通敌人 (7种) | Color(8, 8, 8) | 0.10s | 无 | 0.10s | 标准白闪 |
+| 精英骷髅 | Color(8, 8, 8) | 0.10s | 泛红 0.15s | 0.25s | 受伤泛红 |
+| 精英骑士 | Color(8, 8, 8) | 0.10s | 紫电弧 0.20s | 0.30s | 受伤紫闪 |
+| Boss | Color(8, 8, 8) | 0.10s | 无 | 0.10s | 同普通，Boss差异通过阶段变色体现 |
+
+---
+
+## 11. Boss 死亡粒子参数 (R19 补充)
+
+Boss 死亡时在"碎裂"阶段产生金色碎片粒子效果。
+
+### 11.1 粒子参数表
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 粒子数量 | 12 个 | 足够产生碎片感，不造成性能压力 |
+| 粒子颜色 | 随机 [Color(1.0,0.9,0.3), Color(0.96,0.26,0.21), Color(1.0,0.84,0.0)] | 金+红+深金三色碎片 |
+| 粒子尺寸 | 3x3 ~ 6x6 px | 随机大小，模拟不规则碎片 |
+| 初始位置 | Boss 精灵中心 (global_position) | 碎片从 Boss 中心爆出 |
+| 发射方向 | 360 度随机 | 全向散射 |
+| 发射速度 | 80-160 px/s | 中速散射 |
+| 重力 | 120 px/s^2 向下 | 碎片受重力下坠 |
+| 初始 alpha | 1.0 | 完全不透明 |
+| alpha 衰减 | 1.0 -> 0.0, 0.5s | 0.5s 后完全消失 |
+| 旋转速度 | 3-8 rad/s | 碎片翻滚 |
+| 生命周期 | 0.5s | 每粒子存活 0.5s |
+| 发射时机 | Boss 死亡序列 t=0.55s (碎裂阶段开始时) | 与 Boss 精灵缩小同步 |
+
+### 11.2 ColorRect 手动粒子实现代码
+
+```gdscript
+# boss_ai.gd die() 中，碎裂阶段触发时:
+var PARTICLE_COLORS := [
+    Color(1.0, 0.9, 0.3),    # 金色碎片
+    Color(0.96, 0.26, 0.21), # 红色碎片
+    Color(1.0, 0.84, 0.0)    # 深金碎片
+]
+
+for i in range(12):
+    var p := ColorRect.new()
+    var size := randf_range(3.0, 6.0)
+    p.size = Vector2(size, size)
+    p.color = PARTICLE_COLORS[i % 3]
+    p.position = global_position - p.size / 2.0
+    p.z_index = 5
+    get_parent().add_child(p)
+
+    var angle := randf() * TAU
+    var speed := randf_range(80.0, 160.0)
+    var vel := Vector2(cos(angle), sin(angle)) * speed
+    var grav := Vector2(0, 120.0)
+    var rot_speed := randf_range(3.0, 8.0)
+    var life := 0.5
+
+    var t := create_tween()
+    var target_pos := p.position + vel * life + 0.5 * grav * life * life
+    t.tween_property(p, "position", target_pos, life)
+    t.parallel().tween_property(p, "modulate:a", 0.0, life)
+    t.parallel().tween_property(p, "rotation", rot_speed, life).set_relative(true)
+    t.tween_callback(p.queue_free)
+```
+
+---
+
+## 12. Boss 出场屏幕震动模式 (R19 补充)
+
+### 12.1 震动参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 震动强度 | 5.0 | 比连杀20(7.0)弱，比受伤(3.0)强 |
+| 衰减率 | 8.0/s | 快速衰减，Boss 出场震动不应持续过长 |
+| 震动持续时间 | 0.625s (5.0 / 8.0) | 自然衰减到 0 |
+| 偏移模式 | 随机 Vector2(-1,1) * current_strength | 每帧随机方向 |
+| 震动频率 | 每物理帧 (60fps) | 高频抖动 |
+
+### 12.2 震动强度对比表
+
+| 触发条件 | 强度 | 衰减率 | 持续时间 | 体感 |
+|---------|------|--------|---------|------|
+| 玩家受伤 | 3.0 | 5.0/s | 0.6s | 轻微抖动 |
+| Boss 出场 | 5.0 | 8.0/s | 0.625s | 中等震动 |
+| 连杀 >=20 | 7.0 | 5.0/s | 1.4s | 强烈震动 |
+| Boss 死亡 | 8.0 | 10.0/s | 0.8s | 最强震动 |
+| Boss 横幅出现 | 2.0 | 一次 | 0.1s | 轻微一震 |

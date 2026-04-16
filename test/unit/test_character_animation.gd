@@ -249,33 +249,39 @@ func test_ranger_idle_texture_exists():
 
 
 func test_mage_action_texture_file_on_disk():
-	# Action textures may not have .import files yet, check file on disk
+	# BUG-273: PNG files exist on disk but lack .import files.
+	# player.gd _load_texture_safe() has Image fallback that loads raw PNG.
+	# Verify the file exists on disk (via FileAccess) even if ResourceLoader fails.
 	var path: String = "res://assets/sprites/characters/mage_cast.png"
-	var imported: bool = ResourceLoader.exists(path)
-	if not imported:
-		# File exists on disk but not yet imported by Godot editor
-		# This is expected if Godot editor has not scanned the directory
-		pending("mage_cast.png not yet imported by Godot editor")
-		return
-	assert_true(imported, "mage_cast.png should be importable")
+	var global_path: String = ProjectSettings.globalize_path(path)
+	assert_true(FileAccess.file_exists(global_path), "mage_cast.png should exist on disk")
+	# Also verify _load_texture_safe successfully loads via Image fallback
+	GameManager.selected_character = "mage"
+	var p = load("res://scenes/player.tscn").instantiate()
+	add_child_autofree(p)
+	assert_not_null(p._action_texture, "Mage action texture should load via _load_texture_safe fallback")
 
 
 func test_warrior_action_texture_file_on_disk():
+	# BUG-273: Verify warrior_block.png loads via Image fallback
 	var path: String = "res://assets/sprites/characters/warrior_block.png"
-	var imported: bool = ResourceLoader.exists(path)
-	if not imported:
-		pending("warrior_block.png not yet imported by Godot editor")
-		return
-	assert_true(imported, "warrior_block.png should be importable")
+	var global_path: String = ProjectSettings.globalize_path(path)
+	assert_true(FileAccess.file_exists(global_path), "warrior_block.png should exist on disk")
+	GameManager.selected_character = "warrior"
+	var p = load("res://scenes/player.tscn").instantiate()
+	add_child_autofree(p)
+	assert_not_null(p._action_texture, "Warrior action texture should load via _load_texture_safe fallback")
 
 
 func test_ranger_action_texture_file_on_disk():
+	# BUG-273: Verify ranger_draw.png loads via Image fallback
 	var path: String = "res://assets/sprites/characters/ranger_draw.png"
-	var imported: bool = ResourceLoader.exists(path)
-	if not imported:
-		pending("ranger_draw.png not yet imported by Godot editor")
-		return
-	assert_true(imported, "ranger_draw.png should be importable")
+	var global_path: String = ProjectSettings.globalize_path(path)
+	assert_true(FileAccess.file_exists(global_path), "ranger_draw.png should exist on disk")
+	GameManager.selected_character = "ranger"
+	var p = load("res://scenes/player.tscn").instantiate()
+	add_child_autofree(p)
+	assert_not_null(p._action_texture, "Ranger action texture should load via _load_texture_safe fallback")
 
 
 # ============================================================

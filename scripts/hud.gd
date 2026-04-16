@@ -7,6 +7,13 @@ var _pending_level_ups: int = 0
 var _rerolls_used: int = 0
 const MAX_REROLLS: int = 1
 
+# Card hover effect constants
+const CARD_HOVER_SCALE: float = 1.08
+const CARD_HOVER_Y_OFFSET: float = -4.0
+const CARD_HOVER_DURATION: float = 0.12
+const CARD_UNHOVER_DURATION: float = 0.1
+const CARD_HOVER_GLOW: Color = Color(1.1, 1.05, 0.95)
+
 # --- Subsystems ---
 var _toast: RefCounted = null
 var _skill_btn: RefCounted = null
@@ -52,6 +59,9 @@ func _ready():
 		for child in card.get_children():
 			if child is Control:
 				child.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Card hover/unhover signals for visual feedback
+		card.mouse_entered.connect(_on_card_hover.bind(card))
+		card.mouse_exited.connect(_on_card_unhover.bind(card))
 
 	_toast = load("res://scripts/hud_toast.gd").new(self)
 	_toast.setup_container()
@@ -133,6 +143,7 @@ func _show_upgrade_panel():
 		var card = $UpgradePanel/Panel.get_child(i) as Control
 		if i < _upgrade_options.size():
 			card.visible = true
+			_reset_card_state(card)
 			var option = _upgrade_options[i]
 			card.get_node("VBox/NameLabel").text = option.name
 			card.get_node("VBox/DescLabel").text = option.description
@@ -372,3 +383,28 @@ func _setup_skill_button() -> void:
 
 func _update_skill_display() -> void:
 	_skill_btn.update_display(_get_player())
+
+
+# --- Card Hover Effects ---
+
+func _on_card_hover(card: Control) -> void:
+	if not $UpgradePanel.visible:
+		return
+	var t: Tween = create_tween()
+	t.tween_property(card, "scale", Vector2(CARD_HOVER_SCALE, CARD_HOVER_SCALE), CARD_HOVER_DURATION)\
+		.set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(card, "modulate", CARD_HOVER_GLOW, CARD_HOVER_DURATION)
+
+
+func _on_card_unhover(card: Control) -> void:
+	if not $UpgradePanel.visible:
+		return
+	var t: Tween = create_tween()
+	t.tween_property(card, "scale", Vector2.ONE, CARD_UNHOVER_DURATION)\
+		.set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(card, "modulate", Color.WHITE, CARD_UNHOVER_DURATION)
+
+
+func _reset_card_state(card: Control) -> void:
+	card.scale = Vector2.ONE
+	card.modulate = Color.WHITE
