@@ -84,6 +84,11 @@ var skill_timer: float = 0.0
 var is_skill_ready: bool = true
 var skill_effects_node: Node = null
 
+# Character exclusive passive constants (R12 TOP3 -- canonical source: SkillData)
+const MAGE_DAMAGE_SCALE_BONUS: float = SkillData.MAGE_DAMAGE_SCALE_BONUS
+const WARRIOR_ARMOR_MASTERY_BONUS: int = SkillData.WARRIOR_ARMOR_MASTERY_BONUS
+const RANGER_CRIT_BOOST_BONUS: float = SkillData.RANGER_CRIT_BOOST_BONUS
+
 # Passive: keen_eye counter (Ranger)
 var _keen_eye_counter: int = 0
 # Passive: iron_will (Warrior)
@@ -352,6 +357,8 @@ func apply_passive(passive_id: String):
 	var max_stack: int = DEFAULT_PASSIVE_MAX_STACK
 	if UpgradePool._passives.has(passive_id):
 		max_stack = UpgradePool._passives[passive_id].get("max_stack", DEFAULT_PASSIVE_MAX_STACK)
+	elif UpgradePool._character_passives.has(passive_id):
+		max_stack = UpgradePool._character_passives[passive_id].get("max_stack", 1)
 
 	if owned_passives[passive_id] >= max_stack:
 		return
@@ -373,6 +380,13 @@ func apply_passive(passive_id: String):
 			regen_amount += REGEN_AMOUNT_BONUS
 		"luckycoin":
 			crit_damage_mul += CRIT_DAMAGE_BONUS
+		# Character exclusive passives (R12 TOP3)
+		"mage_damage_scale":
+			damage_bonus += MAGE_DAMAGE_SCALE_BONUS
+		"warrior_armor_mastery":
+			armor += WARRIOR_ARMOR_MASTERY_BONUS
+		"ranger_crit_boost":
+			crit_chance += RANGER_CRIT_BOOST_BONUS
 
 	# Re-check synergies after passive change
 	if SynergyManager:

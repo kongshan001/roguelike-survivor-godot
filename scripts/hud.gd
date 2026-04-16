@@ -358,7 +358,7 @@ const SKILL_READY_COLOR: Color = Color(1, 0.85, 0.3)
 
 var _skill_bg: ColorRect:
 	get: return _skill_btn._skill_bg if _skill_btn else null
-var _skill_icon: ColorRect:
+var _skill_icon: TextureRect:
 	get: return _skill_btn._skill_icon if _skill_btn else null
 var _skill_cooldown_overlay: ColorRect:
 	get: return _skill_btn._skill_cooldown_overlay if _skill_btn else null

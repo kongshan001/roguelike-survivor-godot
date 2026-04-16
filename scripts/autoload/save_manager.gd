@@ -260,8 +260,8 @@ func check_quests_and_achievements() -> void:
 		evolutions = GameManager.get_meta("evolutions")
 	_check_achievement("evolve_weapon", evolutions.size() >= 1)
 
-	# All evolved: collected all 8 evolution weapons (cumulative)
-	var all_evo_ids: Array = ["thunderholywater", "fireknife", "holydomain", "blizzard", "frostknife", "flamebible", "thunderang", "blazerang"]
+	# All evolved: collected all 9 evolution weapons (cumulative)
+	var all_evo_ids: Array = ["thunderholywater", "fireknife", "holydomain", "blizzard", "frostknife", "flamebible", "thunderang", "blazerang", "sentineltotem"]
 	var evo_count: int = 0
 	for eid: String in all_evo_ids:
 		if evolution_history.has(eid):

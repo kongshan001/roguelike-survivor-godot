@@ -1,18 +1,19 @@
 # Test Coverage Report
 
-Generated: 2026-04-16 R10
-QA Agent: Task 10F (Constant Unification + Comprehensive Coverage)
+Generated: 2026-04-16 R12
+QA Agent: Task 12D (Sentinel Totem + DPS Balance Regression)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total test files | 36 |
-| Total test functions | ~930+ |
-| Assertions | ~2300+ |
+| Total test files | 41 |
+| Total test functions | 999 |
+| Assertions | 2504 |
+| Passing | 997 |
 | Pending | 2 (chest.png missing) |
-| Failed | 0 |
-| Orphans | 0 |
+| Failing | 0 |
+| Orphans | 84 |
 
 ## Test File Inventory
 
@@ -38,7 +39,7 @@ QA Agent: Task 10F (Constant Unification + Comprehensive Coverage)
 | test_character_data.gd | 5 | CharacterData resource fields |
 | test_hud_skill_button.gd | 22 | Skill button setup (mage/warrior/ranger), cooldown overlay, icon colors, key label |
 
-### Weapon Systems (6 files)
+### Weapon Systems (8 files)
 
 | File | Tests | Module Coverage |
 |------|-------|----------------|
@@ -46,14 +47,17 @@ QA Agent: Task 10F (Constant Unification + Comprehensive Coverage)
 | test_weapon_fire.gd | 31 | Weapon stat scaling: projectile count/damage/pierce, lightning damage/bolts, cone angle/range/burn, aura radius/slow/freeze, boomerang count/distance/cooldown, orbit count/radius, damage bonus formula, synergy stat modifications (6 synergies) |
 | test_weapon_evolution.gd | 18 | Evolution recipes (8), recipe structure, check_evolution_available, evolved weapon data, UpgradePool integration |
 | test_weapon_registry.gd | 16 | Recipe count, structure, ingredient validation, unique results, evolution matching |
+| test_weapon_balance.gd | 16 | DPS balance regression: thunderang/fireknife/blazerang/frostknife/thunderholywater nerf/buff verification, global weapon damage/cooldown invariant checks |
+| test_sentinel_totem.gd | 16 | Sentinel Totem (bible+boomerang): registration, orbit type, orbit_fire_rate, evolution recipe, damage, orbit_count, radius/speed/projectile fields |
 | test_boomerang.gd | 18 | Boomerang flight, return, property preservation |
 | test_evolved_weapon_sprites.gd | 20 | Projectile evolved sprites (fireknife/frostknife), boomerang evolved sprites (thunderang/blazerang), fallback logic, resource existence |
 
-### Passive & Upgrade Systems (3 files)
+### Passive & Upgrade Systems (4 files)
 
 | File | Tests | Module Coverage |
 |------|-------|----------------|
 | test_upgrade_pool.gd | 11 | Weapon registration, upgrade generation, passive availability (7 types), max stack respect |
+| test_character_passives.gd | 19 | Character exclusive passives: registration, SkillData constants, upgrade pool filtering, player application, HUD TextureRect |
 | test_synergy_manager.gd | 24 | All 18 synergy definitions, passive+passive (6), weapon+passive (7), multiple synergies, synergy values, re-check behavior |
 | test_data_resources.gd | 21 | WeaponData/EnemyData/PassiveData/DifficultyData resource validation |
 
@@ -162,17 +166,17 @@ QA Agent: Task 10F (Constant Unification + Comprehensive Coverage)
 | scripts/hud.gd | test_hud, test_hud_skill_button, test_hud_toast | Covered |
 | scripts/skill_effects.gd | test_character_skills, test_skill_data_constants, test_comprehensive | Covered |
 | scripts/data/skill_data.gd | test_skill_data_constants, test_character_skills | Covered |
-| scripts/data/weapon_data.gd | test_data_resources, test_weapon_fire | Covered |
+| scripts/data/weapon_data.gd | test_data_resources, test_weapon_fire, test_sentinel_totem | Covered |
 | scripts/data/enemy_data.gd | test_data_resources, test_enemy_logic | Covered |
 | scripts/data/passive_data.gd | test_data_resources | Covered |
 | scripts/data/character_data.gd | test_character_data | Covered |
 | scripts/data/difficulty_data.gd | test_difficulty_data | Covered |
 | scripts/autoload/game_manager.gd | test_game_manager, test_wave_system, test_endless_mode | Covered |
-| scripts/autoload/upgrade_pool.gd | test_upgrade_pool, test_integration | Covered |
+| scripts/autoload/upgrade_pool.gd | test_upgrade_pool, test_integration, test_sentinel_totem, test_weapon_balance | Covered |
 | scripts/autoload/synergy_manager.gd | test_synergy_manager, test_integration | Covered |
 | scripts/weapon_controller.gd | test_weapon_controller, test_integration | Covered |
-| scripts/weapons/weapon_fire.gd | test_weapon_fire, test_integration, test_comprehensive | Covered |
-| scripts/weapons/weapon_registry.gd | test_weapon_registry, test_weapon_evolution | Covered |
+| scripts/weapons/weapon_fire.gd | test_weapon_fire, test_integration, test_comprehensive, test_sentinel_totem | Covered |
+| scripts/weapons/weapon_registry.gd | test_weapon_registry, test_weapon_evolution, test_sentinel_totem | Covered |
 | scripts/weapons/boomerang.gd | test_boomerang, test_evolved_weapon_sprites | Covered |
 | scripts/weapons/weapon_effects.gd | test_integration | Covered |
 | scripts/projectile.gd | test_projectile, test_evolved_weapon_sprites | Covered |
@@ -182,7 +186,7 @@ QA Agent: Task 10F (Constant Unification + Comprehensive Coverage)
 | scripts/save_manager.gd | test_save_manager | Covered |
 | scripts/enemies/boss_ai.gd | test_boss_ai | Covered |
 
-## Identified Gaps (None Critical)
+## Identified Gaps
 
 1. `scripts/shop.gd` - No dedicated test file (low priority: pure UI)
 2. `scripts/character_select.gd` - No test (low priority: UI navigation)

@@ -2,6 +2,7 @@ extends Node
 
 var _weapons: Dictionary = {}
 var _passives: Dictionary = {}
+var _character_passives: Dictionary = {}
 var _initialized: bool = false
 
 
@@ -18,6 +19,7 @@ func _ensure_initialized():
 		"regen": {"name": "再生护符", "description": "每5秒回复1HP", "icon_color": Color(0.2, 0.9, 0.4), "max_stack": 3},
 		"luckycoin": {"name": "幸运硬币", "description": "暴击伤害+50%，金币+15%", "icon_color": Color(1.0, 0.85, 0.1), "max_stack": 3},
 	}
+	_register_character_passives()
 
 
 func ensure_weapons_registered() -> void:
@@ -151,6 +153,14 @@ func register_weapon(weapon_id: String, data: Resource):
 	_weapons[weapon_id] = data
 
 
+func _register_character_passives() -> void:
+	_character_passives = {
+		"mage_damage_scale": {"name": "Elemental Mastery", "description": "All weapon damage +8%", "icon_color": Color(0.3, 0.5, 1.0), "max_stack": 1, "character": "mage"},
+		"warrior_armor_mastery": {"name": "Iron Skin", "description": "Gain +2 armor", "icon_color": Color(0.6, 0.6, 0.6), "max_stack": 1, "character": "warrior"},
+		"ranger_crit_boost": {"name": "Eagle Eye", "description": "+12% crit chance", "icon_color": Color(1.0, 0.8, 0.2), "max_stack": 1, "character": "ranger"},
+	}
+
+
 func get_random_upgrades(owned_weapons: Dictionary, owned_passives: Dictionary = {}, count: int = 3) -> Array[Dictionary]:
 	_ensure_initialized()
 	var options: Array[Dictionary] = []
@@ -208,6 +218,23 @@ func get_random_upgrades(owned_weapons: Dictionary, owned_passives: Dictionary =
 				"name": p.name,
 				"description": p.description,
 				"icon_color": p.icon_color,
+			})
+
+	# Character exclusive passives (filtered by selected_character)
+	var selected_char: String = GameManager.selected_character if GameManager else ""
+	for cp_id in _character_passives:
+		var cp: Dictionary = _character_passives[cp_id]
+		if cp.get("character", "") != selected_char:
+			continue
+		var cp_stacks: int = owned_passives.get(cp_id, 0)
+		var cp_max: int = cp.get("max_stack", 1)
+		if cp_stacks < cp_max:
+			options.append({
+				"type": "character_passive",
+				"id": cp_id,
+				"name": cp.name,
+				"description": cp.description,
+				"icon_color": cp.icon_color,
 			})
 
 	options.shuffle()

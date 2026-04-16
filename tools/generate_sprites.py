@@ -98,6 +98,13 @@ PALETTE = {
     # Wave complete
     "complete_green":  (0x4C, 0xAF, 0x4F),   # #4CAF50 green checkmark
     "complete_green_dark": (0x2E, 0x7D, 0x32), # #2E7D32 darker green outline
+    # Character passive icons
+    "passive_mage_vortex":    (0x1A, 0x5E, 0xE6),  # #1A5EE6 blue mana vortex
+    "passive_mage_vortex_lt": (0x4D, 0x99, 0xFF),  # #4D99FF lighter blue swirl
+    "passive_warrior_shield": (0xCC, 0x22, 0x22),  # #CC2222 deep red shield
+    "passive_warrior_rage":   (0xFF, 0x66, 0x22),  # #FF6622 orange rage glow
+    "passive_ranger_cross":   (0x22, 0x8B, 0x3A),  # #228B3A forest green crosshair
+    "passive_ranger_cross_lt":(0x44, 0xBB, 0x55),  # #44BB55 lighter green reticle
 }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,7 +112,7 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets", "sprites")
 
 
 def ensure_dirs():
-    for sub in ["characters", "enemies", "weapons", "pickups", "ui", "skills", "effects"]:
+    for sub in ["characters", "enemies", "weapons", "pickups", "ui", "skills", "effects", "passives"]:
         os.makedirs(os.path.join(ASSETS_DIR, sub), exist_ok=True)
 
 
@@ -3136,6 +3143,229 @@ def gen_fire_slime_32():
     save(img, "enemies", "fire_slime.png")
 
 
+# ── Character Passive Icons (16x16) ────────────────────────────────────────
+
+def gen_passive_mage_vortex():
+    """Passive icon: Element Resonance / Mana Vortex (16x16, blue).
+    Blue #1A5EE6 swirl/vortex shape representing Mage's mana resonance.
+    Three concentric arcs rotating clockwise with a bright center dot.
+    """
+    img, d = draw_img(16, 16)
+    outline = rgba("dark_outline")
+    blue_c = rgba("passive_mage_vortex")       # #1A5EE6 deep blue
+    blue_lt = rgba("passive_mage_vortex_lt")   # #4D99FF lighter blue
+    white = rgba("white")
+    bg_glow = (*PALETTE["passive_mage_vortex"][:3], 60)  # faint background glow
+
+    # Background glow circle (radius 6, very transparent)
+    _fill_circle(d, 8, 8, 6, bg_glow)
+
+    # Outer swirl arc (radius 6, 270-degree arc, outline)
+    # Approximate a clockwise spiral with pixel segments
+    # Arc: from top, going clockwise -- 3/4 circle (skip bottom-right quadrant)
+    outer_arc = [
+        # Top (12 o'clock to 3 o'clock)
+        (8, 2), (9, 2),
+        (10, 3), (11, 4),
+        (12, 5), (13, 6),
+        # Right (3 o'clock to 6 o'clock)
+        (14, 7), (14, 8),
+        # Bottom (6 o'clock to 9 o'clock)
+        (13, 9), (12, 10),
+        (11, 11), (10, 12),
+        (9, 13), (8, 13),
+        # Left (9 o'clock upward to ~7 o'clock)
+        (7, 13), (6, 12),
+        (5, 11), (4, 10),
+        (3, 9), (2, 8),
+        # Top-left (going up toward 12 o'clock)
+        (2, 7), (3, 6),
+        (4, 5), (5, 4),
+        (6, 3), (7, 2),
+    ]
+    for pt in outer_arc:
+        d.point(pt, fill=outline)
+
+    # Outer arc fill (the arc body, inside the outline)
+    outer_fill = [
+        # Top
+        (8, 3), (9, 3),
+        (10, 4), (11, 5),
+        (12, 6), (13, 7),
+        (13, 8),
+        # Right to bottom
+        (12, 9), (11, 10),
+        (10, 11), (9, 12),
+        (8, 12), (7, 12),
+        # Bottom to left
+        (6, 11), (5, 10),
+        (4, 9), (3, 8),
+        (3, 7), (4, 6),
+        (5, 5), (6, 4),
+        (7, 3),
+    ]
+    for pt in outer_fill:
+        d.point(pt, fill=blue_c)
+
+    # Middle swirl arc (radius 4, offset slightly to show rotation)
+    mid_arc = [
+        (8, 4), (9, 4), (10, 5), (11, 6), (11, 7), (11, 8),
+        (10, 9), (9, 10), (8, 10), (7, 10), (6, 9), (5, 8),
+        (5, 7), (5, 6), (6, 5), (7, 4),
+    ]
+    for pt in mid_arc:
+        d.point(pt, fill=blue_lt)
+
+    # Inner swirl (radius 2, bright)
+    inner_arc = [
+        (8, 6), (9, 6), (10, 7), (10, 8),
+        (9, 9), (8, 9), (7, 9), (6, 8),
+        (6, 7), (7, 6),
+    ]
+    for pt in inner_arc:
+        d.point(pt, fill=blue_c)
+
+    # Center bright dot (the mana core)
+    d.point((8, 7), fill=white)
+    d.point((8, 8), fill=white)
+
+    save(img, "passives", "mage_vortex.png")
+
+
+def gen_passive_warrior_shield():
+    """Passive icon: Unyielding Will / Shield+Fury (16x16, red).
+    Red #CC2222 shield shape with orange rage cracks and a center fist emblem.
+    """
+    img, d = draw_img(16, 16)
+    outline = rgba("dark_outline")
+    red_c = rgba("passive_warrior_shield")      # #CC2222 deep red shield
+    rage_c = rgba("passive_warrior_rage")       # #FF6622 orange rage glow
+    white = rgba("white")
+    gold_c = rgba("gold")
+
+    # Shield outline (heater shield shape: pointed bottom)
+    shield_outline = [
+        # Top edge
+        (3, 2), (4, 2), (5, 2), (6, 2), (7, 2), (8, 2), (9, 2), (10, 2), (11, 2), (12, 2),
+        # Left side
+        (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9),
+        # Left taper
+        (3, 10), (3, 11), (4, 12), (5, 13),
+        # Bottom point
+        (7, 14), (8, 14),
+        # Right taper
+        (10, 13), (11, 12), (12, 11), (13, 10),
+        # Right side
+        (13, 9), (13, 8), (13, 7), (13, 6), (13, 5), (13, 4), (13, 3),
+    ]
+    for pt in shield_outline:
+        d.point(pt, fill=outline)
+
+    # Shield body fill (red)
+    # Shield interior x-bounds per row (heater shield tapering to bottom point)
+    shield_rows = {
+        3: (3, 12), 4: (3, 12), 5: (3, 12), 6: (3, 12), 7: (3, 12),
+        8: (3, 12), 9: (3, 12),
+        10: (3, 12), 11: (4, 11), 12: (5, 10), 13: (6, 9),
+    }
+    for y, (x0, x1) in shield_rows.items():
+        for x in range(x0, x1 + 1):
+            d.point((x, y), fill=red_c)
+
+    # Center fist/emblem (gold vertical bar + horizontal bar = T shape)
+    for py in range(5, 11):
+        d.point((7, py), fill=gold_c)
+        d.point((8, py), fill=gold_c)
+    for px in range(5, 11):
+        d.point((px, 6), fill=gold_c)
+        d.point((px, 7), fill=gold_c)
+
+    # Rage cracks (orange lines radiating from center)
+    crack_pts = [
+        (4, 3), (3, 4),       # top-left crack
+        (11, 3), (12, 4),     # top-right crack
+        (3, 9),               # left crack
+        (12, 9),              # right crack
+        (5, 12), (10, 12),    # bottom cracks
+    ]
+    for pt in crack_pts:
+        d.point(pt, fill=rage_c)
+
+    # Top highlight
+    d.point((4, 3), fill=white)
+
+    save(img, "passives", "warrior_shield.png")
+
+
+def gen_passive_ranger_crosshair():
+    """Passive icon: Eagle Eye / Crosshair (16x16, green).
+    Green #228B3A crosshair/reticle with concentric circles and cross lines.
+    """
+    img, d = draw_img(16, 16)
+    outline = rgba("dark_outline")
+    green_c = rgba("passive_ranger_cross")      # #228B3A forest green
+    green_lt = rgba("passive_ranger_cross_lt")   # #44BB55 lighter green
+    white = rgba("white")
+    bg_glow = (*PALETTE["passive_ranger_cross"][:3], 50)  # faint background glow
+
+    # Background glow circle (radius 6, very transparent)
+    _fill_circle(d, 8, 8, 6, bg_glow)
+
+    # Outer circle outline (radius 6)
+    _draw_outline_circle(d, 8, 8, 6, outline)
+
+    # Outer circle fill (green ring)
+    for dy in range(-6, 7):
+        dx_max = int((36 - dy * dy) ** 0.5)
+        for dx in range(-dx_max, dx_max + 1):
+            dist_sq = dx * dx + dy * dy
+            if dist_sq > 16:  # outside radius 4
+                d.point((8 + dx, 8 + dy), fill=green_c)
+
+    # Inner circle outline (radius 3)
+    _draw_outline_circle(d, 8, 8, 3, green_lt)
+
+    # Cross lines (horizontal + vertical through center, with gaps at inner circle)
+    # Horizontal line (left)
+    for px in range(1, 5):
+        d.point((px, 7), fill=green_c)
+        d.point((px, 8), fill=green_c)
+    # Horizontal line (right)
+    for px in range(11, 15):
+        d.point((px, 7), fill=green_c)
+        d.point((px, 8), fill=green_c)
+    # Vertical line (top)
+    for py in range(1, 5):
+        d.point((7, py), fill=green_c)
+        d.point((8, py), fill=green_c)
+    # Vertical line (bottom)
+    for py in range(11, 15):
+        d.point((7, py), fill=green_c)
+        d.point((8, py), fill=green_c)
+
+    # Center dot (white, the target point)
+    d.point((8, 8), fill=white)
+    d.point((7, 7), fill=white)
+    d.point((8, 7), fill=green_lt)
+    d.point((7, 8), fill=green_lt)
+
+    # Corner ticks (small lines at 45-degree angles for a scope feel)
+    # Top-left
+    d.point((4, 4), fill=green_lt)
+    d.point((3, 3), fill=green_c)
+    # Top-right
+    d.point((11, 4), fill=green_lt)
+    d.point((12, 3), fill=green_c)
+    # Bottom-left
+    d.point((4, 11), fill=green_lt)
+    d.point((3, 12), fill=green_c)
+    # Bottom-right
+    d.point((11, 11), fill=green_lt)
+    d.point((12, 12), fill=green_c)
+
+    save(img, "passives", "ranger_crosshair.png")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────
 
 def main():
@@ -3210,6 +3440,12 @@ def main():
     print("\nSkill Effects:")
     gen_freeze_star()
     gen_arrow()
+
+    # Character Passive Icons
+    print("\nCharacter Passive Icons:")
+    gen_passive_mage_vortex()
+    gen_passive_warrior_shield()
+    gen_passive_ranger_crosshair()
 
     print(f"\nDone! All sprites saved to {ASSETS_DIR}")
 

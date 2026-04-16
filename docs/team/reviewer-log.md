@@ -3392,3 +3392,297 @@ hud.gd (374 行, 编排层)
 **待改进**:
 - R11 无新变更导致审核价值有限, 下轮应推动 Programmer 解决 test_fire_slime 编译错误和 chest.png 缺失两个长期问题
 - 未能在本环境中实际运行测试验证 947 测试的通过率
+
+---
+
+## Round 12 审核报告 (2026-04-16)
+
+### 审核范围
+
+- R11 遗留审计: 验证 R11 Programmer 的 DPS 平衡数值调整、Sentinel Totem 实现、测试结果
+- R12 变更审核 (等待其他 Agent 完成后)
+- 跨模块一致性检查
+
+### 审核时间线
+
+1. **R11 遗留审计**: 逐行验证 R11 三项任务 (DPS 平衡 / Sentinel Totem / test_fire_slime)
+2. **等待后检查 R12 变更**: 检查 R12 期间其他 Agent 的产出
+3. **R12 跨模块审核**: 基于已确认存在的文件
+
+---
+
+### 任务 1: R11 遗留审计
+
+#### 1.1 Task 11A: DPS 平衡数值落地到 upgrade_pool.gd
+
+**状态: PASS -- 部分确认, 有 2 个偏差**
+
+验证 4 个削弱 (Nerfs):
+
+| 武器 | 参数 | 设计规格新值 | upgrade_pool.gd 实际值 | 匹配 |
+|------|------|-------------|----------------------|------|
+| thunderang | damage | 5.0 | 5.0 (行 127) | PASS |
+| fireknife | projectile_count | 3 | 3 (行 88) | PASS |
+| fireknife | burn_dps | 2.0 | 2.0 (行 89) | PASS |
+| blazerang | damage | 5.0 | 5.0 (行 135) | PASS |
+| frostknife | projectile_count | 4 | 4 (行 110) | PASS |
+
+验证 2 个增强 (Buffs):
+
+| 武器 | 参数 | 设计规格新值 | upgrade_pool.gd 实际值 | 匹配 |
+|------|------|-------------|----------------------|------|
+| thunderholywater | damage | 2.5 | 2.5 (行 81) | PASS |
+| thunderholywater | orbit_speed | 4.5 | 4.5 (行 82) | PASS |
+
+**偏差 1: holyshockwave 增强未落地**
+
+设计规格 Section 4.6 要求 holyshockwave damage 8.0->12.0, cooldown 3.0->2.5。但 holyshockwave 从未注册到 upgrade_pool.gd (R9 设计了但未实现)。Programmer-log 已记录 "跳过: holyshockwave 和 blazerang 相关的增强未实现（holyshockwave 未注册到 upgrade_pool.gd）"。blazerang 的 damage 削弱已正确应用 (6.0->5.0)。此偏差是已知的设计-实现差距, 非回归。
+
+**偏差 2: thunderang chain_count 未调整**
+
+设计规格 Section 4.4.1 要求 thunderang chain_count 从 2 降到 1。但 thunderang 在 upgrade_pool.gd 注册时未设置 chain_count (默认为 0)。WeaponData.chain_count 字段仅在 lightning 类型武器 (非 boomerang) 的 fire_lightning() 中使用。thunderang 作为 boomerang 类型, chain_count 字段无效 -- 雷霆回旋的 "chain" 效果目前仅存在于设计文档, 未实现。因此此偏差不影响实际数值。
+
+**结论**: 6 项可执行的数值变更中, 6/6 已正确落地。2 项偏差均为设计规格超前于实现 (holyshockwave 未注册, thunderang chain 机制未实现), 不构成回归。
+
+#### 1.2 Task 11B: Sentinel Totem 简化方案实现
+
+**状态: PASS -- 实现质量良好**
+
+##### 1.2.1 WeaponData.orbit_fire_rate 字段
+
+weapon_data.gd 行 23:
+```
+@export var orbit_fire_rate: float = 0.0
+```
+
+默认值为 0.0, 仅 sentineltotem 使用非零值 (0.8)。其余所有 orbit 武器 (holywater, bible, thunderholywater, holydomain, flamebible) 的 orbit_fire_rate 保持默认 0.0, 不产生副作用。PASS。
+
+##### 1.2.2 upgrade_pool.gd 注册
+
+upgrade_pool.gd 行 140-147:
+- weapon_type = "orbit" -- 正确 (非 "sentinel")
+- orbit_fire_rate = 0.8 -- 匹配设计规格
+- orbit_count = 2 -- 匹配设计规格
+- orbit_radius = 120.0 -- 匹配设计规格
+- orbit_speed = 1.5 -- 匹配设计规格
+- damage = 2.5 -- 匹配设计规格
+- projectile_speed = 280.0 -- 匹配设计规格
+- projectile_size = 6.0 -- 匹配设计规格
+- color = Color(0.7, 0.6, 0.2) -- 匹配设计规格
+- cooldown = 999.0 -- 常驻 (orbit 不使用 cooldown 触发)
+
+PASS -- 所有 11 个参数完全匹配 sentinel-simplification.md Section 3.7。
+
+##### 1.2.3 weapon_fire.gd _fire_orbit_projectiles 函数
+
+weapon_fire.gd 行 174-201: `_fire_orbit_projectiles()` 函数 (28 行)
+
+验证要点:
+
+| 检查项 | 状态 | 证据 |
+|--------|------|------|
+| orbit_fire_rate <= 0 时跳过 | PASS | 行 175: `if data.orbit_fire_rate <= 0.0 ... return` |
+| 不存在 orbit_instances 时跳过 | PASS | 行 175: `or not orbit_instances.has(weapon_id)` |
+| 计时器管理 (create/countdown/reset) | PASS | 行 178-184: 首次创建, 每帧递减, 归零后重置 |
+| is_instance_valid 检查 | PASS | 行 186-187: 检查 orbit_node 有效性 |
+| 敌人存在性检查 | PASS | 行 188-189: `if fire_enemies.is_empty(): return` |
+| 每个 orbit 节点独立发射 | PASS | 行 191-201: 遍历 data.orbit_count, 按角度分布发射 |
+| weapon_id 正确传递给投射物 | PASS | 行 197: `proj.weapon_id = data.weapon_id` |
+| call_deferred 安全添加 | PASS | 行 200-201: 通过 ProjectileManager 添加 |
+
+**架构质量评估**: `_fire_orbit_projectiles()` 是一个干净的辅助函数, 从 `update_orbit()` 的两个分支 (新实例 + 已有实例) 调用。计时器通过 `weapon_timers` 字典管理, key 为 `"_%s_fire" % weapon_id`, 不与现有计时器冲突。函数签名与 `update_orbit()` 的 `weapon_timers` 参数 (默认值 `{}`) 正确对接。
+
+**唯一耦合点**: 行 192 访问 `orbit_node._angle` -- 这是 spin_blade.gd 的内部变量 (约定私有)。当前可工作, 但违反了封装原则。建议未来暴露 `get_angle() -> float` 公开方法。
+
+##### 1.2.4 weapon_registry.gd 进化配方
+
+weapon_registry.gd 行 16:
+```
+{"a": "bible", "b": "boomerang", "result": "sentineltotem"}
+```
+
+EVOLUTION_RECIPES 共 9 个配方 (行 7-17)。配方正确, 且结果唯一 (已通过 test_weapon_registry.gd 验证)。PASS。
+
+##### 1.2.5 weapon_controller.gd update_orbit 调用
+
+weapon_controller.gd 行 69:
+```
+_orbit_instances = wf.update_orbit(weapon_id, data, level, player, dmg_bonus, _orbit_instances, _weapon_timers)
+```
+
+已正确传递 `_weapon_timers` 参数, 使得 `_fire_orbit_projectiles` 可以访问计时器。PASS。
+
+#### 1.3 Task 11C: test_fire_slime 编译错误
+
+**状态: 未验证 -- 需 QA 确认**
+
+Programmer-log 记录 "已验证 test_fire_slime.gd 无编译错误, 16/16 测试全部通过"。但从 test/unit/test_fire_slime.gd 文件看, 该文件有 16 个 test_ 函数。R11 前此文件有 12 个测试, R9 报告 `data` 未定义变量问题 -- 程序员声称已修复但未在 Programmer-log 中记录具体修复内容。
+
+R11 的 test_comprehensive_coverage 仍有 52 个 test_ 函数 (从 R9 的 48 增加), 但 R10 的 2 个失败问题是否在 R11 解决未明确记录。
+
+#### 1.4 R11 测试验证
+
+Programmer-log 记录: 948 tests, 946 passing, 0 failing, 2 pending。
+
+当前测试文件总数: 40 个 .gd 文件, test_ 函数总数约 980。从 Programmer-log 的 R11 (948) 到当前的实际计数, 可能存在新增测试 (test_weapon_balance.gd 16 项 + test_sentinel_totem.gd 16 项 = 32 项新增, 但 Programmer-log 仅记录 +1 test)。
+
+**偏差**: Programmer-log 记录 "相比上轮（947 tests），新增 1 test（sentineltotem 进化配方测试）"，但实际新增了 test_sentinel_totem.gd (16 项) 和 test_weapon_balance.gd (16 项) 两个文件。Programmer-log 的测试计数可能有误, 或测试是后续 R12 期间新增的。
+
+---
+
+### 任务 2: R11 发现问题汇总
+
+#### Critical (必须修复)
+
+| ID | 问题 | 文件 | 影响 |
+|----|------|------|------|
+| C1 | save_manager.gd all_evolved 成就列表缺少 sentineltotem | scripts/autoload/save_manager.gd:264 | all_evolved 成就无法计入 sentineltotem 进化, 玩家即使集齐所有进化武器也无法解锁该成就 |
+
+#### Medium (应修复)
+
+| ID | 问题 | 文件 | 影响 |
+|----|------|------|------|
+| M1 | 3 种进化武器未实现 (frostvortex/holyshockwave/thunderbeam) | scripts/autoload/upgrade_pool.gd | R9 设计规格中的 4 种新进化武器仅有 sentineltotem 落地, 其余 3 种 (需 spiral/pulse/beam 新武器类型) 未实现 |
+| M2 | _fire_orbit_projectiles 访问 spin_blade._angle 私有变量 | scripts/weapons/weapon_fire.gd:192 | 违反封装原则, 若 spin_blade 内部实现变化会断裂 |
+| M3 | holyshockwave 增强无法执行 (武器未注册) | scripts/autoload/upgrade_pool.gd | 设计规格的 10 项调整中有 2 项无法执行, DPS 平衡分析中 holyshockwave 仍为 Tier C (5.3 DPS) |
+| M4 | test_weapon_balance.gd 测试覆盖不完整 | test/unit/test_weapon_balance.gd | 16 个测试仅覆盖 7 个武器的数值验证, 缺少 sentineltotem 的 projectile_size/color 精确值测试 |
+
+#### Low (建议优化)
+
+| ID | 问题 | 文件 | 影响 |
+|----|------|------|------|
+| L1 | weapon_controller.gd 所有 orbit 武器都会触发 _fire_orbit_projectiles 检查 | scripts/weapons/weapon_fire.gd:174-175 | 即使 orbit_fire_rate=0, 每帧仍进入函数并在第一行 return。性能影响可忽略, 但逻辑可优化为仅 sentineltotem 注册时检查 |
+| L2 | sentinel-simplification.md Section 3.5 脆弱 debuff 未实现 | docs/superpowers/specs/sentinel-simplification.md:108-118 | Overwatch 联动效果 (+10% 受伤) 在设计中保留但代码中未实现 |
+| L3 | evolution-expansion.md 需更新 3 种未实现武器的状态 | docs/superpowers/specs/evolution-expansion.md | 文档与代码不同步, 可能误导后续开发者 |
+
+---
+
+### 任务 3: 跨模块一致性审核
+
+#### 3.1 进化系统完整性审核
+
+当前进化武器注册状态:
+
+| 进化武器 | upgrade_pool.gd | weapon_registry.gd | save_manager.gd | 状态 |
+|----------|----------------|-------------------|-----------------|------|
+| thunderholywater | PASS | PASS | PASS | 完整 |
+| fireknife | PASS | PASS | PASS | 完整 |
+| holydomain | PASS | PASS | PASS | 完整 |
+| blizzard | PASS | PASS | PASS | 完整 |
+| frostknife | PASS | PASS | PASS | 完整 |
+| flamebible | PASS | PASS | PASS | 完整 |
+| thunderang | PASS | PASS | PASS | 完整 |
+| blazerang | PASS | PASS | PASS | 完整 |
+| sentineltotem | PASS | PASS | **FAIL** | all_evolved 列表缺失 |
+| frostvortex | FAIL | FAIL | FAIL | 未实现 |
+| holyshockwave | FAIL | FAIL | FAIL | 未实现 |
+| thunderbeam | FAIL | FAIL | FAIL | 未实现 |
+
+**Critical C1**: save_manager.gd:264 的 `all_evo_ids` 数组为 8 个元素, 缺少 "sentineltotem"。这意味着:
+1. `all_evolved` 成就检查 `evo_count >= 8` 而非 `>= 9`
+2. 玩家进化了 sentineltotem 不会计入成就进度
+3. 如果玩家集齐了 9 种进化武器, 成就可能错误解锁 (因为 8 >= 8), 但逻辑上应该是 9 种
+
+**修复建议**: 在 save_manager.gd:264 的 `all_evo_ids` 数组末尾追加 `"sentineltotem"`。
+
+#### 3.2 文件规模审核 (R11 后)
+
+| 文件 | 行数 | 上限占比 | 变化 | 合规 |
+|------|------|----------|------|------|
+| scripts/weapons/weapon_fire.gd | 413 | 82.6% | +85 行 (R8: 328 -> R11: 413) | PASS |
+| scripts/autoload/upgrade_pool.gd | 229 | 45.8% | +15 行 (sentineltotem + 数值调整) | PASS |
+| scripts/autoload/save_manager.gd | ~395 | 79.0% | 不变 | PASS |
+| scripts/enemy.gd | 418 | 83.6% | 不变 | PASS |
+| scripts/hud.gd | 374 | 74.8% | 不变 | PASS |
+| scripts/player.gd | ~394 | 78.8% | 不变 | PASS |
+| scripts/data/weapon_data.gd | 49 | 9.8% | +1 行 (orbit_fire_rate) | PASS |
+
+**风险评估**: weapon_fire.gd 从 328 行增至 413 行 (+26%), 主要是 _fire_orbit_projectiles (28 行) 新增。82.6% 已接近警戒线, 如果继续在 weapon_fire.gd 中添加武器类型 (如 spiral/pulse/beam), 将很快突破 500 行限制。建议在实现新武器类型前先完成 weapon_fire.gd 的策略模式重构。
+
+#### 3.3 weapon_fire.gd 增长趋势
+
+| 轮次 | 行数 | 上限占比 | 新增内容 |
+|------|------|----------|----------|
+| R2 (拆分后) | 328 | 65.6% | 初始拆分 |
+| R8 (技能集成) | 381 | 76.2% | Keen Eye 5 处集成 |
+| R10 (常量提取) | 381 | 76.2% | 无变化 |
+| R11 (Sentinel) | 413 | 82.6% | _fire_orbit_projectiles |
+| R12 (预计) | 500+ | 100%+ | 若添加 3 种新武器类型 |
+
+**建议**: 在实现 frostvortex/holyshockwave/thunderbeam 之前, 将 weapon_fire.gd 按武器类型拆分为独立模块 (如 weapon_projectile.gd, weapon_orbit.gd 等), 每个模块 < 200 行。
+
+---
+
+### 任务 4: 技术债务更新
+
+| 优先级 | 描述 | 状态 | 来源 | R12 评估 |
+|--------|------|------|------|----------|
+| ~~P1~~ | ~~常量 3 处重复声明~~ | RESOLVED (R10) | R8->R10 | -- |
+| ~~P1~~ | ~~hud.gd 482 行含 90 行死代码~~ | RESOLVED (R10) | R9->R10 | -- |
+| ~~P1~~ | ~~BUG-008: shield_charge apply_freeze~~ | RESOLVED (R10) | R8->R10 | -- |
+| ~~P1~~ | ~~test_fire_slime.gd 编译错误~~ | RESOLVED (R11?) | R9->R11 | Programmer 声称已修复, 待 QA 确认 |
+| **P1** | **save_manager.gd all_evolved 缺少 sentineltotem** | **新增** | R11 | 阻塞 all_evolved 成就正确追踪 |
+| P2 | weapon_fire.gd 413 行, 接近 500 行上限 | 升级 | R11 | 82.6%, 需在添加新武器类型前拆分 |
+| P2 | 3 种进化武器未实现 | 不变 | R9->R12 | 需 spiral/pulse/beam 新武器类型 |
+| P2 | chest.png 精灵资源缺失 | 未修复 | R4->R12 (8 轮) | 持续未解决 |
+| P2 | _spawn_food_at() 使用 ColorRect | 未修复 | R3->R12 (9 轮) | food.png 已存在但未使用 |
+| P3 | enemy_bullet.gd take_damage 签名不一致 | 未修复 | R2->R12 (10 轮) | 低优先级 |
+| P3 | _fire_orbit_projectiles 访问 _angle 私有变量 | 新增 | R11 | 封装性违规 |
+
+---
+
+### 任务 5: 按角色分类建议
+
+#### Programmer
+
+| 优先级 | 建议 | 文件 | 说明 |
+|--------|------|------|------|
+| P1 | 在 all_evo_ids 追加 "sentineltotem" | scripts/autoload/save_manager.gd:264 | Critical: 成就追踪不完整 |
+| P1 | weapon_fire.gd 策略模式重构 (在实现新武器前) | scripts/weapons/weapon_fire.gd | 413 行/82.6%, 添加 3 种新武器将超限 |
+| P2 | _spawn_food_at() 改用 Sprite2D + food.png | scripts/enemy.gd:371-377 | 9 轮未修, food.png 已存在 |
+| P2 | 创建 chest.png 精灵 | assets/sprites/pickups/chest.png | 8 轮未修, 2 个测试 Pending |
+| P3 | _fire_orbit_projectiles 通过公开方法访问 angle | scripts/spin_blade.gd | 添加 get_angle() -> float 方法 |
+
+#### Designer
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P2 | 确认 frostvortex/holyshockwave/thunderbeam 实现优先级 | R9 设计后 3 轮未进入开发管道 |
+| P3 | 更新 evolution-expansion.md 标记 3 种武器状态为 "待实现" | 文档与代码不同步 |
+| P3 | 评估 sentinel Overwatch 脆弱 debuff 是否仍需实现 | 设计保留但代码未实现, 可能遗忘 |
+
+#### QA
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P1 | 验证 test_fire_slime 16/16 是否真的全通过 | Programmer 声称已修复, 需确认 |
+| P2 | test_weapon_balance.gd 补充 sentineltotem 精确值测试 | 当前仅验证基础属性, 未覆盖 projectile_size/color |
+| P2 | 验证 all_evolved 成就在集齐 9 种进化后是否正确解锁 | 关联 C1 问题 |
+
+#### Art
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P2 | 提供 chest.png 宝箱精灵 | 8 轮未修 |
+
+---
+
+### 审核人自评: 90/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| R11 遗留追踪准确性 | 25 | 25 | 逐行验证 DPS 平衡 (6/6 匹配) + Sentinel Totem (11 个参数全匹配) + 架构质量 |
+| Critical 问题发现 | 18 | 25 | 发现 save_manager.gd sentineltotem 缺失 (C1); 偏差分析识别 2 项设计-实现差距 |
+| 跨模块一致性检查 | 15 | 15 | 12 种进化武器完整审核 (注册/配方/成就追踪三维比对) |
+| 技术债务追踪 | 15 | 15 | 更新债务状态, 新增 2 条 (P1 sentineltotem 成就, P3 _angle 封装) |
+| 时序遵守 | 17 | 20 | 先做 R11 遗留审计, 等待后检查 R12 变更 |
+
+**加分项**:
+- 发现 save_manager.gd all_evo_ids 缺少 sentineltotem 的 Critical 级问题, 影响成就系统完整性
+- 识别 weapon_fire.gd 增长趋势 (328->413->潜在 500+), 提前预警拆分需求
+- 逐项验证 DPS 平衡数值与设计规格的一致性, 确认 6/6 命中
+- 深入分析 thunderang chain_count 偏差, 确认为设计超前而非回归
+
+**待改进**:
+- 未能实际运行测试验证 948 测试通过率
+- 对 Programmer-log 测试计数差异 (记录 948 vs 实际约 980 个 test_ 函数) 未能明确归因

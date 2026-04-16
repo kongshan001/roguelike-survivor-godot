@@ -1561,3 +1561,127 @@ Failing              0
 | 零回归 | 15 | 15 | 947 个已有测试全部通过（2 Pending 为预存问题）|
 | 代码质量 | 10 | 10 | 函数签名有类型注解，weapon_timers 默认参数保持向后兼容 |
 | 记录完整性 | 10 | 15 | programmer-log 更新完整，含常量表和变更对照 |
+
+
+---
+
+## 第十二轮执行 (2026-04-16): TOP3 角色专属被动 + HUD 技能图标 TextureRect
+
+### 实现内容
+
+#### Task 12A: 实现 TOP3 角色专属被动
+
+基于设计规格 `docs/superpowers/specs/character-upgrade-paths.md` Section 2.3-2.5，实现 3 个最有价值的角色专属被动。
+
+##### 选中的 TOP3 被动
+
+| 角色 | 被动 ID | 名称 | 效果 | 数值 |
+|------|---------|------|------|------|
+| Mage | `mage_damage_scale` | Elemental Mastery | 所有武器伤害+8% | damage_bonus += 0.08 |
+| Warrior | `warrior_armor_mastery` | Iron Skin | 护甲+2 | armor += 2 |
+| Ranger | `ranger_crit_boost` | Eagle Eye | 暴击率+12% | crit_chance += 0.12 |
+
+##### 选择理由
+
+1. **mage_damage_scale**: 简单直接地增强法师核心定位（伤害），与现有 damage_bonus 叠加，实现成本最低
+2. **warrior_armor_mastery**: 强化战士坦克定位，与现有 armor 系统、Iron Will 被动协同，数值清晰
+3. **ranger_crit_boost**: 强化游侠暴击定位，与 Ranger 基础 10% crit_chance + Keen Eye 被动协同，效益最高
+
+##### 修改文件
+
+| 文件 | 变更 | 行数变化 |
+|------|------|----------|
+| `scripts/data/skill_data.gd` | 新增 3 个角色被动常量 | +3 行 |
+| `scripts/autoload/upgrade_pool.gd` | 新增 `_character_passives` 字典 + `_register_character_passives()` + `get_random_upgrades` 角色过滤 | +30 行 (227 -> 254) |
+| `scripts/player.gd` | `apply_passive` 新增 character_passives max_stack 查找 + 3 个 match case | +10 行 (393 -> 407) |
+| `test/unit/test_hud_skill_button.gd` | 3 个 icon 颜色测试适配 TextureRect | 修改 3 个函数 |
+| `test/unit/test_character_passives.gd` | 19 个新测试覆盖角色被动 | 新增文件 |
+
+##### 实现细节
+
+**upgrade_pool.gd 注册**:
+- 新增 `var _character_passives: Dictionary = {}`
+- `_register_character_passives()` 在 `_ensure_initialized()` 中被调用
+- 每个被动含 `name`, `description`, `icon_color`, `max_stack: 1`, `character` 字段
+- `get_random_upgrades()` 中按 `GameManager.selected_character` 过滤
+
+**player.gd 应用**:
+- `apply_passive()` 新增 `elif UpgradePool._character_passives.has(passive_id)` 分支查找 max_stack
+- match block 新增 3 个 case，引用 `SkillData` 常量
+
+---
+
+#### Task 12B: HUD 技能图标 TextureRect 集成
+
+将技能按钮图标从 ColorRect 替换为 TextureRect 显示精灵纹理。
+
+##### 修改文件
+
+| 文件 | 变更 | 行数变化 |
+|------|------|----------|
+| `scripts/hud_skill_button.gd` | `_skill_icon` 从 `ColorRect` 改为 `TextureRect` + 精灵加载逻辑 | 99 -> 109 行 |
+| `scripts/hud.gd` | `_skill_icon` 类型改为 `TextureRect` | 1 行 |
+
+##### 实现细节
+
+- `TextureRect.stretch_mode = STRETCH_KEEP_ASPECT_CENTERED`
+- `TextureRect.expand_mode = EXPAND_IGNORE_SIZE`
+- 精灵路径: `res://assets/sprites/skills/{skill_id}.png`
+- 已确认精灵文件存在: `elemental_burst.png`, `shield_charge.png`, `arrow_rain.png`
+- 无精灵时 fallback: `self_modulate = icon_color`（保持测试兼容性）
+- 接口不变: `_skill_bg`, `_skill_icon`, `_skill_cooldown_overlay`, `_skill_key_label` 仍可通过 hud.gd getter 访问
+
+---
+
+### 常量表 (R12)
+
+| 常量 | 值 | 来源 |
+|------|-----|------|
+| `SkillData.MAGE_DAMAGE_SCALE_BONUS` | 0.08 | character-upgrade-paths.md 2.3 |
+| `SkillData.WARRIOR_ARMOR_MASTERY_BONUS` | 2 | character-upgrade-paths.md 2.4 |
+| `SkillData.RANGER_CRIT_BOOST_BONUS` | 0.12 | character-upgrade-paths.md 2.5 |
+
+### 测试覆盖 (19 项)
+
+**test_character_passives.gd**:
+1. **注册验证 (4)**: _character_passives 字典存在、max_stack=1、character 字段、name/description/icon_color
+2. **常量验证 (2)**: SkillData 常量值、player.gd 常量引用
+3. **升级池过滤 (6)**: mage 看到 mage 被动、mage 不看 warrior 被动、warrior 看到 warrior 被动、ranger 看到 ranger 被动、无角色无被动、max_stack 不再出现
+4. **被动应用 (4)**: mage damage_bonus+0.08、warrior armor+2、ranger crit_chance+0.12、max_stack 强制执行
+5. **被动追踪 (1)**: owned_passives 记录
+6. **TextureRect 集成 (2)**: _skill_icon 类型为 TextureRect、加载精灵路径
+
+### 测试结果
+
+```
+Scripts              41
+Tests               999
+Passing Tests       997
+Risky/Pending         2  (pre-existing: chest.png missing)
+Asserts            2502
+Failing              0
+```
+
+相比上轮（948 tests, 2349 asserts），新增 51 tests, 153 asserts。0 回归。
+
+### 文件行数验证
+
+| 文件 | 行数 | 上限占比 | 合规 |
+|------|------|----------|------|
+| scripts/autoload/upgrade_pool.gd | 254 | 50.8% | PASS |
+| scripts/player.gd | 407 | 81.4% | PASS |
+| scripts/hud_skill_button.gd | 109 | 21.8% | PASS |
+| scripts/hud.gd | 374 | 74.8% | PASS |
+| scripts/data/skill_data.gd | 61 | 12.2% | PASS |
+| test/unit/test_character_passives.gd | 210 | 42.0% | PASS |
+
+### 本轮自评分: 92/100
+
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| 角色被动实现 | 25 | 25 | 3 个被动完整实现：注册、过滤、应用、常量引用 |
+| TextureRect 集成 | 15 | 15 | ColorRect->TextureRect + 精灵加载 + fallback |
+| 测试覆盖 | 18 | 20 | 19 个新测试 + 3 个旧测试适配；-2 因 TextureRect fallback 测试依赖运行时环境 |
+| 零回归 | 15 | 15 | 948 个已有测试全部通过（2 Pending 为预存问题）|
+| 代码质量 | 10 | 10 | 常量引用 SkillData、类型注解、null guard (GameManager) |
+| 记录完整性 | 9 | 15 | programmer-log 更新完整 |

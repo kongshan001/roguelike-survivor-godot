@@ -46,6 +46,11 @@ const WARRIOR_PASSIVE_DURATION: float = 3.0
 const WARRIOR_PASSIVE_COOLDOWN: float = 30.0
 const RANGER_PASSIVE_HIT_COUNT: int = 5
 
+# Character exclusive passive constants (R12 TOP3)
+const MAGE_DAMAGE_SCALE_BONUS: float = 0.08       # +8% all weapon damage
+const WARRIOR_ARMOR_MASTERY_BONUS: int = 2          # +2 armor
+const RANGER_CRIT_BOOST_BONUS: float = 0.12         # +12% crit chance
+
 # --- Resource fields ---
 @export var skill_id: String = ""
 @export var skill_name: String = ""

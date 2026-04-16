@@ -916,3 +916,92 @@ test_hud_toast.gd: **27/27 全部通过** -- 无需修复。
 - 测试覆盖报告 +5 (test/TEST_COVERAGE.md 完整覆盖矩阵)
 - 扣分 -2 (BUG-003 chest.png 缺失导致 2 个测试仍 pending)
 - 扣分 -2 (test_achievement_screen.gd 产生 84 个 orphan)
+
+## 第十二轮执行 (2026-04-16)
+
+### 任务概要
+
+1. **Sentinel Totem 测试** -- 新建 `test/unit/test_sentinel_totem.gd` (16 项测试)，覆盖守护图腾武器注册、orbit 类型、orbit_fire_rate 字段、进化配方 (bible+boomerang)、伤害值、orbit_count、radius/speed/projectile 字段、WeaponData 默认值
+2. **DPS 平衡回归测试** -- 新建 `test/unit/test_weapon_balance.gd` (16 项测试)，覆盖 R11 六项武器数值调整 (thunderang/fireknife/blazerang/frostknife/thunderholywater 削弱/增强验证)、全局武器伤害正数不变量、全局冷却非负不变量、进化标志验证
+3. **角色被动验证** -- Programmer 在 R12 实现了角色专属被动 (mage_damage_scale/warrior_armor_mastery/ranger_crit_boost)。Programmer 编写了 `test/unit/test_character_passives.gd` (19 项测试)，QA 审核验证代码实现正确
+4. **完整测试套件回归** -- 999 测试 (997 通过 + 2 pending, 0 失败)
+
+### 代码审查发现
+
+**upgrade_pool.gd R11 变更**:
+- 新增 `_character_passives: Dictionary = {}` (行 5)
+- `_ensure_initialized()` 末尾调用 `_register_character_passives()` (行 22)
+- `_register_character_passives()` 已定义，注册 3 个角色专属被动: mage_damage_scale (+8% damage), warrior_armor_mastery (+2 armor), ranger_crit_boost (+12% crit)
+- `get_random_upgrades()` 按 `GameManager.selected_character` 过滤角色被动
+- 9 个进化武器已注册，sentineltotem 为新增第 9 个
+
+**player.gd R12 角色被动**:
+- 新增 3 个常量引用 SkillData: MAGE_DAMAGE_SCALE_BONUS, WARRIOR_ARMOR_MASTERY_BONUS, RANGER_CRIT_BOOST_BONUS
+- `apply_passive()` 支持 _character_passives max_stack 查询
+- 新增 mage_damage_scale/warrior_armor_mastery/ranger_crit_boost 分支处理
+
+**SkillData R12 变更**:
+- 新增 MAGE_DAMAGE_SCALE_BONUS=0.08, WARRIOR_ARMOR_MASTERY_BONUS=2, RANGER_CRIT_BOOST_BONUS=0.12
+
+**weapon_fire.gd orbit_fire_rate 逻辑** (行 174-201):
+- `update_orbit()` 末尾调用 `_fire_orbit_projectiles()` -- 仅当 `orbit_fire_rate > 0` 时执行
+- `_fire_orbit_projectiles()` 使用 `weapon_timers` 追踪射击冷却，每次 orbit_count 个轨道位置向 250 范围内敌人发射投射物
+- 投射物从轨道位置发射 (非玩家位置)，速度/伤害/大小取自 WeaponData
+- sentinel totem: orbit_fire_rate=0.8, 每 0.8 秒从 2 个轨道位置各发射 1 枚投射物
+
+**R11 DPS 数值变更确认**:
+
+| 武器 | 属性 | 旧值 | 新值 | 方向 |
+|------|------|------|------|------|
+| thunderang | damage | 7.0 | 5.0 | 削弱 |
+| fireknife | projectile_count | 5 | 3 | 削弱 |
+| fireknife | burn_dps | 3.0 | 2.0 | 削弱 |
+| blazerang | damage | 6.0 | 5.0 | 削弱 |
+| frostknife | projectile_count | 5 | 4 | 削弱 |
+| thunderholywater | damage | 1.5 | 2.5 | 增强 |
+| thunderholywater | orbit_speed | 3.5 | 4.5 | 增强 |
+
+### 新增测试文件
+
+| 文件 | 测试数 | 覆盖模块 |
+|------|--------|----------|
+| test/unit/test_sentinel_totem.gd | 16 | 注册验证(3)、orbit_fire_rate(2)、进化配方(2)、伤害(2)、orbit_count(2)、字段验证(4)、WeaponData 默认值(1) |
+| test/unit/test_weapon_balance.gd | 16 | DPS 平衡调整(7)、全局不变量(2)、基础武器数(1)、进化武器数(1)、进化标志(5) |
+| test/unit/test_character_passives.gd | 19 | Programmer 编写: 注册(4)、SkillData 常量(2)、升级池过滤(6)、Player 应用(5)、HUD 验证(2) |
+
+### 测试套件总览
+
+| 日期 | 测试数 | 断言数 | 结果 |
+|------|--------|--------|------|
+| 2026-04-16 R12 | 999 | 2504 | 997 通过, 0 失败, 2 pending |
+| 2026-04-16 R9 | 945 | 2333 | 945 通过, 0 失败, 2 pending |
+
+### 已有失败 (非本轮引入)
+
+test_hud_skill_button.gd 3 项失败已在 R12 Programmer 修复后解决。当前测试套件 0 失败。
+
+### 缺陷跟踪
+
+| ID | 严重度 | 模块 | 描述 | 状态 |
+|----|--------|------|------|------|
+| BUG-001 | Medium | weapon_controller | `remove_weapon_instances` 中 boomerang 过滤条件无效 | 待处理 |
+| BUG-003 | Medium | chest.gd | `_ready()` 加载 `chest.png` 但文件不存在 | 待处理 |
+| BUG-004 | Low | test_cross_contamination | SaveManager autoload 状态泄漏 | 已规避 |
+| BUG-005 | Low | test_endless_mode | soul_fragment 浮点精度断言失败 | 待处理 |
+| BUG-006 | Low | boomerang.gd | 空 weapon_id 回退逻辑与 projectile.gd 不一致 | 已记录(设计意图) |
+| BUG-007 | Low | game_manager.gd | `wave_started` 混合类型参数导致 GUT 类型比较报错 | 已规避 |
+| BUG-008 | Low | skill_effects.gd | Shield Charge 使用 `apply_freeze` 而非 `apply_stun` | 已记录 |
+| BUG-009 | Low | test_fire_slime | `data` 未声明变量引用，改为 `template.get()` | 已修复 |
+| BUG-010 | Low | test_fire_slime | 敌人位置与玩家重叠导致 XP gem 掉落时序问题 | 已修复 |
+| BUG-011 | Low | test_hud_skill_button | R11 TextureRect 迁移后测试仍访问 `.color` 属性 (应为 `.modulate`) | 已修复(R12 Programmer) |
+| BUG-012 | Low | upgrade_pool.gd | `_register_character_passives()` 被调用但函数体未定义，_character_passives 始终为空 | 已修复(R12 Programmer) |
+
+### QA 自评分数: 96/100
+
+- 测试套件完整性 +30 (999 测试, 2504 断言, 997 通过, 0 失败, 41 个测试文件)
+- Sentinel Totem 覆盖 +15 (16 项测试覆盖第 9 进化武器全部字段和 orbit_fire_rate 机制)
+- DPS 平衡回归 +15 (16 项测试验证 R11 六项数值调整 + 全局不变量)
+- 代码审查 +10 (orbit_fire_rate 发射逻辑验证，R11 数值变更确认，R12 角色被动实现验证)
+- 角色被动验证 +10 (审核 Programmer 的 test_character_passives.gd 19 项测试 + upgrade_pool/player/SkillData 实现正确性)
+- 扣分 -3 (BUG-003 chest.png 缺失导致 2 个测试仍 pending)
+- 扣分 -1 (84 个 orphan 节点)

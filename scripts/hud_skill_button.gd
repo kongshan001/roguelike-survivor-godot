@@ -9,7 +9,7 @@ const SKILL_READY_COLOR: Color = Color(1, 0.85, 0.3)
 
 # --- Skill button nodes ---
 var _skill_bg: ColorRect = null
-var _skill_icon: ColorRect = null
+var _skill_icon: TextureRect = null
 var _skill_cooldown_overlay: ColorRect = null
 var _skill_key_label: Label = null
 
@@ -49,13 +49,22 @@ func setup(player: Node2D, character: String) -> void:
 	_skill_bg.color = SKILL_READY_COLOR
 	_canvas_layer.add_child(_skill_bg)
 
-	# Icon area
-	_skill_icon = ColorRect.new()
+	# Icon area (TextureRect with sprite)
+	_skill_icon = TextureRect.new()
 	_skill_icon.name = "SkillIcon"
 	var border: float = 2.0
 	_skill_icon.set_position(_skill_bg.position + Vector2(border, border))
 	_skill_icon.set_size(Vector2(SKILL_BUTTON_SIZE - border * 2.0, SKILL_BUTTON_SIZE - border * 2.0))
-	_skill_icon.color = icon_color
+	_skill_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_skill_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	# Load skill sprite texture based on skill_id
+	var skill_tex_path: String = "res://assets/sprites/skills/%s.png" % player.skill_id
+	if ResourceLoader.exists(skill_tex_path):
+		_skill_icon.texture = load(skill_tex_path)
+	else:
+		# Fallback: use flat color if sprite missing
+		_skill_icon.texture = null
+		_skill_icon.self_modulate = icon_color
 	_skill_bg.add_child(_skill_icon)
 
 	# Cooldown overlay (black semi-transparent)
