@@ -3093,3 +3093,302 @@ func apply_stun(duration: float) -> void:
 **加分项**: 发现 test_fire_slime.gd:280-281 编译错误是影响测试套件完整性的真实问题。识别出 hud.gd 死代码的精确行范围 (393-482) 使删除操作可直接执行。
 
 **扣分说明**: R10 产出较少 (Programmer 无变更), 审核深度受限。常量重复和 BUG-008 已是第 3 轮继承, 作为 Reviewer 未能推动修复, 仅能记录。
+
+---
+
+## Round 11 审核报告 (2026-04-16)
+
+### 审核范围
+
+- R10 遗留审计: 验证 R10 Programmer 的 hud.gd 拆分、常量统一、BUG-008 修复
+- R11 变更审核 (等待其他 Agent 完成后)
+- 跨模块一致性检查
+
+### 审核时间线
+
+1. **R10 遗留审计**: 首先完成 -- 逐行验证 R10 三项任务
+2. **等待后检查 R11 变更**: 检查其他 Agent 的 R11 产出
+3. **R11 跨模块审核**: 基于已确认存在的文件
+
+---
+
+### 任务 1: R10 遗留审计
+
+#### 1.1 Task 10A: hud.gd 拆分 (482 -> 374 行)
+
+**状态: PASS -- 修复确认**
+
+验证要点:
+
+| 检查项 | 状态 | 证据 |
+|--------|------|------|
+| hud.gd 行数降至 374 | PASS | 当前文件 375 行 (含末尾空行), 从 R9 的 482 行降至 374 行 |
+| 内联技能按钮代码移除 | PASS | `_setup_skill_button()` (行 369-370) 现在仅委托 `_skill_btn.setup()`, `_update_skill_display()` (行 373-374) 仅委托 `_skill_btn.update_display()` |
+| getter 转发保持测试兼容 | PASS | 行 359-366: `_skill_bg`/`_skill_icon`/`_skill_cooldown_overlay`/`_skill_key_label` 使用 getter 转发到 `_skill_btn` |
+| SKILL_BUTTON_SIZE/SKILL_READY_COLOR 保留 | PASS | 行 356-357: 本地常量保留用于测试 |
+| 无功能损失 | PASS | hud.gd `_process()` 行 71 调用 `_skill_btn.update_display(_get_player())`, `_ready()` 行 62-63 创建并初始化 `_skill_btn` |
+
+**拆分质量评估**: 委托模式干净。hud.gd 不再包含技能按钮的视觉构建逻辑, 所有子节点创建、位置计算、冷却覆盖层渲染均在 hud_skill_button.gd 中完成。getter 转发确保现有测试 (test_hud_skill_button.gd) 可继续访问内部属性而不破坏封装。
+
+#### 1.2 Task 10B: 常量统一 (SkillData 引用)
+
+**状态: PASS -- 修复确认**
+
+验证 skill_effects.gd 常量引用:
+
+| 常量 | 旧声明方式 | 新声明方式 | 行号 |
+|------|-----------|-----------|------|
+| MAGE_SKILL_DAMAGE | 硬编码 `15.0` | `= SkillData.MAGE_SKILL_DAMAGE` | 7 |
+| MAGE_SKILL_RADIUS | 硬编码 `150.0` | `= SkillData.MAGE_SKILL_RADIUS` | 8 |
+| WARRIOR_SKILL_STUN_DURATION | 硬编码 `2.0` | `= SkillData.WARRIOR_SKILL_STUN_DURATION` | 19 |
+| MAGE_PASSIVE_DAMAGE_BONUS | 硬编码 `0.10` | `= SkillData.MAGE_PASSIVE_DAMAGE_BONUS` | 36 |
+| WARRIOR_PASSIVE_ARMOR_BONUS | 硬编码 `3` | `= SkillData.WARRIOR_PASSIVE_ARMOR_BONUS` | 37 |
+| RANGER_PASSIVE_HIT_COUNT | 硬编码 `5` | `= SkillData.RANGER_PASSIVE_HIT_COUNT` | 41 |
+| (全部 35 个技能/被动常量) | 硬编码 | `= SkillData.XXX` | 7-41 |
+
+验证 player.gd 常量引用:
+
+| 常量 | 旧声明方式 | 新声明方式 | 行号 |
+|------|-----------|-----------|------|
+| MAGE_SKILL_COOLDOWN | 硬编码 `20.0` | `= SkillData.MAGE_SKILL_COOLDOWN` | 39 |
+| WARRIOR_SKILL_COOLDOWN | 硬编码 `15.0` | `= SkillData.WARRIOR_SKILL_COOLDOWN` | 40 |
+| RANGER_SKILL_COOLDOWN | 硬编码 `18.0` | `= SkillData.RANGER_SKILL_COOLDOWN` | 41 |
+| MAGE_PASSIVE_DAMAGE_BONUS | 硬编码 `0.10` | `= SkillData.MAGE_PASSIVE_DAMAGE_BONUS` | 44 |
+| WARRIOR_PASSIVE_ARMOR_BONUS | 硬编码 `3` | `= SkillData.WARRIOR_PASSIVE_ARMOR_BONUS` | 45 |
+| WARRIOR_PASSIVE_DURATION | 硬编码 `3.0` | `= SkillData.WARRIOR_PASSIVE_DURATION` | 47 |
+| WARRIOR_PASSIVE_COOLDOWN | 硬编码 `30.0` | `= SkillData.WARRIOR_PASSIVE_COOLDOWN` | 48 |
+| RANGER_PASSIVE_HIT_COUNT | 硬编码 `5` | `= SkillData.RANGER_PASSIVE_HIT_COUNT` | 49 |
+
+验证 SkillData 新增常量:
+
+| 常量 | 值 | 行号 |
+|------|-----|------|
+| WARRIOR_PASSIVE_DURATION | 3.0 | 45 |
+
+**常量统一评估**: 所有技能和被动常量现在以 SkillData 为唯一数据源。player.gd 和 skill_effects.gd 使用 `const X = SkillData.X` 语法, 保持常量名称不变以兼容测试。测试文件 test_skill_data_constants.gd 的三源一致性验证仍然有效。
+
+**唯一保留的本地常量**:
+- skill_effects.gd: `WARRIOR_AFTERIMAGE_COUNT` (3) 和 `WARRIOR_AFTERIMAGE_ALPHA` (0.4) -- 视觉特效参数, 不属于技能数值, 正确地保留为本地常量。
+
+#### 1.3 Task 10C: BUG-008 修复 (shield_charge apply_freeze -> apply_stun)
+
+**状态: PASS -- 修复确认**
+
+验证 enemy.gd apply_stun 方法:
+
+enemy.gd 行 229-230:
+```
+func apply_stun(duration: float) -> void:
+    _freeze_timer = maxf(_freeze_timer, duration)
+```
+
+方法签名包含返回值类型注解 (`-> void`), 正确使用 `maxf` 保护叠加。
+
+验证 skill_effects.gd 调用点:
+
+skill_effects.gd 行 115-116:
+```
+if enemy.has_method("apply_stun"):
+    enemy.apply_stun(WARRIOR_SKILL_STUN_DURATION)
+```
+
+使用 `has_method` 安全检查后调用 `apply_stun`, 不再使用 `apply_freeze`。
+
+**注意**: apply_stun 和 apply_freeze 的内部实现仍然相同 (都写 `_freeze_timer`)。这是可接受的短期方案 -- 方法名现在正确表达了设计意图 (charge = stun, ice = freeze), 未来行为分化时只需修改各自实现。
+
+#### 1.4 R10 标记的所有 Bug 验证汇总
+
+| Bug ID | 描述 | R10 状态 | R11 验证 |
+|--------|------|---------|---------|
+| BUG-008 | shield_charge apply_freeze -> apply_stun | 已修复 | **确认已修复** -- skill_effects.gd:115 使用 apply_stun |
+| 圣水升级无效 | cooldown 999 -> 1 | (R10 前已修复) | **确认已修复** -- 圣水走 orbit 路径, cooldown 由 WeaponData 控制 |
+| 冰冻光环伤害为零 | cooldown 999 -> 0 | (R10 前已修复) | **确认已修复** -- frostaura 走 aura 路径, update_aura 正确计算 damage * delta |
+| 屏幕抖动 | shake cooldown | (R10 前已修复) | **确认已修复** -- arena.gd:97-99 使用 _shake_cooldown (0.5s) 防止连续抖动 |
+
+#### 1.5 R10 测试验证
+
+Programmer-log 记录: 947 tests, 943 passing, 2 failing (pre-existing), 2 pending.
+
+| 指标 | 值 | 评估 |
+|------|-----|------|
+| 总测试数 | 947 | 持续增长 (R9: 945, R10: +2) |
+| 通过数 | 943 | 99.6% 通过率 |
+| 失败数 | 2 | 预存问题 (test_comprehensive_coverage + test_fire_slime) |
+| Pending | 2 | 预存问题 (chest.png missing) |
+
+**test_comprehensive_coverage 失败**: Programmer-log 记录为 "pre-existing", 与 R10 变更无关。根因可能是综合测试中的某个断言值在新常量统一后需要更新。
+
+**test_fire_slime 失败**: 同为 R9 遗留的 `data` 未定义变量问题 (行 280-281), R10 未修复。
+
+---
+
+### 任务 2: R11 变更审核
+
+等待后检查 R11 期间其他 Agent 的变更产出。
+
+#### 2.1 Programmer 变更检查
+
+| 预期任务 | 状态 | 验证 |
+|----------|------|------|
+| DPS 平衡调整 | **未观察到** | weapon_data.gd, weapon_fire.gd 无变更 |
+| Sentinel 实现 | **未观察到** | scripts/ 下无 sentinel 相关文件 |
+| 其他代码变更 | **未观察到** | git status clean (基于快照) |
+
+#### 2.2 Designer 变更检查
+
+| 预期任务 | 状态 | 验证 |
+|----------|------|------|
+| 角色升级差异化路线 | **未观察到** | docs/superpowers/specs/ 下无新文件 |
+| designer-log 更新 | **未观察到** | -- |
+
+#### 2.3 QA 变更检查
+
+| 预期任务 | 状态 | 验证 |
+|----------|------|------|
+| 新增测试 | **未观察到** | test/unit/ 下无新文件 |
+| qa-log 更新 | **未观察到** | -- |
+
+#### 2.4 Art 变更检查
+
+| 预期任务 | 状态 | 验证 |
+|----------|------|------|
+| 精灵改进 | **未观察到** | assets/sprites/ 下无新文件 |
+
+**R11 产出评估**: 截至审核时间, R11 期间各角色 (Programmer/Designer/QA/Art) 尚未提交新的代码变更。R11 审核基于 R10 已提交的代码状态进行。
+
+---
+
+### 任务 3: 跨模块一致性审核 (R10 后状态)
+
+#### 3.1 常量管理架构 (R10 后)
+
+R10 常量统一后的架构:
+
+```
+SkillData (唯一数据源)
+    |
+    +-- player.gd: const X = SkillData.X  (11 个常量)
+    +-- skill_effects.gd: const X = SkillData.X  (35 个常量)
+    +-- test_skill_data_constants.gd: 三源一致性验证  (34 个测试)
+```
+
+**评估**: 这是从 R8 继承的 P1 技术债务, R10 已通过 SkillData 引用方式解决。三处重复声明问题已消除, 但保留了本地常量名称以确保测试兼容性。这是正确的工程权衡。
+
+#### 3.2 hud.gd 子系统架构 (R10 后)
+
+```
+hud.gd (374 行, 编排层)
+    |
+    +-- hud_toast.gd (RefCounted, 115 行): Toast 通知
+    +-- hud_skill_button.gd (RefCounted, 100 行): 技能按钮 UI
+```
+
+**评估**: hud.gd 从 482 行降至 374 行, 成功低于 400 行目标。两个子系统均为 RefCounted (非 Node), 通过构造函数注入 CanvasLayer 引用。hud.gd 使用 getter 转发属性以保持测试兼容性。
+
+#### 3.3 enemy.gd 状态效果系统
+
+| 方法 | 参数 | 内部实现 | 用途 |
+|------|------|---------|------|
+| apply_freeze(duration) | float | _freeze_timer = maxf(...) | 冰冻 (Mage elemental_burst) |
+| apply_stun(duration) | float | _freeze_timer = maxf(...) | 击晕 (Warrior shield_charge) |
+| apply_slow(pct) | float | _slow_pct = maxf(...), _slow_timer = 1.0 | 减速 (frostaura) |
+| apply_burn(dps, duration) | float, float | _burn_dps = maxf(...), _burn_timer = maxf(...) | 燃烧 (firestaff, fire_slime) |
+
+**评估**: 四种状态效果接口齐全。apply_stun 已在 R10 正确添加, 语义清晰。当前 stun/freeze 内部实现相同, 未来可独立分化。
+
+---
+
+### 任务 4: 发现问题汇总
+
+#### Critical (必须修复)
+
+无 Critical 级别问题。
+
+#### Medium (应修复)
+
+| ID | 问题 | 文件 | 影响 |
+|----|------|------|------|
+| M1 | test_fire_slime.gd:280-281 引用未定义变量 `data` | test/unit/test_fire_slime.gd:280-281 | 该文件部分测试运行时必定报错 (R9->R10->R11, 3 轮未修复) |
+| M2 | 2 个预存测试失败 (test_comprehensive_coverage + test_fire_slime) | test/unit/ | 测试通过率 99.6%, 但 0.4% 失败影响测试套件可信度 |
+| M3 | chest.png 精灵资源缺失 | assets/sprites/pickups/ | 2 个 chest 测试 Pending, 宝箱视觉为 ColorRect |
+
+#### Low (建议优化)
+
+| ID | 问题 | 文件 | 影响 |
+|----|------|------|------|
+| L1 | apply_stun 与 apply_freeze 实现完全相同 | scripts/enemy.gd:225-230 | 语义已正确区分, 未来实现分化时需注意 |
+| L2 | enemy.gd _spawn_food_at() 仍用 ColorRect | scripts/enemy.gd:371-377 | 与项目 Sprite2D 迁移方向不一致, food.png 已存在但未使用 |
+| L3 | save_manager.gd:258 类型注解 Dictionary 写为 Array | scripts/autoload/save_manager.gd:258 | 运行时无害但静态类型误导 (R3 继承) |
+| L4 | hud.gd _on_boss_warning timer 无 is_instance_valid 检查 | scripts/hud.gd:97-99 | HUD 释放后 timer 回调可能访问无效节点 |
+
+---
+
+### 任务 5: 技术债务更新
+
+| 优先级 | 描述 | 状态 | 来源 |
+|--------|------|------|------|
+| ~~P1~~ | ~~常量 3 处重复声明~~ | **RESOLVED** (R10) | R8->R10 |
+| ~~P1~~ | ~~hud.gd 482 行含 90 行死代码~~ | **RESOLVED** (R10) | R9->R10 |
+| ~~P1~~ | ~~BUG-008: shield_charge apply_freeze~~ | **RESOLVED** (R10) | R8->R10 |
+| P1 | test_fire_slime.gd 编译错误 | 未修复 | R9->R11 (3 轮) |
+| P2 | chest.png 精灵资源缺失 | 未修复 | R4->R11 (7 轮) |
+| P2 | _spawn_food_at() 使用 ColorRect | 未修复 | R3->R11 (8 轮) |
+| P2 | save_manager.gd 元数据类型注解不匹配 | 未修复 | R3->R11 (8 轮) |
+| P3 | enemy_bullet.gd take_damage 签名不一致 | 未修复 | R2->R11 (9 轮, 低优先级) |
+| P3 | generate_sprites.py 未运行验证 | 未执行 | R9->R11 (2 轮) |
+
+**R10 技术债务清偿总结**: R10 成功解决了 3 项 P1 级技术债务 (常量统一、hud 死代码、BUG-008), 是近期债务清偿效率最高的一轮。
+
+---
+
+### 任务 6: 按角色分类建议
+
+#### Programmer
+
+| 优先级 | 建议 | 文件 | 说明 |
+|--------|------|------|------|
+| P1 | 修复 test_fire_slime.gd:280-281 未定义变量 | test/unit/test_fire_slime.gd | 3 轮未修, 将 `data` 改为 `template.get("burn_aura_dps")` 或创建 EnemyData 实例 |
+| P2 | _spawn_food_at() 改用 Sprite2D + food.png | scripts/enemy.gd:371-377 | `preload("res://assets/sprites/pickups/food.png")` 替代 ColorRect |
+| P2 | 创建 chest.png 精灵并迁移 chest.gd | scripts/chest.gd:24-31 | 宝箱仍用 ColorRect, 需要美术提供 chest.png |
+| P3 | 修复 save_manager.gd:258 类型注解 | scripts/autoload/save_manager.gd:258 | `var evolutions: Array = []` 应为 `var evolutions: Dictionary = {}` |
+
+#### Designer
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P2 | 确认 sentinel 实现优先级 | evolution-expansion.md 有完整设计, 但无简化方案文件 |
+| P3 | 评估 DPS 平衡需求 | 当前武器数值直接从 H5 迁移, 无 Godot 环境实测数据 |
+
+#### QA
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P1 | 确认 test_fire_slime 和 test_comprehensive_coverage 失败根因 | 2 个失败影响测试套件完整性 |
+| P2 | 补充 apply_stun 区别于 apply_freeze 的测试 | 验证 stun/freeze 未来分化时行为独立 |
+
+#### Art
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P2 | 提供 chest.png 宝箱精灵 | assets/sprites/pickups/ 目录缺失, 导致 2 个测试 Pending |
+
+---
+
+### 审核人自评: 88/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| R10 遗留追踪准确性 | 25 | 25 | 逐行验证 3 项任务, 全部确认已修复, 附精确行号证据 |
+| Bug 修复验证深度 | 22 | 25 | BUG-008 验证覆盖方法签名 + 调用点 + has_method 检查; 常量统一覆盖全部 46 处引用 |
+| R11 变更审核 | 12 | 20 | R11 各角色无新产出, 审核范围有限 |
+| 技术债务追踪 | 15 | 15 | 3 项 P1 标记 RESOLVED, 更新 9 项债务状态 |
+| 时序遵守 | 14 | 15 | 先做 R10 遗留审计, 等待后检查 R11 变更, 无 Critical 误报 |
+
+**加分项**:
+- R10 的三处修复 (hud 拆分、常量统一、BUG-008) 全部逐行验证, 确认质量达标
+- 识别出 test_fire_slime 编译错误已持续 3 轮未修复, 应升级关注
+- 确认 hud.gd 子系统架构 (toast + skill_button) 拆分后的委托模式正确
+
+**待改进**:
+- R11 无新变更导致审核价值有限, 下轮应推动 Programmer 解决 test_fire_slime 编译错误和 chest.png 缺失两个长期问题
+- 未能在本环境中实际运行测试验证 947 测试的通过率

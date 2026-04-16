@@ -20,6 +20,7 @@ extends Resource
 @export var orbit_count: int = 1
 @export var orbit_radius: float = 50.0
 @export var orbit_speed: float = 3.0
+@export var orbit_fire_rate: float = 0.0  # Seconds between orbit-fired projectiles; 0 = no firing
 
 # Lightning
 @export var chain_count: int = 0

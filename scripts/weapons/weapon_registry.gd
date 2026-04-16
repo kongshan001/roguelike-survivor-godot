@@ -3,7 +3,7 @@ extends RefCounted
 ## 通过 load("res://scripts/weapons/weapon_registry.gd").new() 使用
 
 
-## 8 种进化武器配方
+## 9 种进化武器配方
 const EVOLUTION_RECIPES: Array = [
 	{"a": "holywater", "b": "lightning", "result": "thunderholywater"},
 	{"a": "knife", "b": "firestaff", "result": "fireknife"},
@@ -13,6 +13,7 @@ const EVOLUTION_RECIPES: Array = [
 	{"a": "bible", "b": "firestaff", "result": "flamebible"},
 	{"a": "boomerang", "b": "lightning", "result": "thunderang"},
 	{"a": "boomerang", "b": "firestaff", "result": "blazerang"},
+	{"a": "bible", "b": "boomerang", "result": "sentineltotem"},
 ]
 
 

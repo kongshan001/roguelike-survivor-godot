@@ -66,7 +66,7 @@ func _fire_weapon(weapon_id: String, data: WeaponData, player: CharacterBody2D):
 		"projectile":
 			wf.fire_projectile(data, level, player, dmg_bonus)
 		"orbit":
-			_orbit_instances = wf.update_orbit(weapon_id, data, level, player, dmg_bonus, _orbit_instances)
+			_orbit_instances = wf.update_orbit(weapon_id, data, level, player, dmg_bonus, _orbit_instances, _weapon_timers)
 		"lightning":
 			wf.fire_lightning(data, level, player, dmg_bonus)
 		"cone":

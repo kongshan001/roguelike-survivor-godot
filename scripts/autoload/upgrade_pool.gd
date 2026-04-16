@@ -77,15 +77,15 @@ func _register_evolved_weapons() -> void:
 	# 1. 雷暴圣水
 	var thw := WeaponData.new()
 	thw.weapon_name = "雷暴圣水"; thw.weapon_id = "thunderholywater"; thw.weapon_type = "orbit"
-	thw.damage = 1.5; thw.cooldown = 1.0; thw.orbit_count = 3; thw.orbit_radius = 60.0
-	thw.orbit_speed = 3.5; thw.color = Color(0.2, 0.4, 1.0); thw.projectile_size = 10.0
+	thw.damage = 2.5; thw.cooldown = 1.0; thw.orbit_count = 3; thw.orbit_radius = 60.0
+	thw.orbit_speed = 4.5; thw.color = Color(0.2, 0.4, 1.0); thw.projectile_size = 10.0
 	thw.is_evolved = true; thw.description = "旋转+链式闪电"
 	register_weapon("thunderholywater", thw)
 	# 2. 火焰飞刀
 	var fk := WeaponData.new()
 	fk.weapon_name = "火焰飞刀"; fk.weapon_id = "fireknife"; fk.weapon_type = "projectile"
-	fk.damage = 3.0; fk.cooldown = 0.5; fk.projectile_count = 5; fk.projectile_pierce = 2
-	fk.projectile_speed = 400.0; fk.burn_dps = 3.0; fk.burn_duration = 2.0
+	fk.damage = 3.0; fk.cooldown = 0.5; fk.projectile_count = 3; fk.projectile_pierce = 2
+	fk.projectile_speed = 400.0; fk.burn_dps = 2.0; fk.burn_duration = 2.0
 	fk.color = Color(1.0, 0.6, 0.1); fk.projectile_size = 6.0; fk.is_evolved = true
 	fk.description = "燃烧穿透飞刀"
 	register_weapon("fireknife", fk)
@@ -106,7 +106,7 @@ func _register_evolved_weapons() -> void:
 	# 5. 冰霜飞刀
 	var frk := WeaponData.new()
 	frk.weapon_name = "冰霜飞刀"; frk.weapon_id = "frostknife"; frk.weapon_type = "projectile"
-	frk.damage = 2.5; frk.cooldown = 0.6; frk.projectile_count = 5; frk.projectile_pierce = 2
+	frk.damage = 2.5; frk.cooldown = 0.6; frk.projectile_count = 4; frk.projectile_pierce = 2
 	frk.projectile_speed = 380.0; frk.slow_pct = 0.4; frk.freeze_pct = 0.05
 	frk.color = Color(0.4, 0.8, 1.0); frk.projectile_size = 6.0; frk.is_evolved = true
 	frk.description = "减速穿透飞刀"
@@ -122,7 +122,7 @@ func _register_evolved_weapons() -> void:
 	# 7. 雷霆回旋
 	var tr := WeaponData.new()
 	tr.weapon_name = "雷霆回旋"; tr.weapon_id = "thunderang"; tr.weapon_type = "boomerang"
-	tr.damage = 7.0; tr.cooldown = 0.8; tr.projectile_count = 4; tr.projectile_pierce = 3
+	tr.damage = 5.0; tr.cooldown = 0.8; tr.projectile_count = 4; tr.projectile_pierce = 3
 	tr.boomerang_max_dist = 400.0; tr.boomerang_return_speed = 380.0; tr.boomerang_curvature = 0.15
 	tr.boomerang_track_angle = 1.31; tr.color = Color(0.5, 0.7, 1.0); tr.projectile_size = 10.0
 	tr.is_evolved = true; tr.description = "追踪+闪电链"
@@ -130,12 +130,20 @@ func _register_evolved_weapons() -> void:
 	# 8. 烈焰回旋
 	var br := WeaponData.new()
 	br.weapon_name = "烈焰回旋"; br.weapon_id = "blazerang"; br.weapon_type = "boomerang"
-	br.damage = 6.0; br.cooldown = 0.8; br.projectile_count = 3; br.projectile_pierce = 3
+	br.damage = 5.0; br.cooldown = 0.8; br.projectile_count = 3; br.projectile_pierce = 3
 	br.boomerang_max_dist = 380.0; br.boomerang_return_speed = 360.0; br.boomerang_curvature = 0.2
 	br.boomerang_track_angle = 1.05; br.burn_dps = 3.0; br.burn_duration = 2.5
 	br.color = Color(1.0, 0.4, 0.0); br.projectile_size = 10.0; br.is_evolved = true
 	br.description = "追踪+火焰轨迹"
 	register_weapon("blazerang", br)
+	# 9. Sentinel Totem (bible + boomerang) -- Simplified to orbit type
+	var st := WeaponData.new()
+	st.weapon_name = "守护图腾"; st.weapon_id = "sentineltotem"; st.weapon_type = "orbit"
+	st.damage = 2.5; st.cooldown = 999.0; st.orbit_count = 2; st.orbit_radius = 120.0
+	st.orbit_speed = 1.5; st.orbit_fire_rate = 0.8
+	st.projectile_speed = 280.0; st.projectile_size = 6.0; st.color = Color(0.7, 0.6, 0.2)
+	st.is_evolved = true; st.description = "环绕图腾+定向射击"
+	register_weapon("sentineltotem", st)
 
 
 func register_weapon(weapon_id: String, data: Resource):

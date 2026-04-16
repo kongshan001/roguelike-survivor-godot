@@ -1027,12 +1027,54 @@ def gen_splitter():
 
 
 def gen_splitter_small():
+    """Splitter Small (32x32 canvas, ~14x14 body) -- improved visibility.
+    Larger body (14x14 vs old 8x8), dark outline, crack lines, bigger eyes,
+    and stubby legs for better in-game recognizability.
+    """
     img, d = draw_img(32, 32)
-    d.rounded_rectangle([(12, 12), (20, 20)], radius=2, fill=rgba("splitter_s"))
-    d.point((14, 15), fill=rgba("white"))
-    d.point((17, 15), fill=rgba("white"))
-    d.rectangle([(13, 20), (15, 23)], fill=rgba("splitter_s"))
-    d.rectangle([(17, 20), (19, 23)], fill=rgba("splitter_s"))
+    outline = rgba("dark_outline")
+    body_c = rgba("splitter_s")
+    white = rgba("white")
+    # Body outline (1px dark border around 12x12 area at x=10..23, y=8..21)
+    for x in range(10, 24):
+        d.point((x, 7), fill=outline)   # top edge
+        d.point((x, 22), fill=outline)  # bottom edge
+    for y in range(8, 22):
+        d.point((9, y), fill=outline)   # left edge
+        d.point((24, y), fill=outline)  # right edge
+    # Rounded corners (clip outline to simulate rounded rect)
+    for corner_x, corner_y in [(10, 8), (23, 8), (10, 21), (23, 21)]:
+        d.point((corner_x, corner_y), fill=body_c)  # soften corners
+    # Body fill (14x14 block at x=10..23, y=8..21)
+    d.rectangle([(10, 8), (23, 21)], fill=body_c)
+    # Crack lines (horizontal crack through middle -- inherited from parent splitter)
+    crack_c = rgba("splitter")  # darker parent color
+    d.point((11, 13), fill=crack_c)
+    d.point((12, 13), fill=crack_c)
+    d.point((13, 14), fill=crack_c)
+    d.point((14, 14), fill=crack_c)
+    d.point((15, 13), fill=crack_c)
+    d.point((18, 14), fill=crack_c)
+    d.point((19, 14), fill=crack_c)
+    d.point((20, 13), fill=crack_c)
+    d.point((21, 13), fill=crack_c)
+    d.point((22, 14), fill=crack_c)
+    # Eyes (3x2 each, with dark pupil)
+    eye_dark = rgba("black")
+    # Left eye
+    d.rectangle([(11, 10), (14, 11)], fill=white)
+    d.point((13, 10), fill=eye_dark)
+    # Right eye
+    d.rectangle([(17, 10), (20, 11)], fill=white)
+    d.point((19, 10), fill=eye_dark)
+    # Legs (stubby, 2px wide each, 4px tall)
+    d.rectangle([(11, 22), (13, 25)], fill=body_c)
+    d.rectangle([(20, 22), (22, 25)], fill=body_c)
+    # Leg outline (bottom of legs)
+    for x in range(11, 14):
+        d.point((x, 26), fill=outline)
+    for x in range(20, 23):
+        d.point((x, 26), fill=outline)
     save(img, "enemies", "splitter_small.png")
 
 
@@ -1076,7 +1118,7 @@ def gen_holy_water():
     # Central orb
     d.ellipse([(4, 4), (12, 12)], fill=rgba("holy_water"))
     # Glow ring (lighter)
-    d.ellipse([(2, 2), (14, 14)], outline=(*PALETTE["holy_water"][:3], 100), width=1)
+    d.ellipse([(2, 2), (14, 14)], outline=(*PALETTE["holy_water"][:3], 180), width=1)
     # Shine
     d.point((6, 5), fill=rgba("white"))
     save(img, "weapons", "holy_water.png")
@@ -1872,65 +1914,75 @@ def gen_flamebible():
 
 
 def gen_thunderang():
-    """Thunderang (20x20) -- boomerang shape + electric sparks (#FFD700 + #4D80FF)."""
+    """Thunderang (20x20) -- boomerang V-shape + concentrated lightning tips.
+    Simplified from R10 review: removed scattered inner sparks, focused electric
+    effect on V-tip bolts only. V-shape made thicker for better readability.
+    """
     img, d = draw_img(20, 20)
     outline = rgba("dark_outline")
     boom = rgba("boomerang")
     yellow = rgba("thunder_yellow")
     elec = rgba("elec_blue")
     white = rgba("white")
-    # Boomerang V-shape drawn pixel-by-pixel (thicker, 2px wide)
-    # Left arm (going from tip down to center)
-    v_left = [
-        (2, 4), (3, 4), (3, 5), (4, 5), (4, 6), (5, 6), (5, 7),
-        (6, 7), (6, 8), (7, 8), (7, 9), (8, 9), (8, 10), (9, 10), (9, 11),
-    ]
-    # Right arm (mirror)
-    v_right = [
-        (17, 4), (16, 4), (16, 5), (15, 5), (15, 6), (14, 6), (14, 7),
-        (13, 7), (13, 8), (12, 8), (12, 9), (11, 9), (11, 10), (10, 10), (10, 11),
-    ]
-    # Bottom curve
-    v_bottom = [(9, 12), (10, 12), (9, 13), (10, 13)]
-    for pt in v_left + v_right + v_bottom:
-        d.point(pt, fill=boom)
-    # Outline
-    ol_left = [
-        (1, 3), (2, 3), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7),
+    # Boomerang V-shape -- thicker 3px-wide arms for readability
+    # Left arm (outer edge, center, inner edge)
+    v_left_outer = [
+        (2, 4), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7),
         (8, 8), (9, 9), (8, 11), (9, 14),
     ]
-    ol_right = [
-        (18, 3), (17, 3), (16, 3), (15, 4), (14, 5), (13, 6), (12, 7),
+    v_left_center = [
+        (2, 5), (3, 5), (4, 6), (5, 7), (6, 8), (7, 9),
+        (8, 10), (9, 11), (8, 12),
+    ]
+    v_left_inner = [
+        (2, 6), (3, 6), (4, 7), (5, 8), (6, 9), (7, 10),
+        (8, 11), (9, 12), (8, 13),
+    ]
+    # Right arm (mirror)
+    v_right_outer = [
+        (17, 4), (16, 3), (15, 4), (14, 5), (13, 6), (12, 7),
         (11, 8), (10, 9), (11, 11), (10, 14),
     ]
-    for pt in ol_left + ol_right:
+    v_right_center = [
+        (17, 5), (16, 5), (15, 6), (14, 7), (13, 8), (12, 9),
+        (11, 10), (10, 11), (11, 12),
+    ]
+    v_right_inner = [
+        (17, 6), (16, 6), (15, 7), (14, 8), (13, 9), (12, 10),
+        (11, 11), (10, 12), (11, 13),
+    ]
+    # Bottom curve
+    v_bottom = [(8, 14), (9, 14), (10, 14), (11, 14),
+                (8, 15), (9, 15), (10, 15), (11, 15)]
+    # Fill all boomerang pixels
+    for pt in (v_left_center + v_left_inner + v_right_center + v_right_inner
+               + v_bottom):
+        d.point(pt, fill=boom)
+    # Outline on outer edges
+    for pt in v_left_outer + v_right_outer:
         d.point(pt, fill=outline)
-    # Gold tips
-    d.point((2, 4), fill=yellow)
-    d.point((17, 4), fill=yellow)
-    # Electric sparks -- zigzag lightning between the arms
-    sparks_yellow = [
-        (4, 2), (5, 3), (3, 4), (6, 2),
-        (14, 2), (15, 3), (13, 4), (16, 2),
-        (7, 3), (8, 4), (6, 5), (9, 3), (10, 4),
-        (12, 3), (11, 4), (13, 5), (10, 3),
-    ]
-    for pt in sparks_yellow:
-        d.point(pt, fill=yellow)
-    # Electric blue sparks (inner glow)
-    sparks_blue = [
-        (5, 7), (6, 8), (4, 8), (5, 9),
-        (14, 7), (13, 8), (15, 8), (14, 9),
-        (8, 6), (9, 7), (7, 7), (8, 8),
-        (11, 6), (10, 7), (12, 7), (11, 8),
-    ]
-    for pt in sparks_blue:
-        d.point(pt, fill=elec)
-    # Bright spark highlights
-    d.point((4, 2), fill=white)
-    d.point((15, 2), fill=white)
-    d.point((7, 3), fill=white)
-    d.point((12, 3), fill=white)
+    # Gold tips (on the two tips of the V)
+    d.point((2, 5), fill=yellow)
+    d.point((3, 4), fill=yellow)
+    d.point((17, 5), fill=yellow)
+    d.point((16, 4), fill=yellow)
+    # Lightning bolt at left tip -- clean zigzag from tip upward
+    d.point((2, 3), fill=yellow)
+    d.point((3, 2), fill=elec)
+    d.point((4, 1), fill=yellow)
+    d.point((5, 1), fill=white)   # bright spark at top
+    # Lightning bolt at right tip -- mirror zigzag
+    d.point((17, 3), fill=yellow)
+    d.point((16, 2), fill=elec)
+    d.point((15, 1), fill=yellow)
+    d.point((14, 1), fill=white)  # bright spark at top
+    # Single small spark at bottom center
+    d.point((9, 16), fill=elec)
+    d.point((10, 16), fill=elec)
+    d.point((9, 17), fill=yellow)
+    # Tip highlights
+    d.point((3, 3), fill=white)
+    d.point((16, 3), fill=white)
     save(img, "weapons", "thunderang.png")
 
 

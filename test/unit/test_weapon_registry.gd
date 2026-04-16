@@ -11,7 +11,7 @@ func before_each():
 # --- Recipe count ---
 
 func test_recipe_count():
-	assert_eq(_registry.EVOLUTION_RECIPES.size(), 8, "8 evolution recipes")
+	assert_eq(_registry.EVOLUTION_RECIPES.size(), 9, "9 evolution recipes")
 
 
 # --- Recipe structure ---
@@ -63,6 +63,12 @@ func test_knife_firestaff_level_3():
 	assert_eq(result["result"], "fireknife", "knife+firestaff Lv3 => fireknife")
 
 
+func test_bible_boomerang_level_3():
+	var weapons: Dictionary = {"bible": 3, "boomerang": 3}
+	var result: Dictionary = _registry.check_evolution_available(weapons)
+	assert_eq(result["result"], "sentineltotem", "bible+boomerang Lv3 => sentineltotem")
+
+
 func test_bible_holywater_level_3():
 	var weapons: Dictionary = {"knife": 3, "firestaff": 3, "bible": 3, "holywater": 3}
 	var result: Dictionary = _registry.check_evolution_available(weapons)
@@ -94,7 +100,7 @@ func test_only_one_ingredient_max():
 	assert_eq(result.size(), 0, "No matching recipe for holywater+knife")
 
 
-# --- All 8 recipes have unique results ---
+# --- All 9 recipes have unique results ---
 
 func test_unique_result_ids():
 	var results: Array = []

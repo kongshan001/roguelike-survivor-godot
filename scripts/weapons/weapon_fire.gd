@@ -118,7 +118,7 @@ func _spawn_crit_knife(player: CharacterBody2D, dmg: float) -> void:
 
 # --- Orbit ---
 
-func update_orbit(weapon_id: String, data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float, orbit_instances: Dictionary) -> Dictionary:
+func update_orbit(weapon_id: String, data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float, orbit_instances: Dictionary, weapon_timers: Dictionary = {}) -> Dictionary:
 	var orbit_count: int
 	var radius: float
 	var damage: float
@@ -151,6 +151,7 @@ func update_orbit(weapon_id: String, data: WeaponData, level: int, player: Chara
 		else:
 			existing.damage = damage
 			existing.global_position = player.global_position
+			_fire_orbit_projectiles(weapon_id, data, player, dmg_bonus, orbit_instances, weapon_timers)
 			return orbit_instances
 
 	var instance := Node2D.new()
@@ -166,7 +167,38 @@ func update_orbit(weapon_id: String, data: WeaponData, level: int, player: Chara
 		pm.call_deferred("add_child", instance)
 	instance.global_position = player.global_position
 	orbit_instances[key] = instance
+	_fire_orbit_projectiles(weapon_id, data, player, dmg_bonus, orbit_instances, weapon_timers)
 	return orbit_instances
+
+
+func _fire_orbit_projectiles(weapon_id: String, data: WeaponData, player: CharacterBody2D, dmg_bonus: float, orbit_instances: Dictionary, weapon_timers: Dictionary) -> void:
+	if data.orbit_fire_rate <= 0.0 or not orbit_instances.has(weapon_id):
+		return
+	var delta: float = _controller.get_process_delta_time()
+	var fire_timer_key: String = "_%s_fire" % weapon_id
+	if not weapon_timers.has(fire_timer_key):
+		weapon_timers[fire_timer_key] = data.orbit_fire_rate
+	weapon_timers[fire_timer_key] -= delta
+	if weapon_timers[fire_timer_key] > 0.0:
+		return
+	weapon_timers[fire_timer_key] = data.orbit_fire_rate
+	var orbit_node: Node2D = orbit_instances[weapon_id]
+	if not is_instance_valid(orbit_node):
+		return
+	var fire_enemies := _get_enemies(player, 250.0)
+	if fire_enemies.is_empty():
+		return
+	for i in range(data.orbit_count):
+		var blade_angle: float = orbit_node._angle + (TAU * i / data.orbit_count)
+		var fire_pos: Vector2 = orbit_node.global_position + Vector2(cos(blade_angle), sin(blade_angle)) * data.orbit_radius
+		var target: Node2D = fire_enemies[i % fire_enemies.size()]
+		var proj_scene: PackedScene = preload("res://scenes/projectile.tscn")
+		var proj: Area2D = proj_scene.instantiate()
+		proj.weapon_id = data.weapon_id
+		proj.setup(fire_pos, target.global_position, data.projectile_speed, data.damage * dmg_bonus, 0, Color(0.9, 0.85, 0.5), data.projectile_size)
+		var pm: Node = _get_pm(player)
+		if pm:
+			pm.call_deferred("add_child", proj)
 
 
 # --- Lightning ---
