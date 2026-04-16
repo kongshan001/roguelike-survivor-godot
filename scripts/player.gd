@@ -100,10 +100,19 @@ var _iron_will_cooldown: float = 0.0
 var _burn_dps: float = 0.0
 var _burn_timer: float = 0.0
 
+# Animation frame constants (Method C: Sprite2D + _physics_process)
+const ANIM_INTERVAL: float = 1.0 / 4.0  # 4 FPS = 0.25s per frame
+
 @onready var hurtbox: Area2D = $Hurtbox
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var sprite: Sprite2D = $Sprite
 var _char_color: Color = Color.WHITE
+
+# Animation frame state
+var _anim_time: float = 0.0
+var _anim_frame: int = 0
+var _idle_texture: Texture2D = null
+var _action_texture: Texture2D = null
 
 
 func _ready():
@@ -122,23 +131,8 @@ func _ready():
 	skill_effects_node.set_script(load("res://scripts/skill_effects.gd"))
 	add_child(skill_effects_node)
 
-	# Apply character-specific bonuses
-	match GameManager.selected_character:
-		"warrior":
-			armor += 1
-			sprite.texture = preload("res://assets/sprites/characters/warrior.png")
-			_char_color = Color(0.83, 0.18, 0.18)
-			_init_skill("shield_charge", WARRIOR_SKILL_COOLDOWN)
-		"ranger":
-			crit_chance += 0.1
-			sprite.texture = preload("res://assets/sprites/characters/ranger.png")
-			_char_color = Color(0.18, 0.45, 0.2)
-			_init_skill("arrow_rain", RANGER_SKILL_COOLDOWN)
-		"mage":
-			damage_bonus += 0.2
-			sprite.texture = preload("res://assets/sprites/characters/mage.png")
-			_char_color = Color(0.08, 0.4, 0.75)
-			_init_skill("elemental_burst", MAGE_SKILL_COOLDOWN)
+	# Apply character-specific bonuses and animation textures
+	_setup_character_animation()
 
 
 func _init_skill(sid: String, cooldown: float) -> void:
@@ -146,6 +140,51 @@ func _init_skill(sid: String, cooldown: float) -> void:
 	skill_cooldown_max = cooldown
 	skill_timer = 0.0
 	is_skill_ready = true
+
+
+func _setup_character_animation() -> void:
+	match GameManager.selected_character:
+		"warrior":
+			armor += 1
+			_char_color = Color(0.83, 0.18, 0.18)
+			_idle_texture = preload("res://assets/sprites/characters/warrior.png")
+			_action_texture = _load_texture_safe("res://assets/sprites/characters/warrior_block.png")
+			_init_skill("shield_charge", WARRIOR_SKILL_COOLDOWN)
+		"ranger":
+			crit_chance += 0.1
+			_char_color = Color(0.18, 0.45, 0.2)
+			_idle_texture = preload("res://assets/sprites/characters/ranger.png")
+			_action_texture = _load_texture_safe("res://assets/sprites/characters/ranger_draw.png")
+			_init_skill("arrow_rain", RANGER_SKILL_COOLDOWN)
+		"mage":
+			damage_bonus += 0.2
+			_char_color = Color(0.08, 0.4, 0.75)
+			_idle_texture = preload("res://assets/sprites/characters/mage.png")
+			_action_texture = _load_texture_safe("res://assets/sprites/characters/mage_cast.png")
+			_init_skill("elemental_burst", MAGE_SKILL_COOLDOWN)
+	if _idle_texture:
+		sprite.texture = _idle_texture
+
+
+func _load_texture_safe(path: String) -> Texture2D:
+	# Try ResourceLoader first (works when .import file exists)
+	# Use exists() to avoid printing error when file is not yet imported
+	if ResourceLoader.exists(path):
+		var tex: Texture2D = load(path)
+		if tex:
+			return tex
+	# Fallback: load raw PNG via Image -> ImageTexture (works without .import)
+	var global_path: String = ProjectSettings.globalize_path(path)
+	if global_path == path or global_path == "":
+		# globalize_path failed, construct from project data dir
+		global_path = OS.get_data_dir().get_base_dir().get_base_dir() + "/" + path.replace("res://", "")
+	if FileAccess.file_exists(global_path):
+		var img: Image = Image.new()
+		if img.load(global_path) == OK:
+			var img_tex: ImageTexture = ImageTexture.create_from_image(img)
+			img_tex.take_over_path(path)
+			return img_tex
+	return null
 
 
 func _physics_process(delta):
@@ -215,6 +254,19 @@ func _physics_process(delta):
 			_burn_dps = 0.0
 
 	GameManager.update_combo(delta)
+
+	# Character walk animation (Method C: Sprite2D + _physics_process)
+	if is_moving and _idle_texture:
+		_anim_time += delta
+		if _anim_time >= ANIM_INTERVAL:
+			_anim_time -= ANIM_INTERVAL
+			_anim_frame = 1 - _anim_frame
+			sprite.texture = _action_texture if _anim_frame == 1 else _idle_texture
+	else:
+		_anim_time = 0.0
+		_anim_frame = 0
+		if _idle_texture:
+			sprite.texture = _idle_texture
 
 
 # --- Skill system ---

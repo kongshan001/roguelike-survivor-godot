@@ -1,17 +1,17 @@
 # Test Coverage Report
 
-Generated: 2026-04-17 R17
-QA Agent: Task 17 (Tutorial Tests + BUG-272 Verification + Performance Benchmarks + Regression)
+Generated: 2026-04-17 R18
+QA Agent: Task 18 (Tutorial Pending Removal + Character Animation + Enemy Cache Regression)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total test files | 49 |
-| Total test functions | 1276 |
-| Assertions | 3056 |
-| Passing | 1276 |
-| Pending | 0 |
+| Total test files | 50 |
+| Total test functions | 1319 |
+| Assertions | 3142 |
+| Passing | 1316 |
+| Pending | 3 |
 | Failing | 0 |
 | Orphans | 0 |
 
@@ -21,7 +21,7 @@ QA Agent: Task 17 (Tutorial Tests + BUG-272 Verification + Performance Benchmark
 
 | File | Tests | Module Coverage |
 |------|-------|----------------|
-| test_tutorial_system.gd | 54 | Tutorial constants (11), SaveManager fields (6), step trigger conditions (8), display text (5), dismiss conditions (5), skip logic (4), persistence (3), timeout validation (5), edge cases (3), integration (2) -- all pending tutorial_manager.gd implementation |
+| test_tutorial_system.gd | 58 | Tutorial constants (11), SaveManager fields (6), step trigger conditions (8), display text (5), dismiss conditions (5), skip logic (4), persistence (3), timeout validation (5), edge cases (3), integration (2), runtime fix validation (4), internal state (2) -- all hard assertions, matching tutorial_manager.gd API |
 
 ### Performance Benchmark Tests (1 file)
 
@@ -29,11 +29,17 @@ QA Agent: Task 17 (Tutorial Tests + BUG-272 Verification + Performance Benchmark
 |------|-------|----------------|
 | test_performance_benchmark.gd | 17 | get_nodes_in_group baseline (5), enemies_in_range pipeline (3), cache correctness (4), mixed operations (2), performance regression (3) |
 
-### Enemy Cache Tests (1 file, Programmer-created)
+### Enemy Cache Tests (1 file, Programmer-created + QA regression)
 
 | File | Tests | Module Coverage |
 |------|-------|----------------|
-| test_enemy_cache.gd | 9 | register/unregister, get_cached_enemies (valid/freed/dead), multiple register, reset clears, unregister nonexistent |
+| test_enemy_cache.gd | 16 | register/unregister, get_cached_enemies (valid/freed/dead), multiple register, reset clears, unregister nonexistent, death cleanup without unregister, mixed alive/dead, double register, sort_custom after cleanup, multiple get_cached stability, large cache reset |
+
+### Character Animation Tests (1 file, R18 new)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_character_animation.gd | 31 | Animation constants (3), character idle textures (4), action texture load (3), character colors (3), velocity direction (3), frame switching (4), dash behavior (3), texture assets (6), sprite node type (2), animation state vars (2) |
 
 ### BUG-272 Verification (added to test_lv3_transforms.gd)
 
@@ -317,28 +323,30 @@ QA Agent: Task 17 (Tutorial Tests + BUG-272 Verification + Performance Benchmark
 
 All core game logic files have dedicated test coverage.
 
-## Coverage Matrix: Tutorial System (R17)
+## Coverage Matrix: Tutorial System (R18 -- pending removed)
 
 | Feature | test_tutorial_system | Spec: tutorial-system.md |
 |---------|---------------------|--------------------------|
-| TUTORIAL_TOTAL_STEPS = 5 | X (pending) | Section 2 |
-| TUTORIAL_LABEL_OFFSET = 40.0 | X (pending) | Section 3 |
-| TUTORIAL_STEP_MOVE_TIMEOUT = 8.0 | X (pending) | Section 3 |
-| TUTORIAL_STEP_DASH_TIMEOUT = 10.0 | X (pending) | Section 3 |
-| TUTORIAL_STEP_WEAPON_TIMEOUT = 3.0 | X (pending) | Section 3 |
-| TUTORIAL_STEP_SKILL_TIMEOUT = 10.0 | X (pending) | Section 3 |
-| TUTORIAL_STEP_ENEMY_RANGE = 200.0 | X (pending) | Section 3 |
-| TUTORIAL_STEP_MOVE_DELAY = 2.0 | X (pending) | Section 3 |
-| TUTORIAL_FONT_SIZE = 14 | X (pending) | Section 3 |
-| TUTORIAL_BG_COLOR = Color(0,0,0,0.7) | X (pending) | Section 3 |
-| TUTORIAL_TEXT_COLOR = Color(1,0.85,0.3) | X (pending) | Section 3 |
-| TUTORIAL_BG_PADDING = Vector2(8,4) | X (pending) | Section 3 |
-| SaveManager.tutorial_step field | X | Section 4.1 |
-| SaveManager.tutorial_completed field | X | Section 4.1 |
-| Step triggers (1-5 sequential) | X (pending) | Section 2 |
-| Completed flag skips all | X (pending) | Section 4.3 |
-| Save/load persistence | X (pending) | Section 4.1 |
-| arena.gd references tutorial | X (pending) | Section 6.1 |
+| TUTORIAL_TOTAL_STEPS = 5 | X (hard assert) | Section 2 |
+| TUTORIAL_LABEL_OFFSET = 40.0 | X (hard assert) | Section 3 |
+| TUTORIAL_STEP_MOVE_TIMEOUT = 8.0 | X (hard assert) | Section 3 |
+| TUTORIAL_STEP_DASH_TIMEOUT = 10.0 | X (hard assert) | Section 3 |
+| TUTORIAL_STEP_WEAPON_TIMEOUT = 3.0 | X (hard assert) | Section 3 |
+| TUTORIAL_STEP_SKILL_TIMEOUT = 10.0 | X (hard assert) | Section 3 |
+| TUTORIAL_STEP_ENEMY_RANGE = 200.0 | X (hard assert) | Section 3 |
+| TUTORIAL_STEP_MOVE_DELAY = 2.0 | X (hard assert) | Section 3 |
+| TUTORIAL_FONT_SIZE = 14 | X (hard assert) | Section 3 |
+| TUTORIAL_BG_COLOR = Color(0,0,0,0.7) | X (hard assert) | Section 3 |
+| TUTORIAL_TEXT_COLOR = Color(1,0.85,0.3) | X (hard assert) | Section 3 |
+| TUTORIAL_BG_PADDING = Vector2(8,4) | X (hard assert) | Section 3 |
+| SaveManager.tutorial_step field | X (hard assert) | Section 4.1 |
+| SaveManager.tutorial_completed field | X (hard assert) | Section 4.1 |
+| Step triggers (1-5 sequential) | X (hard assert) | Section 2 |
+| Completed flag skips all | X (hard assert) | Section 4.3 |
+| Save/load persistence | X (hard assert) | Section 4.1 |
+| arena.gd references tutorial | X (hard assert) | Section 6.1 |
+| _prev_skill_ready initialization | X (hard assert) | Section 5 (R18) |
+| complete_step internal state | X (hard assert) | Section 5 (R18) |
 
 ## Performance Baseline Measurements (R17)
 

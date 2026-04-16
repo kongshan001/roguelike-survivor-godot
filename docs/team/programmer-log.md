@@ -18,6 +18,26 @@
 
 ## 技术决策
 
+### 2026-04-17: R18 角色动画帧集成 (Method C)
+- **决策**: 采用 Method C (Sprite2D + _physics_process) 实现角色行走动画，不修改 player.tscn
+- **为什么**: 最小侵入性方案 -- 保持 Sprite2D 节点不变，残影系统零改动，不破坏 200+ 测试中的 sprite.texture 引用
+- **实现**:
+  - 新增 `ANIM_INTERVAL` 常量 (0.25s / 4 FPS)
+  - 新增 `_anim_time`, `_anim_frame`, `_idle_texture`, `_action_texture` 成员变量
+  - `_setup_character_animation()` 替代原 `_ready()` 中的角色 match 块，加载 idle/action 两帧纹理
+  - `_physics_process()` 末尾添加帧切换逻辑：移动时累加 delta 并在达到 ANIM_INTERVAL 时交替帧，停止时重置为 idle 帧
+  - `_load_texture_safe()` 辅助函数：先尝试 ResourceLoader，失败后通过 Image.load -> ImageTexture 回退加载 PNG（解决 .import 文件不存在的问题）
+- **修改文件**: `scripts/player.gd` (408 -> 470 行，仍 < 500 限制)
+- **新增纹理引用**: `mage_cast.png`, `warrior_block.png`, `ranger_draw.png` (32x32 RGBA PNG，已存在于 assets/sprites/characters/)
+- **测试**: 1319 测试通过，3 pending (action texture .import 未生成)
+
+### 2026-04-17: R18 TutorialManager 修复 -- Step 5 触发条件
+- **决策**: 当 SaveManager.tutorial_step == 4 时，将 `_prev_skill_ready` 初始化为 false
+- **为什么**: Step 5 的触发条件是 `skill_ready and not _prev_skill_ready`（检测 skill 从 not-ready -> ready 的上升沿）。如果玩家在 step 4 保存并重新加载，`_prev_skill_ready` 默认 true 与 `is_skill_ready` true 相同，上升沿永远不触发，Step 5 卡死
+- **修复**: `setup()` 中添加 `if _step == 4: _prev_skill_ready = false`，使第一次 skill ready 事件即可触发 tooltip
+- **修改文件**: `scripts/tutorial_manager.gd` (第 44-49 行)
+- **新增测试**: 4 个验证测试 (`test_step5_prev_skill_ready_initialization`, `test_step5_prev_skill_ready_true_when_step_below_4`, `test_step5_prev_skill_ready_untouched_when_completed`, `test_tutorial_step_internal_state_after_complete_step`)
+
 ### 2026-04-17: R17 新手引导系统实现
 - **决策**: 新建独立 `scripts/tutorial_manager.gd` 管理引导状态机，通过信号监听触发
 - **为什么**: 遵循 spec 设计的 5 步渐进式教程，低侵入性，不修改 player.gd/enemy_spawner.gd

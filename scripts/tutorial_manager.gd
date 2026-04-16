@@ -41,6 +41,12 @@ func setup(arena: Node2D) -> void:
 		return
 	_step = SaveManager.tutorial_step
 	_prev_kills = GameManager.enemies_killed
+	# When resuming at step 4 (processing step 5), initialize _prev_skill_ready
+	# to false so the first "skill becomes ready" event triggers the tooltip.
+	# Without this, _prev_skill_ready=true matches is_skill_ready=true and the
+	# not-ready -> ready transition never fires.
+	if _step == 4:
+		_prev_skill_ready = false
 	# Connect signals for tutorial triggers
 	if not GameManager.level_up.is_connected(_on_level_up):
 		GameManager.level_up.connect(_on_level_up)
