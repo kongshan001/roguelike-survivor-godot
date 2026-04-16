@@ -10,6 +10,9 @@ const MAX_REROLLS: int = 1
 # --- Toast subsystem ---
 var _toast: RefCounted = null
 
+# --- Skill button subsystem ---
+var _skill_btn: RefCounted = null
+
 # --- Run completion tracking ---
 var _run_quests: Array[String] = []
 var _run_achievements: Array[String] = []
@@ -65,7 +68,8 @@ func _ready():
 		_setup_retreat_button()
 
 	# Skill button (HUD skill display)
-	_setup_skill_button()
+	_skill_btn = load("res://scripts/hud_skill_button.gd").new(self)
+	_skill_btn.setup(_get_player(), GameManager.selected_character)
 
 
 func _process(delta: float):
@@ -73,7 +77,7 @@ func _process(delta: float):
 	_update_wave_display()
 	if _toast:
 		_toast.process_queue(delta)
-	_update_skill_display()
+	_skill_btn.update_display(_get_player())
 
 
 func _on_gold_changed(amount: int):

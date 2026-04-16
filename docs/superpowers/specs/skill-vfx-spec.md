@@ -355,3 +355,30 @@ All skill shakes use faster decay rates than the ambient damage shake, giving th
    - Impact flash: z=6 (above arrows)
 
 5. **No Texture Dependencies**: All VFX described here can be implemented with ColorRect alone. Sprite2D assets (from `assets/sprites/effects/` and `assets/sprites/skills/`) are optional enhancements.
+
+---
+
+## 9. Design Decisions Log
+
+**Note**: This VFX spec was authored by the Art Agent based on the Designer Agent's skill definitions in `character-skills.md`. This log section was added during R9 designer review to ensure all visual values have traceable sources.
+
+| Decision | Why | Value Source |
+|---|---|---|
+| Ring expansion radius = 150px | Matches `MAGE_SKILL_RADIUS` in character-skills.md Section 2.1 | character-skills.md |
+| Ring expansion time = 0.2s | Matches `MAGE_SKILL_EXPAND_TIME` in character-skills.md Section 2.1 | character-skills.md |
+| Freeze tint duration = 1.5s | Matches `MAGE_SKILL_FREEZE_DURATION` in character-skills.md Section 2.1 | character-skills.md |
+| Burst screenshake = 4.0 / 0.15s | Matches `MAGE_SKILL_SCREENSHAKE` / `MAGE_SKILL_SCREENSHAKE_DUR` | character-skills.md |
+| Charge dash distance = 160px | Matches `WARRIOR_SKILL_DISTANCE` | character-skills.md |
+| Stun duration = 2.0s | Matches `WARRIOR_SKILL_STUN_DURATION` | character-skills.md |
+| Charge screenshake = 3.0 / 0.1s | Matches `WARRIOR_SKILL_SCREENSHAKE` / `WARRIOR_SKILL_SCREENSHAKE_DUR` | character-skills.md |
+| Arrow count = 12 | Matches `RANGER_SKILL_ARROW_COUNT` | character-skills.md |
+| Warning time = 0.3s | Matches `RANGER_SKILL_WARNING_TIME` | character-skills.md |
+| Rain radius = 100px | Matches `RANGER_SKILL_RADIUS` | character-skills.md |
+| Arrow size = 4x12 px | Matches `RANGER_SKILL_ARROW_SIZE` for width | character-skills.md |
+| Rain screenshake = 2.0 / 0.08s | Matches `RANGER_SKILL_SCREENSHAKE` / `RANGER_SKILL_SCREENSHAKE_DUR` | character-skills.md |
+| Freeze tint Color(0.5, 0.7, 1.0) | Muted ice-blue that overlays enemy native color without obscuring it | Art Agent decision |
+| Afterimage alpha 0.4/0.3/0.2 | Graduated opacity creates depth illusion with only 3 ghost nodes | Art Agent decision |
+| Stun star orbit radius = 8px | Fits within 14-18px enemy sprite boundary without overlapping | Art Agent decision |
+| All shake decay rates = intensity/duration | Linear decay matches art-log.md shake system convention | art-log.md |
+| All VFX use ColorRect only | Project convention (art-log.md): pixel-art style, no texture dependencies | art-log.md |
+| Z-index values (2, 5, 6, 10) | Layered to prevent visual overlap conflicts; matches art-log.md layer convention | art-log.md |

@@ -89,6 +89,15 @@ PALETTE = {
     "wave_banner_bg":   (0x1A, 0x1A, 0x2E),   # #1A1A2E dark banner background
     "wave_banner_mid":  (0x2A, 0x2A, 0x4E),   # #2A2A4E banner gradient middle
     "wave_banner_edge": (0x3A, 0x3A, 0x5E),   # #3A3A5E banner edge highlight
+    # Wave banner per-wave colors (from WAVE_DEFS in game_manager.gd)
+    "wave1_green":     (0x4C, 0xAF, 0x4F),   # Wave 1 Opening green
+    "wave2_yellow":    (0xFF, 0xD6, 0x4F),   # Wave 2 Swarm yellow
+    "wave3_orange":    (0xFF, 0x91, 0x00),   # Wave 3 Darkness orange
+    "wave4_red":       (0xF0, 0x54, 0x4F),   # Wave 4 Elite red
+    "wave5_boss_red":  (0xFF, 0x17, 0x2B),   # Wave 5 Boss deep red
+    # Wave complete
+    "complete_green":  (0x4C, 0xAF, 0x4F),   # #4CAF50 green checkmark
+    "complete_green_dark": (0x2E, 0x7D, 0x32), # #2E7D32 darker green outline
 }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -2821,6 +2830,289 @@ def gen_wave_transition():
     save(img, "ui", "wave_transition.png")
 
 
+# ── Wave Transition Banner Sprites (R9) ────────────────────────────────────
+
+WAVE_BANNER_COLORS = [
+    ("wave1_green",     "wave_banner_w1"),   # Wave 1 Opening
+    ("wave2_yellow",    "wave_banner_w2"),   # Wave 2 Swarm
+    ("wave3_orange",    "wave_banner_w3"),   # Wave 3 Darkness
+    ("wave4_red",       "wave_banner_w4"),   # Wave 4 Elite
+    ("wave5_boss_red",  "wave_banner_w5"),   # Wave 5 Boss
+]
+
+
+def gen_wave_banner():
+    """Wave start banners (600x80 each, 5 variants).
+    Gradient banner background for wave transition announcements.
+    Each wave has its own color: green/yellow/orange/red/deep-red.
+    Outline: #1A1A2E 2px border. Gradient: wave_color alpha fades top->bottom.
+    """
+    outline_c = rgba("dark_outline")
+    for palette_key, filename in WAVE_BANNER_COLORS:
+        wave_c = PALETTE[palette_key]
+        img, d = draw_img(600, 80)
+
+        # -- Fill with vertical alpha gradient --
+        for y in range(80):
+            # Alpha gradient: top=0.9, center=1.0, bottom=0.5
+            if y < 40:
+                alpha_factor = 0.9 + 0.1 * (y / 40.0)
+            else:
+                alpha_factor = 1.0 - 0.5 * ((y - 40) / 40.0)
+            alpha = int(255 * alpha_factor)
+            for x in range(600):
+                d.point((x, y), fill=(*wave_c, alpha))
+
+        # -- 2px outline border --
+        # Top edge
+        for x in range(600):
+            d.point((x, 0), fill=outline_c)
+            d.point((x, 1), fill=outline_c)
+        # Bottom edge
+        for x in range(600):
+            d.point((x, 78), fill=outline_c)
+            d.point((x, 79), fill=outline_c)
+        # Left edge
+        for y in range(80):
+            d.point((0, y), fill=outline_c)
+            d.point((1, y), fill=outline_c)
+        # Right edge
+        for y in range(80):
+            d.point((598, y), fill=outline_c)
+            d.point((599, y), fill=outline_c)
+
+        # -- Center highlight stripe (y=38,39,40,41) --
+        bright = (*wave_c, 255)
+        for x in range(2, 598):
+            d.point((x, 38), fill=bright)
+            d.point((x, 39), fill=bright)
+            d.point((x, 40), fill=bright)
+            d.point((x, 41), fill=bright)
+
+        # -- Dashed accent lines at y=6 and y=73 --
+        accent_alpha = (*wave_c, 120)
+        for x in range(0, 600, 4):
+            d.point((x, 6), fill=accent_alpha)
+            d.point((x, 73), fill=accent_alpha)
+
+        save(img, "ui", f"{filename}.png")
+
+
+def gen_wave_complete():
+    """Wave complete checkmark icon (40x40, green).
+    Green checkmark V-shape with dark outline.
+    Color: #4CAF50 green, outline #1A1A2E.
+    """
+    img, d = draw_img(40, 40)
+    outline = rgba("dark_outline")
+    green_c = rgba("complete_green")       # #4CAF50
+    green_dk = rgba("complete_green_dark") # #2E7D32
+
+    # -- Checkmark shape: V rotated to form a check --
+    # The checkmark starts from left-middle, goes down to center-bottom, then up to right-top.
+    # Stroke width: 4px, drawn as 2 parallel diagonal lines (outline + fill)
+
+    # First leg: (10, 22) -> (18, 30) (short diagonal down-left to center)
+    # Second leg: (18, 30) -> (32, 10) (long diagonal up-right)
+
+    check_points = [
+        # First leg (short, going down-right)
+        (10, 20), (11, 21), (12, 22), (13, 23), (14, 24), (15, 25),
+        (16, 26), (17, 27), (18, 28), (19, 29),
+        # Second leg (long, going up-right)
+        (20, 27), (21, 25), (22, 24), (23, 22), (24, 20), (25, 18),
+        (26, 17), (27, 15), (28, 13), (29, 12), (30, 10), (31, 9),
+    ]
+
+    # Draw outline (4px wide: offset the points by 1 in each direction)
+    for dx in range(-1, 2):
+        for dy in range(-1, 2):
+            for px, py in check_points:
+                nx, ny = px + dx, py + dy
+                if 0 <= nx < 40 and 0 <= ny < 40:
+                    d.point((nx, ny), fill=outline)
+
+    # Draw fill (center line only, 4px wide)
+    for offset in range(-1, 3):
+        for px, py in check_points:
+            nx = px + (offset if offset < 2 else offset - 1)
+            ny = py + (0 if offset < 2 else 1)
+            if 0 <= nx < 40 and 0 <= ny < 40:
+                d.point((nx, ny), fill=green_c)
+
+    # Thicker fill: draw 2-pixel-wide stroke along the path
+    for i in range(len(check_points) - 1):
+        px, py = check_points[i]
+        nx, ny = check_points[i + 1]
+        # Draw 2x2 block at each point
+        for dx in range(2):
+            for dy in range(2):
+                d.point((px + dx, py + dy), fill=green_c)
+                d.point((nx + dx, ny + dy), fill=green_c)
+
+    # Re-draw outline on top of any fill that leaked
+    for dx in [-2, 2]:
+        for dy in [-2, 2]:
+            for px, py in check_points:
+                ox, oy = px + dx, py + dy
+                if 0 <= ox < 40 and 0 <= oy < 40:
+                    d.point((ox, oy), fill=outline)
+
+    # Add dark green accent on the left side of the check (depth)
+    for i in range(len(check_points)):
+        px, py = check_points[i]
+        if 0 <= px - 1 < 40 and 0 <= py < 40:
+            d.point((px - 1, py), fill=green_dk)
+
+    # White highlight on top edge
+    white = rgba("white")
+    for i in range(0, len(check_points), 3):
+        px, py = check_points[i]
+        if 0 <= px < 40 and 0 <= py - 1 < 40:
+            d.point((px, py - 1), fill=white)
+
+    save(img, "ui", "wave_complete.png")
+
+
+def gen_fire_slime_32():
+    """Fire Slime 32x32 variant for wave system.
+    Larger version of the 16x16 fire slime with more detail.
+    Orange-red #FF6622 body, #CC4411 shadow, #FFCC00 flame core.
+    """
+    img, d = draw_img(32, 32)
+    outline = rgba("dark_outline")
+    body_c = rgba("fire_slime")       # #FF6622
+    shadow_c = rgba("fire_slime_dark") # #CC4411
+    core_c = rgba("fire_core")        # #FFCC00
+    white = rgba("white")
+    black_c = (0x22, 0x22, 0x22, 255)
+
+    # -- Body outline (rounded blob, larger) --
+    body_outline_pts = [
+        # Top dome
+        (12, 8), (13, 8), (14, 8), (15, 8), (16, 8), (17, 8), (18, 8), (19, 8),
+        # Upper sides
+        (10, 9), (11, 9), (20, 9), (21, 9),
+        (9, 10), (22, 10),
+        (8, 11), (23, 11),
+        # Main body sides
+        (7, 12), (24, 12),
+        (7, 13), (24, 13),
+        (7, 14), (24, 14),
+        (7, 15), (24, 15),
+        (7, 16), (24, 16),
+        (7, 17), (24, 17),
+        (7, 18), (24, 18),
+        (7, 19), (24, 19),
+        (7, 20), (24, 20),
+        (7, 21), (24, 21),
+        (8, 22), (23, 22),
+        # Bottom wavy edge
+        (8, 23), (9, 23), (10, 23), (11, 23), (12, 23), (13, 23),
+        (14, 23), (15, 23), (16, 23), (17, 23), (18, 23), (19, 23),
+        (20, 23), (21, 23), (22, 23),
+        # Extra wavy bumps
+        (9, 24), (10, 24), (13, 24), (14, 24), (17, 24), (18, 24), (21, 24), (22, 24),
+        (10, 25), (13, 25), (18, 25), (21, 25),
+    ]
+    for pt in body_outline_pts:
+        d.point(pt, fill=outline)
+
+    # -- Body fill --
+    for y in range(9, 22):
+        for x in range(8, 24):
+            d.point((x, y), fill=body_c)
+    # Top dome fill
+    for x in range(12, 20):
+        d.point((x, 8), fill=body_c)
+    for x in range(10, 22):
+        d.point((x, 9), fill=body_c)
+    for x in range(9, 23):
+        d.point((x, 10), fill=body_c)
+
+    # -- Bottom shadow gradient (darker rows) --
+    for x in range(8, 24):
+        d.point((x, 20), fill=shadow_c)
+        d.point((x, 21), fill=shadow_c)
+        d.point((x, 22), fill=shadow_c)
+
+    # -- Eyes (white with dark pupil, larger) --
+    # Left eye
+    for dx in range(3):
+        for dy in range(3):
+            d.point((10 + dx, 13 + dy), fill=white)
+    d.point((11, 14), fill=black_c)
+    d.point((12, 14), fill=black_c)
+    # Right eye
+    for dx in range(3):
+        for dy in range(3):
+            d.point((19 + dx, 13 + dy), fill=white)
+    d.point((20, 14), fill=black_c)
+    d.point((21, 14), fill=black_c)
+
+    # -- Mouth (wavy line) --
+    d.point((13, 18), fill=shadow_c)
+    d.point((14, 18), fill=black_c)
+    d.point((15, 18), fill=shadow_c)
+    d.point((16, 18), fill=shadow_c)
+    d.point((17, 18), fill=black_c)
+    d.point((18, 18), fill=shadow_c)
+
+    # -- Flame particles on top --
+    # Central tall flame
+    flame_center = [
+        (14, 5), (15, 5), (16, 5), (17, 5),
+        (14, 6), (15, 6), (16, 6), (17, 6),
+        (15, 4), (16, 4),
+        (15, 3), (16, 3),
+    ]
+    for pt in flame_center:
+        d.point(pt, fill=core_c)
+
+    # Flame outline
+    flame_outline_pts = [
+        (15, 2), (16, 2),  # top tip
+        (14, 3), (17, 3),
+        (13, 4), (18, 4),
+        (13, 5), (18, 5),
+        (13, 6), (18, 6),
+        (13, 7), (18, 7),
+    ]
+    for pt in flame_outline_pts:
+        d.point(pt, fill=outline)
+
+    # Re-fill flame center over outline
+    for y in range(3, 7):
+        for x in range(14, 18):
+            d.point((x, y), fill=core_c)
+    for x in range(15, 17):
+        d.point((x, 2), fill=core_c)
+
+    # Side flame wisps (left)
+    d.point((11, 7), fill=shadow_c)
+    d.point((12, 7), fill=body_c)
+    d.point((10, 8), fill=shadow_c)
+    d.point((11, 8), fill=body_c)
+
+    # Side flame wisps (right)
+    d.point((19, 7), fill=body_c)
+    d.point((20, 7), fill=shadow_c)
+    d.point((20, 8), fill=body_c)
+    d.point((21, 8), fill=shadow_c)
+
+    # Flame highlight (white sparkle)
+    d.point((15, 5), fill=white)
+    d.point((16, 4), fill=white)
+
+    # -- Internal texture lines (slime membrane lines) --
+    d.point((12, 16), fill=shadow_c)
+    d.point((13, 16), fill=shadow_c)
+    d.point((18, 17), fill=shadow_c)
+    d.point((19, 17), fill=shadow_c)
+
+    save(img, "enemies", "fire_slime.png")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────
 
 def main():
@@ -2843,7 +3135,7 @@ def main():
     gen_splitter()
     gen_splitter_small()
     gen_boss()
-    gen_fire_slime()
+    gen_fire_slime_32()
     gen_elite_knight()
 
     # Weapons
@@ -2882,6 +3174,8 @@ def main():
     gen_wave_marker()
     gen_boss_warning()
     gen_wave_transition()
+    gen_wave_banner()
+    gen_wave_complete()
 
     # Skills
     print("\nSkill Icons:")

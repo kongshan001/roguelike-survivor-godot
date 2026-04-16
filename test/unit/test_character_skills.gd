@@ -61,8 +61,8 @@ func after_each():
 
 
 func _set_character(char_name: String) -> void:
-	"""Helper: set up player skill state for a specific character.
-	Uses _init_skill directly to avoid re-instantiation issues."""
+	# Helper: set up player skill state for a specific character.
+	# Uses _init_skill directly to avoid re-instantiation issues.
 	GameManager.selected_character = char_name
 	# Clean up existing skill effects node
 	if _player.skill_effects_node and is_instance_valid(_player.skill_effects_node):
@@ -368,3 +368,86 @@ func test_warrior_cooldown_shortest():
 		"Warrior cooldown (15s) < Mage (20s)")
 	assert_lt(_player.WARRIOR_SKILL_COOLDOWN, _player.RANGER_SKILL_COOLDOWN,
 		"Warrior cooldown (15s) < Ranger (18s)")
+
+
+# =====================================================================
+# R9: CONSTANT CONSISTENCY (SkillData <-> skill_effects.gd / player.gd)
+# Uses load() to access skill_data.gd constants because class_name is
+# not resolved at GUT script parse time.
+# =====================================================================
+
+func test_skill_effects_uses_skill_data_constants():
+	# Verify skill_effects.gd damage/radius values match SkillData canonical source
+	var sd: GDScript = load("res://scripts/data/skill_data.gd")
+	assert_not_null(sd, "skill_data.gd should load")
+	var se: Node = _player.skill_effects_node
+	assert_not_null(se, "skill_effects_node should exist")
+
+	# Mage constants
+	assert_eq(se.MAGE_SKILL_DAMAGE, sd.MAGE_SKILL_DAMAGE,
+		"skill_effects MAGE_SKILL_DAMAGE should match SkillData")
+	assert_eq(se.MAGE_SKILL_RADIUS, sd.MAGE_SKILL_RADIUS,
+		"skill_effects MAGE_SKILL_RADIUS should match SkillData")
+	assert_eq(se.MAGE_SKILL_FREEZE_DURATION, sd.MAGE_SKILL_FREEZE_DURATION,
+		"skill_effects MAGE_SKILL_FREEZE_DURATION should match SkillData")
+	assert_eq(se.MAGE_SKILL_EXPAND_TIME, sd.MAGE_SKILL_EXPAND_TIME,
+		"skill_effects MAGE_SKILL_EXPAND_TIME should match SkillData")
+
+	# Warrior constants
+	assert_eq(se.WARRIOR_SKILL_DAMAGE, sd.WARRIOR_SKILL_DAMAGE,
+		"skill_effects WARRIOR_SKILL_DAMAGE should match SkillData")
+	assert_eq(se.WARRIOR_SKILL_DISTANCE, sd.WARRIOR_SKILL_DISTANCE,
+		"skill_effects WARRIOR_SKILL_DISTANCE should match SkillData")
+	assert_eq(se.WARRIOR_SKILL_DURATION, sd.WARRIOR_SKILL_DURATION,
+		"skill_effects WARRIOR_SKILL_DURATION should match SkillData")
+	assert_eq(se.WARRIOR_SKILL_WIDTH, sd.WARRIOR_SKILL_WIDTH,
+		"skill_effects WARRIOR_SKILL_WIDTH should match SkillData")
+	assert_eq(se.WARRIOR_SKILL_STUN_DURATION, sd.WARRIOR_SKILL_STUN_DURATION,
+		"skill_effects WARRIOR_SKILL_STUN_DURATION should match SkillData")
+
+	# Ranger constants
+	assert_eq(se.RANGER_SKILL_DAMAGE_PER_ARROW, sd.RANGER_SKILL_DAMAGE_PER_ARROW,
+		"skill_effects RANGER_SKILL_DAMAGE_PER_ARROW should match SkillData")
+	assert_eq(se.RANGER_SKILL_ARROW_COUNT, sd.RANGER_SKILL_ARROW_COUNT,
+		"skill_effects RANGER_SKILL_ARROW_COUNT should match SkillData")
+	assert_eq(se.RANGER_SKILL_RADIUS, sd.RANGER_SKILL_RADIUS,
+		"skill_effects RANGER_SKILL_RADIUS should match SkillData")
+	assert_eq(se.RANGER_SKILL_TARGET_RANGE, sd.RANGER_SKILL_TARGET_RANGE,
+		"skill_effects RANGER_SKILL_TARGET_RANGE should match SkillData")
+
+	# Passive constants
+	assert_eq(se.MAGE_PASSIVE_DAMAGE_BONUS, sd.MAGE_PASSIVE_DAMAGE_BONUS,
+		"skill_effects MAGE_PASSIVE_DAMAGE_BONUS should match SkillData")
+	assert_eq(se.WARRIOR_PASSIVE_ARMOR_BONUS, sd.WARRIOR_PASSIVE_ARMOR_BONUS,
+		"skill_effects WARRIOR_PASSIVE_ARMOR_BONUS should match SkillData")
+	assert_eq(se.WARRIOR_PASSIVE_HP_THRESHOLD, sd.WARRIOR_PASSIVE_HP_THRESHOLD,
+		"skill_effects WARRIOR_PASSIVE_HP_THRESHOLD should match SkillData")
+	assert_eq(se.WARRIOR_PASSIVE_COOLDOWN, sd.WARRIOR_PASSIVE_COOLDOWN,
+		"skill_effects WARRIOR_PASSIVE_COOLDOWN should match SkillData")
+	assert_eq(se.RANGER_PASSIVE_HIT_COUNT, sd.RANGER_PASSIVE_HIT_COUNT,
+		"skill_effects RANGER_PASSIVE_HIT_COUNT should match SkillData")
+
+
+func test_player_uses_skill_data_cooldowns():
+	# Verify player.gd cooldown constants match SkillData canonical source
+	var sd: GDScript = load("res://scripts/data/skill_data.gd")
+	assert_not_null(sd, "skill_data.gd should load")
+
+	assert_eq(_player.MAGE_SKILL_COOLDOWN, sd.MAGE_SKILL_COOLDOWN,
+		"player MAGE_SKILL_COOLDOWN should match SkillData")
+	assert_eq(_player.WARRIOR_SKILL_COOLDOWN, sd.WARRIOR_SKILL_COOLDOWN,
+		"player WARRIOR_SKILL_COOLDOWN should match SkillData")
+	assert_eq(_player.RANGER_SKILL_COOLDOWN, sd.RANGER_SKILL_COOLDOWN,
+		"player RANGER_SKILL_COOLDOWN should match SkillData")
+
+	# Passive constants on player should also match SkillData
+	assert_eq(_player.MAGE_PASSIVE_DAMAGE_BONUS, sd.MAGE_PASSIVE_DAMAGE_BONUS,
+		"player MAGE_PASSIVE_DAMAGE_BONUS should match SkillData")
+	assert_eq(_player.WARRIOR_PASSIVE_ARMOR_BONUS, sd.WARRIOR_PASSIVE_ARMOR_BONUS,
+		"player WARRIOR_PASSIVE_ARMOR_BONUS should match SkillData")
+	assert_eq(_player.WARRIOR_PASSIVE_HP_THRESHOLD, sd.WARRIOR_PASSIVE_HP_THRESHOLD,
+		"player WARRIOR_PASSIVE_HP_THRESHOLD should match SkillData")
+	assert_eq(_player.WARRIOR_PASSIVE_COOLDOWN, sd.WARRIOR_PASSIVE_COOLDOWN,
+		"player WARRIOR_PASSIVE_COOLDOWN should match SkillData")
+	assert_eq(_player.RANGER_PASSIVE_HIT_COUNT, sd.RANGER_PASSIVE_HIT_COUNT,
+		"player RANGER_PASSIVE_HIT_COUNT should match SkillData")

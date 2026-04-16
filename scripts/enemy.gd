@@ -123,6 +123,12 @@ func _physics_process(delta: float):
 	if enemy_data.is_ranged and not _is_phased:
 		_process_ranged_attack(delta)
 
+	# Fire Slime burn aura (passive contact burn)
+	if enemy_data.has_burn_aura and _player and is_instance_valid(_player):
+		var dist := global_position.distance_to(_player.global_position)
+		if dist < enemy_data.size + 16.0:
+			_player.apply_burn(enemy_data.burn_aura_dps, enemy_data.burn_aura_duration)
+
 	# Flash effect
 	if _flash_timer > 0:
 		_flash_timer -= delta

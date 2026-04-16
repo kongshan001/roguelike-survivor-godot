@@ -1386,3 +1386,193 @@ ls -la assets/sprites/skills/elemental_burst.png \
 2. 视觉验证技能图标在 24x24 下的辨识度（圆形/方形缺口/菱形 + 蓝/红/绿）
 3. 视觉验证 6x6 眩晕星星和 4x12 箭矢在最小尺寸下是否清晰可辨
 4. 验证 1280x80 波次横幅渐变效果
+
+## 第九轮执行 (2026-04-16)
+
+### 任务
+
+1. 波次转场视觉规范设计
+2. 更新 generate_sprites.py 添加波次横幅、完成图标、火焰史莱姆 32x32
+3. AI 绘图提示词迭代
+
+### 完成内容
+
+#### 任务 1: 波次转场视觉规范
+
+**输出文件**: `docs/superpowers/specs/wave-transition-vfx.md`
+
+##### 波次开始横幅 (Wave Start Banner)
+
+| 属性 | 规格 |
+|------|------|
+| 尺寸 | 600 x 80 px |
+| 位置 | 屏幕中央 |
+| 动画 | 从顶部滑入 0.3s (ease-out) -> 停留 1.5s -> 向上滑出 0.5s (ease-in) |
+| 总时长 | 2.3s |
+| 描边 | #1A1A2E 暗蓝紫 2px |
+| 文字 | "Wave N: Name", 白色, 28px |
+| 每波颜色 | W1 绿 #4CAF50 / W2 黄 #FFD64F / W3 橙 #FF9100 / W4 红 #F0544F / W5 深红 #FF172B |
+
+颜色来源: `game_manager.gd` WAVE_DEFS[].color 数组。
+
+##### 波次完成效果 (Wave Complete)
+
+| 属性 | 规格 |
+|------|------|
+| 图标 | 40x40 绿色 checkmark |
+| 颜色 | Color(0.3, 0.69, 0.31) #4CAF50 |
+| 动画 | 缩放弹入 0.15s (0->1.2->1.0) -> 保持 0.9s (alpha 脉冲) -> 淡出 0.3s |
+| 总时长 | 1.5s |
+| 文字 | "Wave Complete!", 绿色, 20px |
+
+##### Boss 警告增强
+
+| 属性 | 规格 |
+|------|------|
+| 背景 | 全宽 x 60px ColorRect |
+| 颜色 | Color(0.8, 0.1, 0.1) 深红 |
+| Alpha | 0.3 <-> 0.7 脉冲, 0.4s 周期 |
+| 持续 | 2.5s (与现有 BossWarningLabel 同步) |
+
+#### 任务 2: generate_sprites.py 更新
+
+##### 调色板扩展
+
+新增 7 种颜色:
+
+| 色名 | Hex | 用途 |
+|------|-----|------|
+| wave1_green | #4CAF50 | Wave 1 Opening 绿色横幅 |
+| wave2_yellow | #FFD64F | Wave 2 Swarm 黄色横幅 |
+| wave3_orange | #FF9100 | Wave 3 Darkness 橙色横幅 |
+| wave4_red | #F0544F | Wave 4 Elite 红色横幅 |
+| wave5_boss_red | #FF172B | Wave 5 Boss 深红横幅 |
+| complete_green | #4CAF50 | 波次完成 checkmark 绿 |
+| complete_green_dark | #2E7D32 | checkmark 深绿描边 |
+
+##### 新增生成函数 (3 个)
+
+| 函数 | 输出 | 尺寸 | 视觉特征 |
+|------|------|------|---------|
+| gen_wave_banner() | wave_banner_w1.png ~ w5.png | 600x80 (x5) | 每波独立渐变色横幅 + 2px 描边 + 中心亮条 + 虚线装饰 |
+| gen_wave_complete() | wave_complete.png | 40x40 | 绿色 checkmark V 形 + 深绿描边 + 白色高光 |
+| gen_fire_slime_32() | fire_slime.png | 32x32 | 橙红 blob 体 + 黄色火焰核心 + 白色眼睛 + 波浪底边 |
+
+##### 变更说明
+
+- `gen_fire_slime()` (16x16) 被 `gen_fire_slime_32()` (32x32) 替代，提供更大更详细的火焰史莱姆精灵
+- 5 个波次横幅各自独立 PNG，使用各自的波次颜色渐变
+- 波次完成 checkmark 使用逐像素 V 形绘制 + 深绿描边 + 白色高光
+
+##### 替换资产
+
+| 旧资产 | 旧尺寸 | 新资产 | 新尺寸 | 变化原因 |
+|--------|--------|--------|--------|---------|
+| fire_slime.png | 16x16 | fire_slime.png | 32x32 | 16px 史莱姆细节不足，火焰和眼睛难以辨认 |
+
+#### 任务 3: AI 绘图提示词
+
+**新建文件**: `docs/art/prompts/wave-transition-prompts.md`
+
+包含 7 个提示词条目:
+
+| 资产名称 | 类型 | 用途 |
+|----------|------|------|
+| wave_banner_w1 | 波次横幅 | Wave 1 Opening 绿色 |
+| wave_banner_w2 | 波次横幅 | Wave 2 Swarm 黄色 |
+| wave_banner_w3 | 波次横幅 | Wave 3 Darkness 橙色 |
+| wave_banner_w4 | 波次横幅 | Wave 4 Elite 红色 |
+| wave_banner_w5 | 波次横幅 | Wave 5 Boss 深红 |
+| wave_complete | UI 图标 | 波次完成 checkmark |
+| boss_flash_bg | 程序化效果 | Boss 警告闪烁背景 (无 PNG) |
+| fire_slime 32x32 | 敌人精灵 | 火焰史莱姆 32px 升级版 |
+
+**更新文件**: `docs/art/prompts/enemy_prompts.md`
+
+- 火焰史莱姆提示词更新为 v2: 尺寸 16x16 -> 32x32, 增加膜纹理线、更高火焰核心描述
+
+### 波次横幅配色表
+
+| 精灵名 | 中文名 | 尺寸 | 主色(渐变) | 辅色(深色) | 描边 |
+|--------|--------|------|-----------|-----------|------|
+| wave_banner_w1 | 波次横幅-W1 | 600x80 | Color(0.30, 0.69, 0.31) #4CAF50 绿 | 渐变暗化至 alpha 0.5 | Color(0.102, 0.102, 0.18) #1A1A2E |
+| wave_banner_w2 | 波次横幅-W2 | 600x80 | Color(1.0, 0.84, 0.31) #FFD64F 黄 | 同上 | 同上 |
+| wave_banner_w3 | 波次横幅-W3 | 600x80 | Color(1.0, 0.57, 0.0) #FF9100 橙 | 同上 | 同上 |
+| wave_banner_w4 | 波次横幅-W4 | 600x80 | Color(0.94, 0.33, 0.31) #F0544F 红 | 同上 | 同上 |
+| wave_banner_w5 | 波次横幅-W5 | 600x80 | Color(1.0, 0.09, 0.17) #FF172B 深红 | 同上 | 同上 |
+| wave_complete | 波次完成 | 40x40 | Color(0.30, 0.69, 0.31) #4CAF50 绿 | Color(0.18, 0.49, 0.20) #2E7D32 深绿 | Color(0.102, 0.102, 0.18) #1A1A2E |
+
+### 火焰史莱姆配色表更新 (16px -> 32px)
+
+| 精灵名 | 中文名 | 旧尺寸 | 新尺寸 | 主色 | 辅色 | 强调色 | 变化 |
+|--------|--------|--------|--------|------|------|--------|------|
+| fire_slime | 火焰史莱姆 | 16x16 | 32x32 | Color(1.0, 0.4, 0.133) #FF6622 橙红 | Color(0.8, 0.267, 0.067) #CC4411 暗橙 | Color(1.0, 0.8, 0.0) #FFCC00 火焰 | 尺寸翻倍, 新增膜纹理线, 更大火焰核心, 3x3 眼睛 |
+
+### 待执行命令
+
+```bash
+# 生成所有 PNG 精灵（包括新的波次横幅 + 完成图标 + 火焰史莱姆 32x32）
+/opt/anaconda3/bin/python3 tools/generate_sprites.py
+
+# 验证 7 个新 PNG 是否生成
+ls -la assets/sprites/ui/wave_banner_w1.png \
+       assets/sprites/ui/wave_banner_w2.png \
+       assets/sprites/ui/wave_banner_w3.png \
+       assets/sprites/ui/wave_banner_w4.png \
+       assets/sprites/ui/wave_banner_w5.png \
+       assets/sprites/ui/wave_complete.png \
+       assets/sprites/enemies/fire_slime.png
+
+# Godot 导入新资产
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path /Users/ks_128/Documents/godot_demo --import
+```
+
+### 设计决策记录
+
+1. **波次横幅使用独立 PNG 而非单一渐变**: 5 种颜色各自生成独立的 600x80 横幅 PNG。原因: 每个波次有独特的配色，独立文件允许程序 Agent 直接按 wave 索引加载，无需运行时计算渐变。替代方案: 单一横幅 + modulate 着色 (modulate 会影响描边颜色，不可接受)。
+
+2. **波次横幅 600x80 而非 1280x80**: 600px 宽度约为典型游戏分辨率 (1280x800) 的 47%，居中显示时两侧留出游戏视野。80px 高度约占屏幕 10%，足以显示文字但不遮挡。R8 的 wave_transition.png 是 1280x80 全宽，用于背景层；wave_banner 是前景层，较窄以突出内容。
+
+3. **波次完成使用 checkmark 而非文字**: 40x40 绿色 checkmark 图标 + "Wave Complete!" 文字组合。checkmark 是跨文化通用的"完成"符号。绿色 Color(0.3, 0.69, 0.31) 复用僵尸主色，与波次进度条 Wave 1 颜色一致，暗示"回归安全的开始状态"。
+
+4. **Boss 警告闪烁使用 ColorRect 而非 PNG**: 全宽红色 ColorRect alpha 脉冲 0.3-0.7。原因: (a) 纯色矩形无需 PNG；(b) alpha 脉冲需要在 _process() 中动态更新，PNG 无法实现；(c) 减少资产文件数量。
+
+5. **火焰史莱姆升级至 32x32**: 16x16 版本的火焰核心仅 4 像素、眼睛 2x2，辨识度不足。32x32 版本增加: 3x3 眼睛+深瞳、更高火焰核心(8 像素)、膜纹理线、更丰富的波浪底边。32px 尺寸仍然小于 Boss(64px)和精英骑士(24px 已有规格，但实际渲染时 32px 史莱姆与 24px 骑士会因形状差异而非尺寸来区分)。
+
+6. **横幅滑入/滑出动画使用 ease-out/ease-in**: ease-out 滑入(快速启动、减速停止)给横幅"落下到位"的感觉。ease-in 滑出(慢启动、加速离开)给"被吸走"的感觉。组合创造"宣布->消失"的节奏感。
+
+### 与第八轮的对比
+
+| 指标 | 第八轮 | 第九轮 | 变化 |
+|------|--------|--------|------|
+| 总评分 | 93/100 | (见下方自评) | |
+| 精灵资产总数 | 42 个 | 49 个 (+7) | +5 横幅 + 1 完成图标 + 1 替换史莱姆 |
+| 调色板色数 | 49 种 | 56 种 | +7 (5 波次色 + 2 checkmark 色) |
+| 提示词文件数 | 6 个 | 7 个 | +1 (wave-transition-prompts.md) |
+| 波次转场视觉规范 | 无 | 完整 | 新增 wave-transition-vfx.md |
+| 火焰史莱姆尺寸 | 16x16 | 32x32 | 细节升级 |
+
+### 质量自评: 91/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 配色准确性 | 15 | 15 | 7 种新色值与 WAVE_DEFS 配色表一致 |
+| 精灵覆盖率(基础资产) | 15 | 15 | 全部基础精灵文件存在 |
+| 精灵覆盖率(进化资产) | 10 | 10 | 8/8 进化武器 PNG 存在 |
+| 精灵覆盖率(波次 UI) | 9 | 10 | 7/7 新资产已编写生成函数 |
+| 波次转场规范完整性 | 10 | 10 | 3 个 VFX 元素全部有详细数值表 + 动画时间线 |
+| 提示词质量 | 8 | 10 | 8 个新提示词 + 1 个更新的 v2 提示词 |
+| 程序化特效质量 | 8 | 10 | Boss 警告闪烁有完整 ColorRect 回退方案 |
+| 工具链可维护性 | 10 | 10 | 新增 7 调色板 + 3 生成函数，命名规范统一 |
+
+**加分项**: 波次横幅 5 色独立设计(+3), 波次完成 checkmark 经典图标(+2), Boss 警告增强无需额外 PNG(+2), 火焰史莱姆 16->32 升级改善辨识度(+3), 完整的 VFX 规格文件含常量表(+5)
+
+**扣分项**: 脚本尚未运行验证 PNG 输出(-2), 5 个横幅 PNG 总计 5x600x80=240000 像素，文件较大(-2), checkmark 40x40 在高分辨率屏幕上可能偏小(-2), 32px 火焰史莱姆与 24px 精英骑士尺寸关系需要程序 Agent 确认 enemy_data.gd 中的 collision_shape 是否需要同步更新(-2)
+
+### 待执行验证
+
+1. 运行 `python3 tools/generate_sprites.py` 确认 7 个新 PNG 正确生成
+2. 视觉验证 5 个波次横幅的渐变效果和颜色区分度
+3. 视觉验证 40x40 checkmark 在游戏中的辨识度
+4. 验证 32x32 火焰史莱姆细节是否比 16x16 版本显著改善
+5. 确认程序 Agent 是否需要同步更新 enemy.gd 中 fire_slime 的 collision_shape 尺寸

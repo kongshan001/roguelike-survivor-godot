@@ -30,3 +30,8 @@ extends Resource
 # Boss phases
 @export var boss_phase2_hp_pct: float = 0.66
 @export var boss_phase3_hp_pct: float = 0.33
+
+# Fire Slime burn aura
+@export var has_burn_aura: bool = false
+@export var burn_aura_dps: float = 2.0
+@export var burn_aura_duration: float = 1.5

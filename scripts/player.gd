@@ -91,6 +91,10 @@ var _iron_will_active: bool = false
 var _iron_will_timer: float = 0.0
 var _iron_will_cooldown: float = 0.0
 
+# Burn DOT (from fire_slime burn aura)
+var _burn_dps: float = 0.0
+var _burn_timer: float = 0.0
+
 @onready var hurtbox: Area2D = $Hurtbox
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var sprite: Sprite2D = $Sprite
@@ -191,6 +195,20 @@ func _physics_process(delta):
 	# Iron Will passive (Warrior)
 	_update_iron_will(delta)
 
+	# Burn DOT (from fire_slime burn aura)
+	if _burn_timer > 0:
+		_burn_timer -= delta
+		var burn_dmg: float = _burn_dps * delta
+		if burn_dmg > 0.0:
+			current_health -= burn_dmg
+			GameManager.damage_taken = true
+			GameManager.health_changed.emit(current_health, max_health)
+			if current_health <= 0:
+				current_health = 0
+				die()
+		if _burn_timer <= 0:
+			_burn_dps = 0.0
+
 	GameManager.update_combo(delta)
 
 
@@ -287,6 +305,11 @@ func take_damage(amount: float):
 func heal(amount: float):
 	current_health = minf(current_health + amount, max_health)
 	GameManager.health_changed.emit(current_health, max_health)
+
+
+func apply_burn(dps: float, duration: float) -> void:
+	_burn_dps = maxf(_burn_dps, dps)
+	_burn_timer = maxf(_burn_timer, duration)
 
 
 func die():

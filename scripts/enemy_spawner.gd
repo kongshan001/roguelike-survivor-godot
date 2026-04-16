@@ -49,6 +49,12 @@ const ENEMY_TEMPLATES: Dictionary = {
 		"max_hp": 4.0, "speed": 50.0, "damage": 1.0,
 		"xp_value": 5, "color": [0.0, 0.54, 0.48], "size": 16.0,
 		"is_splitter": true, "split_count": 2
+	},
+	"fire_slime": {
+		"enemy_id": "fire_slime", "enemy_name": "火焰史莱姆",
+		"max_hp": 6.0, "speed": 30.0, "damage": 1.0,
+		"xp_value": 4, "color": [0.9, 0.4, 0.1], "size": 14.0,
+		"has_burn_aura": true, "burn_aura_dps": 2.0, "burn_aura_duration": 1.5
 	}
 }
 
@@ -224,6 +230,9 @@ func _create_enemy_data(type_key: String) -> EnemyData:
 	data.is_splitter = template.get("is_splitter", false)
 	data.split_count = template.get("split_count", 2)
 	data.is_child = template.get("is_child", false)
+	data.has_burn_aura = template.get("has_burn_aura", false)
+	data.burn_aura_dps = template.get("burn_aura_dps", 2.0)
+	data.burn_aura_duration = template.get("burn_aura_duration", 1.5)
 	data.drop_chance = 0.1
 	return data
 

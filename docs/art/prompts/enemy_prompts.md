@@ -116,12 +116,12 @@ blurry, 3d, realistic, photorealistic, text, watermark, complex shading, anti-al
 ### 火焰史莱姆 Fire Slime (fire_slime)
 - **用途**：波次系统敌人变体精灵（Swarm 波次后出现）
 - **目标工具**：Stable Diffusion / Midjourney
-- **尺寸规格**：64x64 -> 裁剪到 16x16
-- **主体描述**：An orange-red slime creature with bright yellow flame wisps on top, amorphous blob body, white eyes with dark pupils, wavy bottom edge suggesting liquid movement, top-down view
+- **尺寸规格**：128x128 -> 裁剪到 32x32
+- **主体描述**：An orange-red slime creature with bright yellow flame wisps on top, amorphous blob body with rounded dome, white eyes with dark pupils, wavy bottom edge suggesting liquid movement, membrane texture lines on body, taller central flame core, more detailed at 32x32, top-down view
 - **配色指引**：主色 #FF6622 橙红，辅色 #CC4411 暗橙阴影，强调色 #FFCC00 明黄火焰核心
 - **负面提示词**：blurry, 3d, realistic, text, watermark, solid fire, ice, blue
-- **完整 Prompt**：`pixel art, 16-bit, top-down view, game sprite, transparent background, dark outline #1A1A2E, an orange-red #FF6622 slime creature with yellow #FFCC00 flame wisps burning on top, amorphous blob body, white eyes, dark pupils, wavy bottom, simple design --ar 1:1`
-- **备注**：ColorRect 回退 Color(1.0, 0.4, 0.133) #FF6622 橙红 16px；与僵尸绿色史莱姆形成火焰/自然视觉对立。enemy_id 为 "fire_slime"。
+- **完整 Prompt**：`pixel art, 16-bit, top-down view, game sprite, transparent background, dark outline #1A1A2E, an orange-red #FF6622 slime creature at 32x32 pixels with yellow #FFCC00 flame wisps burning on top, tall central flame core, amorphous blob body with rounded dome, white eyes, dark pupils, wavy liquid bottom, membrane texture lines, detailed for larger size, simple design --ar 1:1`
+- **备注**：ColorRect 回退 Color(1.0, 0.4, 0.133) #FF6622 橙红 32px (R9 从 16px 升级至 32px)。与僵尸绿色史莱姆形成火焰/自然视觉对立。enemy_id 为 "fire_slime"。v2 更新：尺寸从 16x16 升级至 32x32，增加火焰细节、膜纹理线和更大的眼睛。
 
 ---
 

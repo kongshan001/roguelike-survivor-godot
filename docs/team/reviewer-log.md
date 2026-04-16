@@ -2505,3 +2505,322 @@ hud.gd 中存在技能按钮 UI (行 389-479, 约 90 行), 但:
 **扣分原因**: 技能系统核心 (player.gd + skill_effects.gd + 技能类) 全部未实现, 是本轮主要任务但完成度仅 15%。测试文件已编写但引用的 API 不存在, 形成测试先行但实现脱节的状态。Toast 拆分是唯一的正面成果。
 
 **核心结论**: R8 的 Toast 模块拆分质量良好, 是一个正确的架构改进。但技能系统实现严重滞后 -- 仅完成了外围 (数据类 + UI 骨架), 核心逻辑 (player 状态机、技能效果、被动特性、weapon_controller 集成) 完全缺失。建议下轮优先完成 P0 级技能系统实现。
+
+---
+
+## Round 9 审核报告 (2026-04-16)
+
+### 审核环境
+
+- 基线: 822 测试, 0 失败, QA 评分 94/100
+- PM R9 计划: 9A (火焰史莱姆), 9B (HUD 技能按钮拆分), 9C (常量统一), 9D (进化扩展设计)
+- 审核范围: R8 遗留验证 + R9 新增代码质量 + 跨角色一致性
+
+---
+
+### 任务 1: R8 遗留验证
+
+#### 1.1 hud.gd 行数是否已降至 < 400 行
+
+| 指标 | R8 PM 要求 | 当前实际 | 状态 |
+|------|-----------|----------|------|
+| hud.gd 行数 | < 400 | **479** | **FAIL** |
+
+**分析**: hud.gd 当前 479 行。R8 时 478 行，R9 无修改。Toast 系统已拆分到 hud_toast.gd (115 行), 但技能按钮 UI (行 389-479, 约 90 行) 填补了 Toast 拆分腾出的空间。
+
+**根因**: hud.gd 持续承担新功能 -- Toast 拆分腾出的空间被技能按钮代码填补。PM R9 计划的 9B (提取技能按钮到 hud_skill_button.gd) 未执行。`scripts/hud_skill_button.gd` 文件不存在。
+
+#### 1.2 skill_data.gd 常量是否被其他文件正确引用
+
+**状态: FAIL -- 常量在 3 处独立声明, 无一处引用 SkillData**
+
+检查每个文件的引用方式:
+
+| 文件 | 常量声明 | 引用 SkillData |
+|------|----------|---------------|
+| `scripts/data/skill_data.gd` | 42 个常量 (MAGE_SKILL_COOLDOWN 等) | N/A (定义方) |
+| `scripts/player.gd` | MAGE_SKILL_COOLDOWN, WARRIOR_SKILL_COOLDOWN, RANGER_SKILL_COOLDOWN + 被动常量 (行 39-49) | **无** -- 自行声明同名常量 |
+| `scripts/skill_effects.gd` | 18 个技能常量 + 7 个被动常量 (行 6-40) | **无** -- 自行声明同名常量 |
+
+player.gd 行 39-49:
+```
+const MAGE_SKILL_COOLDOWN: float = 20.0
+const WARRIOR_SKILL_COOLDOWN: float = 15.0
+const RANGER_SKILL_COOLDOWN: float = 18.0
+const MAGE_PASSIVE_DAMAGE_BONUS: float = 0.10
+...
+```
+
+skill_effects.gd 行 6-40:
+```
+const MAGE_SKILL_DAMAGE: float = 15.0
+const MAGE_SKILL_RADIUS: float = 150.0
+...
+const MAGE_PASSIVE_DAMAGE_BONUS: float = 0.10
+...
+```
+
+skill_data.gd 行 8-46 包含完全相同的数值。三处声明数值一致，但维护风险极高 -- 修改一处数值必须同步修改另外两处。PM R9 计划的 9C (常量统一: skill_effects.gd/player.gd 引用 SkillData 常量) 未执行。
+
+#### 1.3 BUG-008 (freeze/stun) 是否已修复
+
+**状态: 未修复 -- 仍使用 apply_freeze 代替 apply_stun**
+
+`scripts/skill_effects.gd` 行 114:
+```gdscript
+enemy.apply_freeze(WARRIOR_SKILL_STUN_DURATION)
+```
+
+Warrior 盾牌冲锋对敌人施加的是 freeze 效果，而设计规格 character-skills.md 明确称之为 "stun"。`enemy.gd` 中有 `apply_freeze()` 方法但无 `apply_stun()` 方法。功能上等效 (敌人被定身)，但方法名与设计规格不匹配。
+
+QA 日志 BUG-008 评估为 Low 严重度，状态为 "已记录"。当前无 `apply_stun()` 方法。
+
+---
+
+### 任务 2: R9 代码质量审核
+
+#### 2.1 火焰史莱姆实现审核
+
+##### enemy_data.gd -- PASS
+
+`scripts/data/enemy_data.gd` 行 35-37:
+```gdscript
+@export var has_burn_aura: bool = false
+@export var burn_aura_dps: float = 2.0
+@export var burn_aura_duration: float = 1.5
+```
+
+完全匹配 fire-slime-design.md Section 2.4 的定义。
+
+##### enemy_spawner.gd -- PASS
+
+`ENEMY_TEMPLATES` 行 53-58 包含 fire_slime 条目:
+```gdscript
+"fire_slime": {
+    "enemy_id": "fire_slime", "enemy_name": "火焰史莱姆",
+    "max_hp": 6.0, "speed": 30.0, "damage": 1.0,
+    "xp_value": 4, "color": [0.9, 0.4, 0.1], "size": 14.0,
+    "has_burn_aura": true, "burn_aura_dps": 2.0, "burn_aura_duration": 1.5
+}
+```
+
+数值与 fire-slime-design.md Section 2.3 完全匹配。`_create_enemy_data()` 行 233-235 正确处理 burn_aura 字段。
+
+##### enemy.gd burn_aura 逻辑 -- PASS (实现正确)
+
+`scripts/enemy.gd` 行 126-130:
+```gdscript
+# Fire Slime burn aura (passive contact burn)
+if enemy_data.has_burn_aura and _player and is_instance_valid(_player):
+    var dist := global_position.distance_to(_player.global_position)
+    if dist < enemy_data.size + 16.0:
+        _player.apply_burn(enemy_data.burn_aura_dps, enemy_data.burn_aura_duration)
+```
+
+逻辑正确: 检查 burn_aura 标志、玩家有效性和距离阈值 (enemy size + 16px player radius)。
+
+##### player.gd apply_burn -- **CRITICAL: 方法缺失**
+
+`scripts/player.gd` 行 95-96 声明了燃烧变量:
+```gdscript
+var _burn_dps: float = 0.0
+var _burn_timer: float = 0.0
+```
+
+行 199-201 处理燃烧计时器:
+```gdscript
+if _burn_timer > 0:
+    _burn_timer -= delta
+    take_damage(_burn_dps * delta)
+```
+
+**但是 `apply_burn()` 方法不存在。** 全项目搜索 `func apply_burn` 仅在 `enemy.gd` 中找到 (行 209)，player.gd 中无此方法。
+
+当火焰史莱姆接触玩家时，`enemy.gd:130` 调用 `_player.apply_burn(2.0, 1.5)`，将在运行时产生 "Method not found" 错误。火焰史莱姆的 burn aura 功能完全失效。
+
+fire-slime-design.md Section 2.5 明确要求:
+> | `scripts/player.gd` | Add `apply_burn(dps, duration)` method (mirror of enemy's method) | ~5 lines |
+
+该方法未实现。
+
+#### 2.2 HUD 技能按钮拆分审核
+
+**状态: 未执行**
+
+PM R9 计划 9B 要求将技能按钮从 hud.gd 提取到 `scripts/hud_skill_button.gd`。该文件不存在。技能按钮代码仍内联在 hud.gd 行 389-479 (约 90 行)。
+
+#### 2.3 常量统一审核
+
+**状态: 未执行**
+
+PM R9 计划 9C 要求 skill_effects.gd 和 player.gd 引用 SkillData 常量。当前三处独立声明，无任何引用关系。详见 1.2 节。
+
+#### 2.4 新进化设计规格
+
+**状态: 文档不存在**
+
+PM R9 计划 9D 要求设计师输出进化路线扩展规格 (4 进化 -> 8 进化)。`docs/superpowers/specs/evolution-expansion.md` 文件不存在。
+
+当前 8 种进化武器已在 upgrade_pool.gd 和 weapon_registry.gd 中定义:
+- fireknife, frostknife (knife 进化)
+- thunderholywater, holydomain (holywater 进化)
+- blizzard, flamebible (frostaura + bible 进化)
+- thunderang, blazerang (boomerang 进化)
+
+所有 8 种进化配方已完整定义并接入，无需额外设计文档。
+
+---
+
+### 任务 3: 综合代码质量评估
+
+#### 3.1 文件行数检查
+
+| 文件 | 行数 | 上限占比 | 合规 | 变化趋势 |
+|------|------|----------|------|----------|
+| scripts/hud.gd | 479 | 95.8% | PASS | 持平 (R8: 478) |
+| scripts/enemy.gd | 408 | 81.6% | PASS | 持平 (R8: 408) |
+| scripts/weapons/weapon_fire.gd | 381 | 76.2% | PASS | 持平 (R8: 381) |
+| scripts/autoload/game_manager.gd | 365 | 73.0% | PASS | 增长 (R8: 365) |
+| scripts/autoload/save_manager.gd | 330 | 66.0% | PASS | 持平 |
+| scripts/skill_effects.gd | 259 | 51.8% | PASS | 持平 |
+| scripts/player.gd | 254 | 50.8% | PASS | 持平 |
+| scripts/enemy_spawner.gd | 263 | 52.6% | PASS | 持平 |
+| **全部文件** | **均 < 500** | -- | **PASS** | -- |
+
+hud.gd (95.8%) 是最接近上限的文件。技能按钮拆分 (9B) 是下轮必要任务。
+
+#### 3.2 火焰史莱姆数值平衡评估
+
+fire-slime-design.md Section 5.2 的敌人对比表:
+
+| 敌人 | HP | 速度 | 伤害 | XP | 威胁 |
+|------|-----|------|------|-----|------|
+| bat | 1 | 80 | 1 | 1 | 快速低威胁 |
+| zombie | 3 | 40 | 1 | 2 | 基础 |
+| skeleton | 5 | 20 | 1 | 3 | 远程 |
+| **fire_slime** | **6** | **30** | **1** | **4** | **Burn aura (2 DPS, 1.5s)** |
+| ghost | 2 | 55 | 1 | 4 | 隐形传送 |
+| splitter | 4 | 50 | 1 | 5 | 死亡分裂 |
+| elite_skeleton | 12 | 15 | 2 | 8 | 远程三发 |
+
+**评估**: fire_slime 的数值定位合理:
+- HP 6 介于 skeleton(5) 和 elite_skeleton(12) 之间, 中等耐久
+- 速度 30 是第二慢的 (仅 skeleton 20 更慢), 适合 "缓慢但危险" 的设计意图
+- XP 4 偏高 (与 ghost 相同), 奖励玩家主动击杀而非躲避
+- burn aura 是真正的威胁: 1.5 秒内造成 3 点伤害 (对 Mage 的 8 HP 约 37%), 显著但非致命
+
+**注意**: 火焰史莱姆被安排在 Lava Cavern (第二关卡) 的 "cavern_fire" 波次, 是中期敌人。其 burn aura 配合岩浆池环境伤害可以形成叠加威胁。
+
+#### 3.3 代码质量评分 (1-10)
+
+| 维度 | 得分 | 说明 |
+|------|------|------|
+| 正确性 | 7 | fire_slime 数据层完整但 player.apply_burn() 缺失, 导致运行时崩溃 |
+| 代码质量 | 8 | 文件行数合规, 命名规范一致, 类型注解完整 |
+| 性能 | 8 | burn_aura 检查在 _physics_process 中每帧执行, 但仅在有 burn_aura 标志时 |
+| 测试覆盖 | 8 | 822 测试零失败, 但无 fire_slime 专门测试 |
+| 一致性 | 6 | 常量三处重复声明未统一; BUG-008 未修复; hud_skill_button 未拆分 |
+
+---
+
+### 综合发现汇总
+
+#### Critical
+
+| # | 问题 | 文件:行 | 说明 |
+|---|------|---------|------|
+| C1 | player.apply_burn() 方法缺失 | scripts/player.gd | 火焰史莱姆接触玩家时调用 `_player.apply_burn()` 但方法不存在。变量 `_burn_dps`/`_burn_timer` 和燃烧处理逻辑已声明, 仅缺少入口方法。fire-slime-design.md Section 2.5 明确要求此方法。 |
+
+#### Medium
+
+| # | 问题 | 文件:行 | 说明 |
+|---|------|---------|------|
+| M1 | 常量三处重复声明未统一 | player.gd:39-49, skill_effects.gd:6-40, skill_data.gd:8-46 | PM R9 计划 9C 未执行。42+ 个常量在 3 个文件中独立声明, 修改一处必须同步修改另外两处。 |
+| M2 | hud_skill_button.gd 未拆分 | scripts/hud.gd:389-479 | PM R9 计划 9B 未执行。hud.gd 达 479 行 (95.8%), 技能按钮 90 行是首选拆分目标。 |
+| M3 | BUG-008 Warrior stun 使用 freeze 方法名 | skill_effects.gd:114 | QA R8 报告, 未修复。apply_freeze vs 设计规格的 apply_stun 不匹配。 |
+
+#### Low
+
+| # | 问题 | 文件:行 | 说明 |
+|---|------|---------|------|
+| L1 | fire_slime 无波次生成触发 | enemy_spawner.gd | ENEMY_TEMPLATES 包含 fire_slime 但波次定义 WAVE_DEFS 中未引用。需在 multi-stage.md 对应波次的 enemy_types 中添加。 |
+| L2 | boomerang 暴击无金色视觉反馈 | weapon_fire.gd:337 | 继承自 R6。knife_crit 有金色但 boomerang_crit 无。 |
+| L3 | _spawn_food() 使用 ColorRect | enemy.gd:352-365 | 继承自 R3。 |
+
+---
+
+### 技术债务更新
+
+| 优先级 | 描述 | 文件 | 状态 |
+|--------|------|------|------|
+| **P0** | player.apply_burn() 方法缺失, 火焰史莱姆 burn aura 运行时崩溃 | scripts/player.gd | **新发现** |
+| P1 | 常量三处重复声明 | player.gd, skill_effects.gd, skill_data.gd | 继承 (R8 PM 9C 未执行) |
+| P1 | hud_skill_button.gd 未拆分, hud.gd 达 95.8% | scripts/hud.gd | 继承 (R8 PM 9B 未执行) |
+| P1 | BUG-008 Warrior stun/freeze 方法名不匹配 | skill_effects.gd:114 | 继承 (R8 QA 报告) |
+| P1 | _spawn_food() 使用 ColorRect 而非 Sprite2D | enemy.gd:352-365 | 继承 (R3) |
+| P1 | holywater 精灵文件名与 weapon_id 不匹配 | assets/sprites/weapons/holy_water.png | 继承 (R5) |
+| P2 | boomerang 暴击无金色视觉反馈 | weapon_fire.gd:337 | 继承 (R6) |
+| P3 | enemy_bullet.gd take_damage 签名不一致 | enemy_bullet.gd:35 | 继承 |
+| RESOLVED | 技能系统核心实现 | player.gd, skill_effects.gd | **已修复** (R8 programmer 第八轮) |
+| RESOLVED | Toast 系统拆分 | hud_toast.gd | **已修复** (R8 programmer 第八轮) |
+| RESOLVED | boomerang is_crit 属性缺失 | boomerang.gd | **已修复** (R8 programmer) |
+
+---
+
+### 按角色优化建议
+
+#### 程序 (Programmer)
+
+| 优先级 | 建议 | 文件 | 修复方案 |
+|--------|------|------|----------|
+| **P0** | 添加 player.apply_burn() 方法 | scripts/player.gd | 添加 `func apply_burn(dps: float, duration: float) -> void: _burn_dps = maxf(_burn_dps, dps); _burn_timer = maxf(_burn_timer, duration)` 约 5 行 |
+| P1 | 常量统一为 SkillData 单一来源 | player.gd, skill_effects.gd | 删除 player.gd:39-49 和 skill_effects.gd:6-40 的重复声明, 改为 `SkillData.MAGE_SKILL_COOLDOWN` 引用 |
+| P1 | 拆分 hud_skill_button.gd | scripts/hud.gd:389-479 | 提取 _setup_skill_button/_update_skill_display 到独立 RefCounted 模块 (同 Toast 拆分模式) |
+| P1 | 修复 BUG-008: 添加 apply_stun | enemy.gd, skill_effects.gd | 在 enemy.gd 添加 `apply_stun()` 方法 (可委托 apply_freeze), 或在 skill_effects.gd 改为调用已有的 apply_freeze 并更新设计规格 |
+| P1 | _spawn_food() 改用 Sprite2D + food.png | enemy.gd:352-365 | 使用 preload("res://assets/sprites/pickups/food.png") 替代 ColorRect |
+
+#### 策划 (Designer)
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P1 | 在波次定义中添加 fire_slime 生成触发 | multi-stage.md 的 cavern_fire 波次需包含 fire_slime。当前 ENEMY_TEMPLATES 有定义但 WAVE_DEFS 未引用 |
+| P2 | 确认进化扩展是否需要额外设计 | 当前 8 种进化已完整定义, evolution-expansion.md 可能不需要 |
+
+#### QA
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P0 | 添加 fire_slime burn_aura 测试 | 验证 fire_slime 接触玩家时是否正确调用 apply_burn (需先修复 P0) |
+| P1 | 添加常量统一回归测试 | 验证 SkillData 引用后数值一致 |
+| P2 | 验证 hud_skill_button 独立模块 | 拆分后功能与拆分前一致 |
+
+---
+
+### R9 PM 计划执行状态
+
+| Phase | 负责角色 | 任务 | 状态 | 说明 |
+|-------|---------|------|------|------|
+| 9A | Programmer | 实现火焰史莱姆 | **部分完成** | 数据层完整 (enemy_data + spawner + enemy.gd burn_aura 检查), 但 player.apply_burn() 缺失导致运行时崩溃 |
+| 9B | Programmer | hud.gd 技能按钮拆分 | **未执行** | hud_skill_button.gd 文件不存在 |
+| 9C | Programmer | 常量统一 | **未执行** | 三处独立声明, 无 SkillData 引用 |
+| 9D | Designer | 进化路线扩展设计 | **N/A** | 8 种进化已完整定义, 无需额外设计文档 |
+| 9E | Art | 技能效果精灵 + 波次转场 | **未评估** | 本轮审核范围内 |
+| 9F | QA | 火焰史莱姆测试 + 常量回归 | **未评估** | 依赖 P0 修复 |
+
+**R9 计划完成度**: 1/4 部分完成 (9A 数据层), 2/4 未执行 (9B, 9C), 1/4 不需要 (9D)。
+
+---
+
+### 审核人自评: 88/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| R8 遗留追踪 | 22 | 25 | 3 项遗留问题逐条验证: hud.gd 行数 (FAIL), 常量引用 (FAIL), BUG-008 (未修复) |
+| R9 新代码审核 | 25 | 25 | fire_slime 完整审核: 数据层 PASS, spawner PASS, enemy.gd PASS, 发现 player.apply_burn() 缺失 (Critical) |
+| PM 计划执行评估 | 18 | 20 | 4 项计划逐条评估, 准确识别执行状态 |
+| 技术债务维护 | 13 | 15 | 新增 1 个 P0 债务, 更新 3 项继承债务状态 |
+| 自评校准遵守 | 10 | 15 | 基准线 80 + 发现 Critical bug (+5) + 准确追踪继承问题 (+3) = 88 |
+
+**加分项**: 发现 player.apply_burn() 方法缺失是火焰史莱姆功能链路中唯一的断裂点 -- 数据层和检测逻辑都已就位, 仅缺 5 行入口方法。这一发现阻止了一个会在运行时崩溃的 bug 进入测试。
+
+**待改进**: 未评估 9E (美术) 和 9F (QA) 的执行状态; boomerang 暴击金色视觉反馈问题已继承 3 轮仍未推动解决。
