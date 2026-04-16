@@ -23,10 +23,10 @@ const CRIT_KNIFE_SPEED: float = 250.0
 const CRIT_KNIFE_LIFETIME: float = 1.0
 
 # Boomerang
-const BOOMERANG_SPEED: float = 280.0
 const BOOMERANG_MAX_COUNT: int = 8
 
 var _controller: Node = null
+var _boomerang_fire: RefCounted = null
 
 
 func _init(controller: Node) -> void:
@@ -90,6 +90,9 @@ func fire_projectile(data: WeaponData, level: int, player: CharacterBody2D, dmg_
 				proj.color = Color(1.0, 0.85, 0.0)
 				proj.is_crit = true
 		proj.damage = proj_damage
+
+		if data.weapon_id == "knife":
+			proj.weapon_level = level
 
 		if data.burn_dps > 0 or data.slow_pct > 0:
 			proj.set_status_effects(data.burn_dps, data.burn_duration, data.slow_pct)
@@ -338,76 +341,17 @@ func update_aura(weapon_id: String, data: WeaponData, level: int, player: Charac
 					_get_effects().create_lightning_effect(player.global_position, bolt_enemies[i].global_position, Color(0.5, 0.8, 1.0), pm)
 
 
-# --- Boomerang ---
+# --- Boomerang (delegated to weapon_boomerang_fire.gd) ---
+
+func _get_boomerang_fire() -> RefCounted:
+	if not _boomerang_fire:
+		_boomerang_fire = load("res://scripts/weapons/weapon_boomerang_fire.gd").new(_controller)
+	return _boomerang_fire
+
 
 func fire_boomerang(data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float, weapon_timers: Dictionary, boomerang_instances: Array) -> Array:
-	var count: int
-	var damage: float
-	var pierce: int
-	var max_dist: float
-	var cooldown: float
-	var track_angle: float
-
-	if data.is_evolved:
-		count = data.projectile_count
-		damage = data.damage * dmg_bonus
-		pierce = data.projectile_pierce
-		max_dist = data.boomerang_max_dist
-		cooldown = data.cooldown
-		track_angle = data.boomerang_track_angle
-	else:
-		count = data.projectile_count + (level - 1)
-		damage = (data.damage + (level - 1)) * dmg_bonus
-		pierce = data.projectile_pierce + (level - 1)
-		max_dist = data.boomerang_max_dist + (level - 1) * 50.0
-		if SynergyManager and SynergyManager.has_synergy("boomerang_crit"):
-			pierce += int(SynergyManager.get_synergy_value("boomerang_crit", "pierce_bonus", 1))
-		cooldown = data.cooldown - (level - 1) * 0.4
-		track_angle = data.boomerang_track_angle + (level - 1) * 0.26
-
-	weapon_timers[data.weapon_id] = maxf(cooldown, 0.5)
-
-	var valid_boomerangs := boomerang_instances.filter(func(b): return is_instance_valid(b))
-
-	for i in range(count):
-		if valid_boomerangs.size() >= BOOMERANG_MAX_COUNT:
-			break
-
-		var enemies := _get_enemies(player, 400.0)
-		var target_dir: Vector2 = Vector2.RIGHT.rotated(randf() * TAU)
-		if not enemies.is_empty():
-			target_dir = player.global_position.direction_to(enemies[i % enemies.size()].global_position)
-
-		var bm: Area2D = _create_boomerang(player.global_position, target_dir, damage, pierce, max_dist, data.boomerang_return_speed, track_angle, data.color, data.projectile_size, data.weapon_id)
-		# Boomerang crit: keen eye (Ranger) then synergy check
-		var is_keen_crit: bool = _controller.notify_weapon_hit(player) if _controller.has_method("notify_weapon_hit") else false
-		if is_keen_crit:
-			bm.damage *= player.crit_damage_mul
-			bm.is_crit = true
-		elif data.weapon_id == "boomerang" and SynergyManager and SynergyManager.has_synergy("boomerang_crit"):
-			if randf() < player.crit_chance:
-				bm.damage *= player.crit_damage_mul
-				bm.is_crit = true
-		bm.weapon_id = data.weapon_id
-		var pm: Node = _get_pm(player)
-		if pm:
-			pm.call_deferred("add_child", bm)
-			valid_boomerangs.append(bm)
-
-	return valid_boomerangs
+	return _get_boomerang_fire().fire_boomerang(data, level, player, dmg_bonus, weapon_timers, boomerang_instances)
 
 
 func _create_boomerang(pos: Vector2, dir: Vector2, dmg: float, prc: int, max_dist: float, return_spd: float, track_angle: float, col: Color, sz: float, wpn_id: String = "boomerang") -> Area2D:
-	var bm_scene: PackedScene = preload("res://scenes/projectile.tscn")
-	var bm: Area2D = bm_scene.instantiate()
-	bm.global_position = pos
-	bm.set_script(load("res://scripts/weapons/boomerang.gd"))
-	bm.direction = dir
-	bm.speed = BOOMERANG_SPEED
-	bm.damage = dmg
-	bm.pierce = prc
-	bm.color = col
-	bm.size = sz
-	bm.weapon_id = wpn_id
-	bm.setup_boomerang(pos, dir, max_dist, return_spd, track_angle)
-	return bm
+	return _get_boomerang_fire()._create_boomerang(pos, dir, dmg, prc, max_dist, return_spd, track_angle, col, sz, wpn_id)

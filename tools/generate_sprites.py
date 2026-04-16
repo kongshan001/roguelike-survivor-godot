@@ -105,6 +105,21 @@ PALETTE = {
     "passive_warrior_rage":   (0xFF, 0x66, 0x22),  # #FF6622 orange rage glow
     "passive_ranger_cross":   (0x22, 0x8B, 0x3A),  # #228B3A forest green crosshair
     "passive_ranger_cross_lt":(0x44, 0xBB, 0x55),  # #44BB55 lighter green reticle
+    # Lv3 transform effect sprites
+    "ricochet_gold":    (0xFF, 0xE5, 0x66),  # #FFE566 golden ricochet spark
+    "ricochet_gold_lt": (0xFF, 0xF4, 0xBB),  # #FFF4BB light gold highlight
+    "shatter_ice":      (0x88, 0xDD, 0xFF),  # #88DDFF ice blue shatter wave
+    "shatter_ice_lt":   (0xCC, 0xEE, 0xFF),  # #CCEEFF light ice edge
+    "homing_trail":     (0x44, 0xBB, 0x55),  # #44BB55 green homing trail dot
+    "homing_trail_lt":  (0x88, 0xDD, 0x88),  # #88DD88 light green trail glow
+    "chain_lightning":  (0xFF, 0xDD, 0x33),  # #FFDD33 yellow chain lightning
+    "chain_lightning_w":(0xFF, 0xFF, 0xAA),  # #FFFFAA bright yellow-white core
+    "bible_expand":     (0xFF, 0xD7, 0x00),  # #FFD700 golden expanding aura
+    "bible_expand_lt":  (0xFF, 0xEE, 0x88),  # #FFEE88 light gold aura edge
+    "frost_particle":   (0xBB, 0xDD, 0xFF),  # #BBDDFF blue-white frost particle
+    "frost_particle_w": (0xEE, 0xEE, 0xFF),  # #EEEEFF white frost highlight
+    "explode_fire":     (0xFF, 0x45, 0x00),  # #FF4500 red-orange explosion ring
+    "explode_fire_lt":  (0xFF, 0x88, 0x44),  # #FF8844 bright orange inner ring
 }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -3366,6 +3381,449 @@ def gen_passive_ranger_crosshair():
     save(img, "passives", "ranger_crosshair.png")
 
 
+# ── Lv3 Transform Effect Sprites ───────────────────────────────────────────
+
+def gen_knife_ricochet():
+    """Knife Lv3 Ricochet effect (8x8, golden spark).
+    Golden #FFE566 spark with bright center, indicates ricochet projectile.
+    4-pointed star shape similar to freeze_star but golden and smaller.
+    """
+    img, d = draw_img(8, 8)
+    gold_c = rgba("ricochet_gold")       # #FFE566
+    gold_lt = rgba("ricochet_gold_lt")   # #FFF4BB highlight
+    outline = rgba("dark_outline")
+    white = rgba("white")
+
+    # Outline (4-pointed star shape in 8x8)
+    outline_pts = [
+        (3, 0), (4, 0),              # top point
+        (0, 3), (0, 4),              # left point
+        (7, 3), (7, 4),              # right point
+        (3, 7), (4, 7),              # bottom point
+        (2, 1), (5, 1),
+        (1, 2), (6, 2),
+        (1, 5), (6, 5),
+        (2, 6), (5, 6),
+    ]
+    for pt in outline_pts:
+        d.point(pt, fill=outline)
+
+    # Star body (cross pattern)
+    for y in range(1, 7):
+        d.point((3, y), fill=gold_c)
+        d.point((4, y), fill=gold_c)
+    for x in range(1, 7):
+        d.point((x, 3), fill=gold_c)
+        d.point((x, 4), fill=gold_c)
+
+    # Diagonal fill (wider star arms)
+    d.point((2, 2), fill=gold_c)
+    d.point((5, 2), fill=gold_c)
+    d.point((2, 5), fill=gold_c)
+    d.point((5, 5), fill=gold_c)
+
+    # Bright highlight
+    d.point((3, 3), fill=gold_lt)
+    d.point((4, 3), fill=gold_lt)
+    d.point((3, 4), fill=gold_lt)
+    d.point((4, 4), fill=gold_lt)
+
+    # White core
+    d.point((3, 3), fill=white)
+
+    save(img, "effects", "knife_ricochet.png")
+
+
+def gen_frost_shatter():
+    """Frost Aura Lv3 Shatter effect (16x16, blue shatter wave).
+    Ice blue #88DDFF expanding ring with cracks radiating outward.
+    Represents the shatter AOE when a frozen enemy dies.
+    """
+    img, d = draw_img(16, 16)
+    ice_c = rgba("shatter_ice")         # #88DDFF
+    ice_lt = rgba("shatter_ice_lt")     # #CCEEFF
+    outline = rgba("dark_outline")
+    white = rgba("white")
+
+    # Outer ring (radius ~6, centered at 7.5)
+    ring_outer = [
+        (4, 1), (5, 1), (10, 1), (11, 1),
+        (2, 3), (3, 2), (12, 2), (13, 3),
+        (1, 4), (1, 5), (14, 4), (14, 5),
+        (1, 10), (1, 11), (14, 10), (14, 11),
+        (2, 13), (3, 14), (12, 14), (13, 13),
+        (4, 15), (5, 15), (10, 15), (11, 15),
+    ]
+    for pt in ring_outer:
+        d.point(pt, fill=outline)
+
+    # Inner ring fill (radius ~4-5)
+    ring_fill = [
+        (5, 2), (6, 2), (9, 2), (10, 2),
+        (3, 3), (4, 3), (11, 3), (12, 3),
+        (2, 4), (2, 5), (13, 4), (13, 5),
+        (2, 6), (2, 9), (13, 6), (13, 9),
+        (2, 10), (2, 11), (13, 10), (13, 11),
+        (3, 12), (4, 13), (11, 13), (12, 12),
+        (5, 14), (6, 14), (9, 14), (10, 14),
+    ]
+    for pt in ring_fill:
+        d.point(pt, fill=ice_c)
+
+    # Brighter ring edge (closer to center)
+    ring_bright = [
+        (6, 3), (9, 3),
+        (3, 6), (3, 9),
+        (12, 6), (12, 9),
+        (6, 13), (9, 13),
+    ]
+    for pt in ring_bright:
+        d.point(pt, fill=ice_lt)
+
+    # Shatter cracks (4 diagonal lines from center)
+    crack_pts = [
+        (7, 5), (8, 5),             # up
+        (5, 7), (5, 8),             # left
+        (10, 7), (10, 8),           # right
+        (7, 10), (8, 10),           # down
+        (6, 6),                     # upper-left
+        (9, 6),                     # upper-right
+        (6, 9),                     # lower-left
+        (9, 9),                     # lower-right
+    ]
+    for pt in crack_pts:
+        d.point(pt, fill=white)
+
+    # Center white flash
+    d.point((7, 7), fill=white)
+    d.point((8, 7), fill=white)
+    d.point((7, 8), fill=white)
+    d.point((8, 8), fill=white)
+
+    save(img, "effects", "frost_shatter.png")
+
+
+def gen_boomerang_homing_trail():
+    """Boomerang Lv3 Homing Trail effect (8x8, green trail dot).
+    Green #44BB55 glowing dot with soft halo, used as trail particle
+    when boomerang has enhanced tracking at Lv3.
+    """
+    img, d = draw_img(8, 8)
+    green_c = rgba("homing_trail")       # #44BB55
+    green_lt = rgba("homing_trail_lt")   # #88DD88 glow
+    outline = rgba("dark_outline")
+
+    # Outer glow halo (alpha-faded ring)
+    halo_pts = [
+        (3, 1), (4, 1),
+        (1, 3), (1, 4),
+        (6, 3), (6, 4),
+        (3, 6), (4, 6),
+        (2, 2), (5, 2),
+        (2, 5), (5, 5),
+    ]
+    for pt in halo_pts:
+        d.point(pt, fill=(*PALETTE["homing_trail_lt"][:3], 80))  # semi-transparent
+
+    # Core dot outline (3x3 area, centered)
+    core_outline = [
+        (3, 2), (4, 2),
+        (2, 3), (2, 4),
+        (5, 3), (5, 4),
+        (3, 5), (4, 5),
+    ]
+    for pt in core_outline:
+        d.point(pt, fill=outline)
+
+    # Core dot fill
+    for y in range(3, 5):
+        for x in range(3, 5):
+            d.point((x, y), fill=green_c)
+
+    # Bright center
+    d.point((3, 3), fill=green_lt)
+
+    save(img, "effects", "boomerang_homing_trail.png")
+
+
+def gen_lightning_chain_kill():
+    """Lightning Lv3 Chain On Kill effect (12x12, yellow lightning bolt).
+    Yellow #FFDD33 zigzag bolt symbol with bright core,
+    represents chain lightning triggered on kill.
+    """
+    img, d = draw_img(12, 12)
+    yellow_c = rgba("chain_lightning")     # #FFDD33
+    yellow_w = rgba("chain_lightning_w")   # #FFFFAA bright core
+    outline = rgba("dark_outline")
+    white = rgba("white")
+
+    # Main bolt body: zigzag from top to bottom, fitting in 12x12
+    bolt_body = [
+        # Top diagonal segment (upper-left)
+        (5, 0), (6, 0),
+        (4, 1), (5, 1),
+        (3, 2), (4, 2),
+        (4, 3), (5, 3),
+        # Horizontal jog
+        (5, 4), (6, 4), (7, 4), (8, 4),
+        # Bottom diagonal segment (lower-right)
+        (7, 5), (8, 5),
+        (6, 6), (7, 6),
+        (5, 7), (6, 7),
+        (6, 8), (7, 8),
+        (7, 9), (8, 9),
+        (8, 10), (9, 10),
+        (9, 11), (10, 11),
+    ]
+
+    # Outline (1px around bolt)
+    bolt_outline_pts = [
+        (4, 0), (7, 0),
+        (3, 1), (6, 1),
+        (2, 2), (5, 2),
+        (3, 3), (6, 3),
+        (4, 4), (9, 4),
+        (6, 5), (9, 5),
+        (5, 6), (8, 6),
+        (4, 7), (7, 7),
+        (5, 8), (8, 8),
+        (6, 9), (9, 9),
+        (7, 10), (10, 10),
+        (8, 11), (11, 11),
+    ]
+    for pt in bolt_outline_pts:
+        d.point(pt, fill=outline)
+
+    # Bolt fill
+    for pt in bolt_body:
+        d.point(pt, fill=yellow_c)
+
+    # Bright core (inner pixels of bolt)
+    core_pts = [
+        (5, 0), (6, 0),
+        (5, 1),
+        (4, 2),
+        (5, 3),
+        (6, 4), (7, 4), (8, 4),
+        (8, 5),
+        (7, 6),
+        (6, 7),
+        (7, 8),
+        (8, 9),
+        (9, 10),
+        (10, 11),
+    ]
+    for pt in core_pts:
+        d.point(pt, fill=yellow_w)
+
+    # White hot center points
+    d.point((6, 4), fill=white)
+    d.point((7, 4), fill=white)
+
+    save(img, "effects", "lightning_chain_kill.png")
+
+
+def gen_bible_expand():
+    """Bible Lv3 Expanding Aura effect (16x16, golden expanding ring).
+    Golden #FFD700 concentric ring with glow, represents the
+    periodic pulse damage aura at Lv3.
+    """
+    img, d = draw_img(16, 16)
+    gold_c = rgba("bible_expand")         # #FFD700
+    gold_lt = rgba("bible_expand_lt")     # #FFEE88
+    outline = rgba("dark_outline")
+    white = rgba("white")
+
+    # Outer ring outline (radius ~6)
+    outer_outline = [
+        (4, 0), (5, 0), (10, 0), (11, 0),
+        (2, 2), (3, 1), (12, 1), (13, 2),
+        (1, 3), (1, 4), (14, 3), (14, 4),
+        (0, 5), (0, 10), (15, 5), (15, 10),
+        (1, 11), (1, 12), (14, 11), (14, 12),
+        (2, 13), (3, 14), (12, 14), (13, 13),
+        (4, 15), (5, 15), (10, 15), (11, 15),
+    ]
+    for pt in outer_outline:
+        d.point(pt, fill=outline)
+
+    # Outer ring fill
+    outer_fill = [
+        (5, 1), (6, 1), (9, 1), (10, 1),
+        (3, 2), (4, 2), (11, 2), (12, 2),
+        (2, 3), (2, 4), (13, 3), (13, 4),
+        (1, 5), (1, 6), (14, 5), (14, 6),
+        (1, 9), (1, 10), (14, 9), (14, 10),
+        (2, 11), (2, 12), (13, 11), (13, 12),
+        (3, 13), (4, 13), (11, 13), (12, 13),
+        (5, 14), (6, 14), (9, 14), (10, 14),
+    ]
+    for pt in outer_fill:
+        d.point(pt, fill=gold_c)
+
+    # Inner ring (radius ~3, lighter gold)
+    inner_fill = [
+        (6, 4), (7, 4), (8, 4), (9, 4),
+        (4, 6), (4, 7), (4, 8), (4, 9),
+        (6, 5), (7, 5), (8, 5), (9, 5),
+        (5, 6), (5, 7), (5, 8), (5, 9),
+        (6, 6), (7, 6), (8, 6), (9, 6),
+        (6, 7), (7, 7), (8, 7), (9, 7),
+        (6, 8), (7, 8), (8, 8), (9, 8),
+        (6, 9), (7, 9), (8, 9), (9, 9),
+        (6, 10), (7, 10), (8, 10), (9, 10),
+        (10, 6), (10, 7), (10, 8), (10, 9),
+        (11, 6), (11, 7), (11, 8), (11, 9),
+    ]
+    for pt in inner_fill:
+        d.point(pt, fill=gold_lt)
+
+    # Inner ring outline
+    inner_outline = [
+        (5, 4), (10, 4),
+        (4, 5), (11, 5),
+        (4, 10), (11, 10),
+        (5, 11), (10, 11),
+    ]
+    for pt in inner_outline:
+        d.point(pt, fill=outline)
+
+    # Center white glow (pulsing core)
+    d.point((7, 7), fill=white)
+    d.point((8, 7), fill=white)
+    d.point((7, 8), fill=white)
+    d.point((8, 8), fill=white)
+
+    save(img, "effects", "bible_expand.png")
+
+
+def gen_holywater_frost():
+    """Holy Water Lv3 Frost Blessing effect (8x8, blue-white frost particle).
+    Blue-white #BBDDFF ice crystal with white highlight,
+    represents frost blessing applied by holy water at Lv3.
+    """
+    img, d = draw_img(8, 8)
+    frost_c = rgba("frost_particle")       # #BBDDFF
+    frost_w = rgba("frost_particle_w")     # #EEEEFF white highlight
+    outline = rgba("dark_outline")
+    white = rgba("white")
+
+    # Crystal shape (diamond/snowflake pattern)
+    # Outline
+    outline_pts = [
+        (3, 0), (4, 0),               # top
+        (0, 3), (0, 4),               # left
+        (7, 3), (7, 4),               # right
+        (3, 7), (4, 7),               # bottom
+        (2, 1), (5, 1),               # upper diagonals
+        (1, 2), (6, 2),
+        (1, 5), (6, 5),
+        (2, 6), (5, 6),
+    ]
+    for pt in outline_pts:
+        d.point(pt, fill=outline)
+
+    # Crystal body (filled diamond)
+    body_pts = [
+        (3, 1), (4, 1),
+        (2, 2), (3, 2), (4, 2), (5, 2),
+        (1, 3), (2, 3), (3, 3), (4, 3), (5, 3), (6, 3),
+        (1, 4), (2, 4), (3, 4), (4, 4), (5, 4), (6, 4),
+        (2, 5), (3, 5), (4, 5), (5, 5),
+        (3, 6), (4, 6),
+    ]
+    for pt in body_pts:
+        d.point(pt, fill=frost_c)
+
+    # Inner lighter cross (snowflake arms)
+    cross_pts = [
+        (3, 0), (4, 0),               # top arm
+        (0, 3), (0, 4),               # left arm
+        (7, 3), (7, 4),               # right arm
+        (3, 7), (4, 7),               # bottom arm
+        (3, 3), (4, 3),               # center horizontal
+        (3, 4), (4, 4),
+    ]
+    for pt in cross_pts:
+        d.point(pt, fill=frost_w)
+
+    # White center spark
+    d.point((3, 3), fill=white)
+    d.point((4, 4), fill=white)
+
+    save(img, "effects", "holywater_frost.png")
+
+
+def gen_firestaff_explode():
+    """Fire Staff Lv3 Searing Flames effect (16x16, red explosion ring).
+    Red-orange #FF4500 expanding circle with bright inner ring,
+    represents the burn zone explosion at Lv3.
+    """
+    img, d = draw_img(16, 16)
+    fire_c = rgba("explode_fire")         # #FF4500
+    fire_lt = rgba("explode_fire_lt")     # #FF8844
+    outline = rgba("dark_outline")
+    gold_c = rgba("gold")                 # #FFD700 center flash
+
+    # Outer explosion ring outline (radius ~6)
+    outer_outline = [
+        (4, 1), (5, 1), (10, 1), (11, 1),
+        (2, 2), (3, 2), (12, 2), (13, 2),
+        (1, 4), (1, 5), (14, 4), (14, 5),
+        (1, 10), (1, 11), (14, 10), (14, 11),
+        (2, 13), (3, 13), (12, 13), (13, 13),
+        (4, 14), (5, 14), (10, 14), (11, 14),
+    ]
+    for pt in outer_outline:
+        d.point(pt, fill=outline)
+
+    # Outer ring fill (red-orange)
+    outer_fill = [
+        (5, 2), (6, 2), (9, 2), (10, 2),
+        (3, 3), (4, 3), (11, 3), (12, 3),
+        (2, 4), (2, 5), (13, 4), (13, 5),
+        (1, 6), (1, 7), (14, 6), (14, 7),
+        (1, 8), (1, 9), (14, 8), (14, 9),
+        (2, 10), (2, 11), (13, 10), (13, 11),
+        (3, 12), (4, 12), (11, 12), (12, 12),
+        (5, 13), (6, 13), (9, 13), (10, 13),
+    ]
+    for pt in outer_fill:
+        d.point(pt, fill=fire_c)
+
+    # Bright inner ring (radius ~3-4, orange)
+    inner_fill = [
+        (5, 4), (6, 4), (7, 4), (8, 4), (9, 4), (10, 4),
+        (4, 5), (5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5),
+        (4, 6), (5, 6), (6, 6), (7, 6), (8, 6), (9, 6), (10, 6), (11, 6),
+        (4, 7), (5, 7), (6, 7), (7, 7), (8, 7), (9, 7), (10, 7), (11, 7),
+        (4, 8), (5, 8), (6, 8), (7, 8), (8, 8), (9, 8), (10, 8), (11, 8),
+        (4, 9), (5, 9), (6, 9), (7, 9), (8, 9), (9, 9), (10, 9), (11, 9),
+        (4, 10), (5, 10), (6, 10), (7, 10), (8, 10), (9, 10), (10, 10), (11, 10),
+        (5, 11), (6, 11), (7, 11), (8, 11), (9, 11), (10, 11),
+    ]
+    for pt in inner_fill:
+        d.point(pt, fill=fire_lt)
+
+    # Center gold flash (2x2)
+    d.point((7, 7), fill=gold_c)
+    d.point((8, 7), fill=gold_c)
+    d.point((7, 8), fill=gold_c)
+    d.point((8, 8), fill=gold_c)
+
+    # Scorch marks (dark pixels at cardinal edges)
+    scorch_pts = [
+        (7, 1), (8, 1),               # top
+        (1, 7), (1, 8),               # left
+        (14, 7), (14, 8),             # right
+        (7, 14), (8, 14),             # bottom
+    ]
+    for pt in scorch_pts:
+        d.point(pt, fill=outline)
+
+    save(img, "effects", "firestaff_explode.png")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────
 
 def main():
@@ -3446,6 +3904,16 @@ def main():
     gen_passive_mage_vortex()
     gen_passive_warrior_shield()
     gen_passive_ranger_crosshair()
+
+    # Lv3 Transform Effect Sprites
+    print("\nLv3 Transform Effects:")
+    gen_knife_ricochet()
+    gen_frost_shatter()
+    gen_boomerang_homing_trail()
+    gen_lightning_chain_kill()
+    gen_bible_expand()
+    gen_holywater_frost()
+    gen_firestaff_explode()
 
     print(f"\nDone! All sprites saved to {ASSETS_DIR}")
 

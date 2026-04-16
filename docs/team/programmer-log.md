@@ -1685,3 +1685,189 @@ Failing              0
 | 零回归 | 15 | 15 | 948 个已有测试全部通过（2 Pending 为预存问题）|
 | 代码质量 | 10 | 10 | 常量引用 SkillData、类型注解、null guard (GameManager) |
 | 记录完整性 | 9 | 15 | programmer-log 更新完整 |
+
+---
+
+## 第十三轮执行 (2026-04-16): TOP3 武器 Lv3 质变效果 + weapon_fire.gd 拆分
+
+### 实现内容
+
+#### Task 13A: TOP3 武器 Lv3 质变效果
+
+基于设计规格 `docs/superpowers/specs/weapon-lv3-transforms.md` 实现 3 个武器 Lv3 质变效果。
+
+##### 1. Knife Lv3 Ricochet (弹射)
+
+**机制**: 当 knife 投射物等级 >= 3 且命中敌人时，从目标位置生成一个弹射投射物，搜索 100px 范围内最近的非主目标敌人，造成 50% 伤害。
+
+**修改文件**:
+
+| 文件 | 变更 | 行数变化 |
+|------|------|----------|
+| `scripts/projectile.gd` | 新增 `weapon_level` 字段 + 5 个弹射常量 + `_spawn_ricochet()` 方法 + `_on_body_entered()` 弹射触发 | 74 -> 112 行 |
+| `scripts/weapons/weapon_fire.gd` | `fire_projectile()` 中为 knife 投射物设置 `weapon_level` | +3 行 |
+
+**弹射常量表**:
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `KNIFE_LV3_RICOCHET_RANGE` | 100.0px | 弹射搜索范围 |
+| `KNIFE_LV3_RICOCHET_DAMAGE_MUL` | 0.5 | 伤害倍率 |
+| `KNIFE_LV3_RICOCHET_SPEED` | 300.0 px/s | 弹射速度 |
+| `KNIFE_LV3_RICOCHET_SIZE` | 4.0 px | 弹射投射物大小 |
+| `KNIFE_LV3_RICOCHET_LIFETIME` | 0.5s | 弹射存活时间 |
+
+**关键设计**:
+- 仅对 `weapon_id == "knife"` 触发，不影响进化武器 fireknife/frostknife
+- 弹射投射物从主目标位置生成，金色色调 (1.0, 0.9, 0.5)
+- 不继承状态效果 (burn/slow)，避免双倍状态叠加
+- `pierce = 0`，弹射只命中一个敌人后消失
+
+---
+
+##### 2. Frost Aura Lv3 Shatter (碎裂)
+
+**机制**: 当 frostaura 等级 >= 3 时，被冰冻的敌人死亡时触发碎裂，对 50px 范围内所有敌人造成 2.0 伤害。
+
+**修改文件**:
+
+| 文件 | 变更 | 行数变化 |
+|------|------|----------|
+| `scripts/enemy.gd` | `die()` 新增 `_handle_shatter()` 调用 + 新增 `_handle_shatter()` + `_spawn_shatter_effect()` 方法 + 2 个碎裂常量 | 418 -> 461 行 |
+
+**碎裂常量表**:
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `FROSTAURA_LV3_SHATTER_RADIUS` | 50.0px | 碎裂范围 |
+| `FROSTAURA_LV3_SHATTER_DAMAGE` | 2.0 | 碎裂伤害 |
+
+**关键设计**:
+- 三重条件: `_freeze_timer > 0` AND `player.owned_weapons.has("frostaura")` AND `level >= 3`
+- 2.0 伤害不足以击杀满 HP 僵尸 (4.0 HP)，防止无限链式碎裂
+- 碎裂特效: 蓝白色圆圈淡出动画（使用 inline GDScript，与 weapon_effects.gd 锥形特效一致）
+- `die()` 调用顺序: `_handle_kill_rewards()` -> `_handle_shatter()` -> `_spawn_xp_gems()` -> ...
+
+---
+
+##### 3. Boomerang Lv3 Homing Tweak (追踪增强)
+
+**机制**: 当 boomerang 等级 >= 3 时，`track_angle *= 1.5`，使回旋镖追踪范围从 60 度提升到 89 度。
+
+**修改文件**: `scripts/weapons/weapon_boomerang_fire.gd` (提取后的新文件)
+
+**数值验证**:
+
+| 等级 | 原始 track_angle | Lv3 后 track_angle | 追踪角度 |
+|------|-----------------|-------------------|----------|
+| Lv1 | 0.52 rad | 0.52 rad (不变) | 30 deg |
+| Lv2 | 0.78 rad | 0.78 rad (不变) | 45 deg |
+| Lv3 | 1.04 rad | 1.56 rad (* 1.5) | 89 deg |
+| Evolved | data值 (不变) | data值 (不变) | N/A |
+
+---
+
+#### Task 13B: weapon_fire.gd 拆分 (419 -> 357 行)
+
+**问题**: weapon_fire.gd 达到 419 行，接近 500 行限制。
+
+**方案**: 将 boomerang 武器逻辑 (`fire_boomerang` + `_create_boomerang` + 常量) 提取到独立模块 `scripts/weapons/weapon_boomerang_fire.gd`。
+
+##### 新增文件
+
+| 文件 | 说明 | 行数 |
+|------|------|------|
+| `scripts/weapons/weapon_boomerang_fire.gd` | Boomerang 武器发射逻辑 -- RefCounted，包含 fire_boomerang + _create_boomerang | 99 行 |
+
+##### 修改文件
+
+| 文件 | 行数变化 |
+|------|----------|
+| `scripts/weapons/weapon_fire.gd` | 419 -> 357 行 (降 15%) |
+
+##### 拆分设计
+
+- `WeaponBoomerangFire` 继承 `RefCounted`，通过 `_init(controller: Node)` 接收 controller 引用
+- `weapon_fire.gd` 通过 `_get_boomerang_fire()` 延迟创建子模块
+- `fire_boomerang()` 和 `_create_boomerang()` 保留在 weapon_fire.gd 中作为委托方法
+- BOOMERANG_SPEED 常量移到 weapon_boomerang_fire.gd，BOOMERANG_MAX_COUNT 保留（委托方法无引用不需要，但为向后兼容保留）
+- 接口完全兼容: weapon_controller.gd 无需修改
+
+---
+
+### 新增测试文件
+
+| 文件 | 测试数 | 覆盖模块 |
+|------|--------|----------|
+| `test/unit/test_lv3_transforms.gd` | 28 | Knife 弹射 (10)、Frost Aura 碎裂 (7)、Boomerang 追踪 (6)、模块委托 (5) |
+
+### 测试覆盖详情 (28 项)
+
+**Knife Ricochet (10)**:
+1. weapon_level 字段默认值
+2. 弹射常量验证 (5 个)
+3. Lv1 不触发弹射
+4. Lv2 不触发弹射
+5. Lv3 触发条件
+6. fireknife (进化) 不触发
+7. frostknife (进化) 不触发
+8. weapon_fire 设置 knife level
+9. 非 knife 不设 level
+10. _spawn_ricochet 方法存在
+
+**Frost Aura Shatter (7)**:
+1. 碎裂常量验证 (2 个)
+2. 未冰冻不触发
+3. 无 frostaura 不触发
+4. frostaura Lv2 不触发
+5. frostaura Lv3 满足全部条件
+6. 方法存在验证 (2 个)
+7. 碎裂伤害不足击杀僵尸
+
+**Boomerang Homing (6)**:
+1. Lv3 追踪角度公式
+2. Lv1 不受影响
+3. Lv2 不受影响
+4. 进化武器不受影响
+5. 追踪倍率验证
+6. Lv3 追踪角度度数
+
+**Module Delegation (5)**:
+1. 模块加载
+2. 委托创建
+3. _create_boomerang 委托
+4. Lv3 追踪角度传递
+5. (含在模块加载中)
+
+### 测试结果
+
+```
+Scripts              42
+Tests              1027
+Passing Tests      1025
+Risky/Pending         2  (pre-existing: chest.png missing)
+Asserts            2543
+Failing              0
+```
+
+相比上轮（999 tests, 2502 asserts），新增 28 tests, 41 asserts。0 回归。
+
+### 文件行数验证
+
+| 文件 | 行数 | 上限占比 | 合规 |
+|------|------|----------|------|
+| scripts/weapons/weapon_fire.gd | 357 | 71.4% | PASS (从 419 降至 357) |
+| scripts/weapons/weapon_boomerang_fire.gd | 99 | 19.8% | PASS (新文件) |
+| scripts/projectile.gd | 112 | 22.4% | PASS |
+| scripts/enemy.gd | 461 | 92.2% | PASS |
+
+### 本轮自评分: 93/100
+
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| 设计规格遵从 | 25 | 25 | 3 个质变效果完全按 weapon-lv3-transforms.md 实现 |
+| 文件拆分 | 15 | 15 | weapon_fire.gd 从 419 行降至 357 行，委托干净，接口兼容 |
+| 测试覆盖 | 18 | 20 | 28 个新测试覆盖全部功能和边界条件；-2 因弹射实际生成效果和碎裂伤害链需运行时验证 |
+| 零回归 | 15 | 15 | 999 个已有测试全部通过（2 Pending 为预存问题）|
+| 代码质量 | 10 | 10 | 所有魔法数字提取为命名常量、类型注解、null guard |
+| 记录完整性 | 10 | 15 | programmer-log 更新完整，含常量表和数值验证 |

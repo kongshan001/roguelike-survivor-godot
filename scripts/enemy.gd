@@ -236,6 +236,7 @@ func die() -> void:
 	is_alive = false
 
 	_handle_kill_rewards()
+	_handle_shatter()
 	_spawn_xp_gems()
 	_spawn_food_drop()
 	_spawn_crate_drop()
@@ -257,6 +258,50 @@ func _handle_kill_rewards() -> void:
 	if SynergyManager and SynergyManager.has_synergy("holywater_luckycoin"):
 		if _last_hit_by == "holywater":
 			GameManager.add_gold(1)
+
+
+# Frost Aura Lv3: Shatter -- frozen enemy explodes on death
+const FROSTAURA_LV3_SHATTER_RADIUS: float = 50.0
+const FROSTAURA_LV3_SHATTER_DAMAGE: float = 2.0
+
+
+func _handle_shatter() -> void:
+	if _freeze_timer <= 0.0:
+		return  # Not frozen, no shatter
+	var player: Node2D = _find_player()
+	if not player or not is_instance_valid(player):
+		return
+	if not player.owned_weapons.has("frostaura"):
+		return
+	if player.owned_weapons["frostaura"] < 3:
+		return  # Not Lv3 yet
+	var all_enemies := get_tree().get_nodes_in_group("enemies")
+	for enemy in all_enemies:
+		if is_instance_valid(enemy) and enemy.is_alive and enemy != self:
+			var dist := global_position.distance_to(enemy.global_position)
+			if dist <= FROSTAURA_LV3_SHATTER_RADIUS:
+				enemy.take_damage(FROSTAURA_LV3_SHATTER_DAMAGE, "frostaura")
+	_spawn_shatter_effect()
+
+
+func _spawn_shatter_effect() -> void:
+	var circle: Node2D = Node2D.new()
+	circle.global_position = global_position
+	var script := GDScript.new()
+	script.source_code = (
+		"extends Node2D\n"
+		+ "var alpha: float = 0.6\n"
+		+ "func _process(delta):\n"
+		+ "\talpha -= delta * 3.0\n"
+		+ "\tif alpha <= 0.0:\n"
+		+ "\t\tqueue_free()\n"
+		+ "\tqueue_redraw()\n"
+		+ "func _draw():\n"
+		+ "\tdraw_circle(Vector2.ZERO, 50.0, Color(0.5, 0.8, 1.0, alpha))\n"
+	)
+	script.reload()
+	circle.set_script(script)
+	get_parent().call_deferred("add_child", circle)
 
 
 func _calculate_gold_drop() -> int:

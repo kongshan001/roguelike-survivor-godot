@@ -19,6 +19,7 @@
 | P1 | Sentinel类型简化 + 进化武器DPS平衡调整 | ✅ 已完成（规格见 specs/sentinel-simplification.md） |
 | P1 | 角色升级差异化路线 + 武器质变等级 | ✅ 已完成（规格见 specs/character-upgrade-paths.md） |
 | P1 | 武器Lv3质变效果优先排序 + TOP3实现规格 | ✅ 已完成（规格见 specs/weapon-lv3-transforms.md） |
+| P1 | 武器Lv3质变效果剩余4武器详细规格 | ✅ 已完成（规格见 specs/weapon-lv3-transforms.md Sections 6-9） |
 
 ## 决策记录
 
@@ -1110,3 +1111,166 @@ R11 中设计了 7 种武器的 Lv3 质变效果（见 `character-upgrade-paths.
 2. Fire Staff Burn Zone 是唯一需要新场景类型的效果，实现复杂度最高但玩家体验价值中等，暂列 Tier C
 3. 优先排序基于理论分析而非实际QA数据（需要实测确认Tier A效果的手感是否符合预期）
 4. 7种效果的完整常量块已包含在规格中，但实际代码中应统一放在 weapon_fire.gd 顶部，避免散落
+
+---
+
+## Round 13 执行 (2026-04-16)
+
+### 任务背景
+
+R12 已完成 TOP3 武器（Knife/Frost Aura/Boomerang）Lv3 质变效果的详细实现规格。本轮需要完善剩余 4 个武器的详细规格：Lightning（链式击杀）、Bible（扩展光环）、Holy Water（冰霜祝福）、Fire Staff（灼烧爆发），使所有 7 种武器的规格达到同等精度。
+
+### 执行流程
+
+未执行三阶段流程（本次为实现规格细化，非新功能设计）。直接读取代码库后输出精确规格。
+
+### 任务输出
+
+为以下 4 个武器编写了与 TOP3 规格格式一致的详细实现规格：
+
+#### Lightning Lv3: Chain On Kill (链式击杀)
+
+**设计概述**: 闪电击杀敌人时，向200px范围内随机一个敌人发射额外闪电（50%伤害）。
+
+**关键设计决策**:
+- **使用 die()-hook 而非信号**: 原始 Tier B 评估假设需要信号（enemy -> weapon_controller），但实际分析代码后发现 die()-hook 模式（同 Shatter）更简单，无需信号。将 3 个文件的实现缩减为仅 1 个文件（enemy.gd）。
+- **Source "lightning_cok" 防递归**: 与 Shatter 的 source "frostaura" 不同，使用独立的 source ID 确保额外闪电击杀不会触发下一轮连锁。最大连锁深度 = 1。
+- **随机目标而非最近**: 闪电主题为"混沌能量"，随机选择创造不可预测的连锁效果。
+
+**数值**: 范围200px，伤害倍率0.5，预估 ~32 行代码（原估 ~40 行 + 1 信号，优化后减少）。
+
+**DPS 影响**: ~0.3-0.5 DPS（~2-3% 总 DPS）。低 DPS 影响可接受，因为链式击杀的价值在于连杀时序（快速清除弱敌触发连锁），而非原始数值。
+
+**修改文件**: `scripts/enemy.gd`（仅 1 个文件）
+
+**测试用例**: 7 条（Lv1/Lv2/Lv3/无目标/多目标/递归防护/进化武器隔离）
+
+#### Bible Lv3: Expanding Aura (扩展光环)
+
+**设计概述**: Bible Lv3 时每 2 秒在玩家位置发射 60px 范围的伤害脉冲，造成 1.5 伤害。
+
+**关键设计决策**:
+- **脉冲以玩家为中心而非轨道刀片**: 轨道刀片已覆盖 80-120px 外环。脉冲覆盖 0-60px 内环死区，使 Bible 成为完整的区域控制武器。
+- **计时器放在 weapon_controller.gd**: 脉冲是 bible 武器的属性，不是 spin_blade 的属性。weapon_controller 已管理 weapon_timers 和 _physics_process。
+- **新增 create_pulse_ring_effect 视觉函数**: 在 weapon_effects.gd 中添加扩展环视觉，使用与 cone effect 相同的内联 GDScript 模式。
+
+**数值**: 间隔2.0s，半径60px，伤害1.5，预估 ~48 行代码。
+
+**DPS 影响**: +0.75 DPS 基础（~12.5% 相对提升），在 5 敌人群聚时 +3.75 总 DPS。
+
+**修改文件**: `scripts/weapon_controller.gd` + `scripts/weapons/weapon_effects.gd`（2 个文件）
+
+**测试用例**: 7 条
+
+#### Holy Water Lv3: Frost Blessing (冰霜祝福)
+
+**设计概述**: 圣水轨道刀片每次命中 15% 概率施加 0.5 秒冻结。
+
+**关键设计决策**:
+- **通过 spin_blade.gd 的 weapon_level 属性传递等级**: spin_blade 的 `_physics_process()` 中执行命中和冻结检查。通过 weapon_fire.gd `update_orbit()` 设置 weapon_level 属性，是最小侵入方式。
+- **15% 概率**: 3 刀片 * 3 命中/秒 * 15% = ~1.35 冻结/秒有效值。每秒约 1 次冻结，足以注意但不永久锁定敌人。
+- **与 frostaura Shatter 协同**: holywater 冻结可以设置 shatter 触发条件，这是有意为之的跨武器构建协同。
+
+**数值**: 冻结概率0.15，冻结持续0.5s，预估仅 ~6 行代码（7 种效果中最低）。
+
+**DPS 影响**: ~10% 间接提升（冻结敌人不移动，更容易被其他武器命中）。
+
+**修改文件**: `scripts/spin_blade.gd` + `scripts/weapons/weapon_fire.gd`（2 个文件）
+
+**测试用例**: 6 条
+
+#### Fire Staff Lv3: Searing Burst (灼烧爆发) -- 修订设计
+
+**设计概述**: 燃烧状态下的敌人在死亡时爆炸，对 45px 范围内所有敌人造成 3.0 伤害。
+
+**关键设计决策 -- 从 Burn Zone 修订为 Searing Burst**:
+
+原始设计（character-upgrade-paths.md Section 3）为"灼烧火焰"——命中位置生成持久化燃烧区域（40px Area2D, 1.0 DPS, 2s）。此方案排 Tier C 因为需要**新场景类型**。
+
+修订方案为"灼烧爆发"——燃烧敌人在死亡时触发爆炸。使用与 Shatter/Chain On Kill 相同的 die()-hook 模式，完全消除对新场景的需求：
+
+| 对比 | 原始 Burn Zone | 修订 Searing Burst |
+|---|---|---|
+| 新场景 | 1 (burn_zone.tscn) | 0 |
+| 新脚本 | 1 (burn_zone.gd) | 0 |
+| 代码行数 | ~60 | ~42 |
+| 持续性 | 持久 Area2D (2s 生命周期) | 瞬间爆炸 |
+| 总伤害/触发 | 1.0 DPS * 2s = 2.0 | 3.0 burst |
+
+**反递归**: Source "firestaff_burst" 防止无限连锁。但原始锥形命中的 `_last_hit_by = "firestaff"` 不会被 burst 覆盖，允许最大 2 层连锁（可接受的奖励）。
+
+**数值**: 半径45px，伤害3.0，预估 ~42 行代码。
+
+**DPS 影响**: ~0.4-0.9 DPS（~5-11% 情境提升）。
+
+**修改文件**: `scripts/weapons/weapon_fire.gd`（常量替换） + `scripts/enemy.gd`（2 个文件）
+
+**测试用例**: 8 条
+
+### 关键改进
+
+1. **Lightning 无需信号**: 原始评估假设需要信号连接 enemy -> weapon_controller，但 die()-hook 模式完全消除了这一需求。文件数从 3 减至 1。
+2. **Fire Staff 无需新场景**: 从 Tier C 的 60 行 + 1 场景 + 1 脚本，优化为 42 行 + 0 新文件。
+3. **全 7 种效果统一 die()-hook 模式**: Shatter / Chain On Kill / Searing Burst 都使用相同的 enemy.gd die() hook 模式，代码结构一致，易于维护。
+4. **总计 0 新场景、0 新信号**: 所有 7 种效果的实现完全基于现有代码结构，不需要任何新的场景文件或信号定义。
+
+### 输出文件
+
+| 文件 | 功能 | 优先级 |
+|---|---|---|
+| `docs/superpowers/specs/weapon-lv3-transforms.md` | 全部 7 种武器质变详细实现规格（Sections 3-12） | P1 HIGH |
+
+### 全 7 种效果实施成本总表
+
+| 排名 | 武器 | Lv3 效果 | 代码行数 | 新场景 | 新信号 |
+|---|---|---|---|---|---|
+| 1 | Knife | Ricochet (弹射1次, 50%伤害) | ~45 | 0 | 0 |
+| 2 | Frost Aura | Shatter (冻结死亡爆炸) | ~36 | 0 | 0 |
+| 3 | Boomerang | Homing Tweak (追踪角度+50%) | ~3 | 0 | 0 |
+| 4 | Lightning | Chain On Kill (击杀额外闪电) | ~32 | 0 | 0 |
+| 5 | Bible | Expanding Aura (周期脉冲) | ~48 | 0 | 0 |
+| 6 | Holy Water | Frost Blessing (15%冻结) | ~6 | 0 | 0 |
+| 7 | Fire Staff | Searing Burst (燃烧死亡爆炸) | ~42 | 0 | 0 |
+| -- | **合计** | | **~212** | **0** | **0** |
+
+### 决策记录
+
+**Lightning die()-hook 模式**:
+- **决策**: 使用 enemy.gd die() 中的 _handle_lightning_cok() 函数，不使用信号
+- **为什么**: 分析代码后发现 fire_lightning() 是同步调用，die()-hook 可直接访问 _last_hit_by 和 player.owned_weapons。不需要异步信号回调，减少 2 个文件的修改和 1 个信号定义
+- **放弃的替代方案**: 信号 enemy.killed -> weapon_controller._on_lightning_kill（增加耦合度，需要 weapon_controller 知道 lightning 武器的击杀事件）
+
+**Bible 脉冲计时器位置**:
+- **决策**: 计时器放在 weapon_controller.gd，不在 spin_blade.gd
+- **为什么**: 脉冲是 bible 武器的行为，不是轨道刀片的行为。weapon_controller 已有 _physics_process 和 weapon_timers 字典，是天然的计时器管理位置。spin_blade.gd 是通用轨道脚本，不应包含特定武器逻辑
+- **放弃的替代方案**: spin_blade.gd 中添加 bible 专属逻辑（违反通用组件原则）
+
+**Holy Water weapon_level 传递**:
+- **决策**: 在 spin_blade.gd 添加 weapon_level 变量，由 weapon_fire.gd update_orbit() 设置
+- **为什么**: spin_blade._physics_process() 执行命中检测和伤害，冻结检查必须在命中点。通过属性传递等级是最简单方式，不需要修改 setup() 签名（setup 被 holywater/bible/evolved 多处调用）
+- **放弃的替代方案**: (1) 修改 setup() 签名添加 level 参数（影响所有调用者）；(2) 通过信号通知 weapon_controller（增加耦合，异步时序问题）
+
+**Fire Staff Searing Burst 修订**:
+- **决策**: 用死亡爆炸替代持久化燃烧区域
+- **为什么**: 原始 Burn Zone 方案需要新场景类型（持久化 Area2D + tick 伤害），是 7 种效果中唯一需要新场景的。修订为 die()-hook 爆炸后，所有 7 种效果都不需要新场景。实现成本从 60 行 + 1 场景 + 1 脚本降至 42 行 + 0 新文件
+- **放弃的替代方案**: (1) 保持原始 Burn Zone 方案（成本最高，Tier C 排名原因）；(2) 完全移除 Fire Staff Lv3 效果（减少多样性）
+
+### 自评打分
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 规格精度 | 9/10 | 精确到函数名、行号范围、代码片段（所有代码基于实际文件内容编写） |
+| 数值表完整性 | 10/10 | 每种效果有完整常量表、变量定义、GDScript 代码块 |
+| 测试覆盖 | 9/10 | 每种效果有 6-8 条测试用例，覆盖 Lv1/Lv2/Lv3/进化武器/反递归/协同 |
+| 设计决策记录 | 9/10 | 总计 20 个决策条目（TOP3 有 8 个，新增 4 武器 12 个），每个有原因和替代方案 |
+| 平衡性分析 | 9/10 | 每种效果有 DPS 计算、与当前 DPS 对比、连锁反应分析、协同分析 |
+| 代码结构一致性 | 10/10 | 所有 3 种 die()-hook 效果使用相同模式，weapon_level 属性传递模式在 projectile.gd 和 spin_blade.gd 间一致 |
+| 原始设计优化 | 9/10 | Lightning 从 3 文件减至 1 文件，Fire Staff 从新场景减至 0 新场景，总量从预估 ~186 行优化至 ~128 行（Tier B+C） |
+
+**综合评分**: 93/100
+
+### 改进空间
+1. Fire Staff Searing Burst 的 2 层连锁可能比理论分析更强（原始锥形命中设置 `_last_hit_by` 在多个敌人上，burst 击杀不会覆盖），需要 QA 实测验证
+2. Bible 脉冲视觉效果（create_pulse_ring_effect）使用了 draw_arc，在大量脉冲同时触发时可能有性能影响（每脉冲 1 个 Node2D + _process + _draw）
+3. Lightning COK 的随机目标选择在极端情况下（1 个弱敌 + 1 个 Boss）可能随机打到 Boss 身上只造成微量伤害，缺乏智能目标优先级
+4. 全 7 种效果总计 ~212 行新增代码，其中 ~102 行集中在 enemy.gd（Shatter 36 + COK 32 + Burst 42 + die() 修改），enemy.gd 膨胀需要关注

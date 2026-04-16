@@ -17,6 +17,14 @@ var slow_pct: float = 0.0
 # Kill attribution
 var weapon_id: String = ""
 var is_crit: bool = false
+var weapon_level: int = 1
+
+# Knife Lv3 Ricochet constants
+const KNIFE_LV3_RICOCHET_RANGE: float = 100.0
+const KNIFE_LV3_RICOCHET_DAMAGE_MUL: float = 0.5
+const KNIFE_LV3_RICOCHET_SPEED: float = 300.0
+const KNIFE_LV3_RICOCHET_SIZE: float = 4.0
+const KNIFE_LV3_RICOCHET_LIFETIME: float = 0.5
 
 
 func setup(pos: Vector2, target_pos: Vector2, spd: float, dmg: float, prc: int, col: Color, sz: float):
@@ -68,6 +76,37 @@ func _on_body_entered(body: Node2D):
 		if slow_pct > 0.0 and body.has_method("apply_slow"):
 			body.apply_slow(slow_pct)
 		_hit_enemies.append(body)
+
+		# Knife Lv3 Ricochet: bounce to a nearby enemy
+		if weapon_id == "knife" and weapon_level >= 3:
+			_spawn_ricochet(body)
+
 		pierce -= 1
 		if pierce <= 0:
 			queue_free()
+
+
+func _spawn_ricochet(primary_target: Node2D) -> void:
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	var best_enemy: Node2D = null
+	var best_dist: float = KNIFE_LV3_RICOCHET_RANGE
+	for enemy in enemies:
+		if is_instance_valid(enemy) and enemy.is_alive and enemy != primary_target and not enemy in _hit_enemies:
+			var dist := global_position.distance_to(enemy.global_position)
+			if dist < best_dist:
+				best_dist = dist
+				best_enemy = enemy
+	if best_enemy == null:
+		return
+	var ricochet: Area2D = preload("res://scenes/projectile.tscn").instantiate()
+	ricochet.global_position = primary_target.global_position
+	ricochet.direction = primary_target.global_position.direction_to(best_enemy.global_position)
+	ricochet.speed = KNIFE_LV3_RICOCHET_SPEED
+	ricochet.damage = damage * KNIFE_LV3_RICOCHET_DAMAGE_MUL
+	ricochet.pierce = 0
+	ricochet.color = Color(1.0, 0.9, 0.5)  # Golden tint
+	ricochet.size = KNIFE_LV3_RICOCHET_SIZE
+	ricochet.weapon_id = "knife"
+	ricochet.weapon_level = weapon_level
+	ricochet.lifetime = KNIFE_LV3_RICOCHET_LIFETIME
+	get_parent().call_deferred("add_child", ricochet)

@@ -1,19 +1,19 @@
 # Test Coverage Report
 
-Generated: 2026-04-16 R12
-QA Agent: Task 12D (Sentinel Totem + DPS Balance Regression)
+Generated: 2026-04-16 R13
+QA Agent: Task 13D (Lv3 Weapon Transforms + Orphan Analysis)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total test files | 41 |
-| Total test functions | 999 |
-| Assertions | 2504 |
-| Passing | 997 |
+| Total test files | 43 |
+| Total test functions | 1044 |
+| Assertions | 2581 |
+| Passing | 1042 |
 | Pending | 2 (chest.png missing) |
 | Failing | 0 |
-| Orphans | 84 |
+| Orphans | 84 (BUG-101: enemy.gd triple-quote parse error) |
 
 ## Test File Inventory
 
@@ -48,6 +48,7 @@ QA Agent: Task 12D (Sentinel Totem + DPS Balance Regression)
 | test_weapon_evolution.gd | 18 | Evolution recipes (8), recipe structure, check_evolution_available, evolved weapon data, UpgradePool integration |
 | test_weapon_registry.gd | 16 | Recipe count, structure, ingredient validation, unique results, evolution matching |
 | test_weapon_balance.gd | 16 | DPS balance regression: thunderang/fireknife/blazerang/frostknife/thunderholywater nerf/buff verification, global weapon damage/cooldown invariant checks |
+| test_weapon_lv3_transforms.gd | 17 | Lv3 quality transforms: Knife ricochet (constants, weapon_level, Lv2 no-ricochet, evolved no-ricochet, method existence, call_deferred), Frost Aura shatter (constants, method existence, freeze check, level check, Lv2 guard, die() call), Boomerang tracking (1.5x multiplier, formula, Lv3 actual, Lv2 no-bonus, evolved direct) |
 | test_sentinel_totem.gd | 16 | Sentinel Totem (bible+boomerang): registration, orbit type, orbit_fire_rate, evolution recipe, damage, orbit_count, radius/speed/projectile fields |
 | test_boomerang.gd | 18 | Boomerang flight, return, property preservation |
 | test_evolved_weapon_sprites.gd | 20 | Projectile evolved sprites (fireknife/frostknife), boomerang evolved sprites (thunderang/blazerang), fallback logic, resource existence |
@@ -155,12 +156,34 @@ QA Agent: Task 12D (Sentinel Totem + DPS Balance Regression)
 | Boss flag on wave 5 | X | X |
 | Spawn rate floor at high cycle | X | X |
 
+## Coverage Matrix: Lv3 Weapon Quality Transforms
+
+| Transform | test_weapon_lv3_transforms | test_weapon_fire | test_integration |
+|-----------|---------------------------|------------------|------------------|
+| Knife Lv3 ricochet constants | X | | |
+| Knife Lv3 weapon_level set | X | | |
+| Knife Lv2 no ricochet | X | | |
+| Knife evolved no ricochet | X | | |
+| Knife ricochet method/code | X | | |
+| Frost Aura Lv3 shatter constants | X | | |
+| Frost Aura Lv3 method exists | X | | |
+| Frost Aura Lv3 checks frozen | X | | |
+| Frost Aura Lv3 checks level | X | | |
+| Frost Aura Lv2 no shatter | X | | |
+| Frost Aura die() calls shatter | X | | |
+| Boomerang Lv3 1.5x tracking | X | | |
+| Boomerang Lv3 formula | X | | |
+| Boomerang Lv3 actual fire | X | | |
+| Boomerang Lv2 no bonus | X | | |
+| Boomerang evolved direct data | X | | |
+| Knife fire + weapon_level | | X | X |
+
 ## Source File Coverage
 
 | Source File | Test File(s) | Status |
 |-------------|-------------|--------|
 | scripts/player.gd | test_player_logic, test_player_dash, test_character_skills, test_comprehensive | Covered |
-| scripts/enemy.gd | test_enemy_logic, test_endless_mode, test_fire_slime | Covered |
+| scripts/enemy.gd | test_enemy_logic, test_endless_mode, test_fire_slime, test_weapon_lv3_transforms | Covered |
 | scripts/enemy_spawner.gd | test_enemy_spawner | Covered |
 | scripts/arena.gd | test_arena_screen_shake, test_chest_system | Covered |
 | scripts/hud.gd | test_hud, test_hud_skill_button, test_hud_toast | Covered |
@@ -175,11 +198,11 @@ QA Agent: Task 12D (Sentinel Totem + DPS Balance Regression)
 | scripts/autoload/upgrade_pool.gd | test_upgrade_pool, test_integration, test_sentinel_totem, test_weapon_balance | Covered |
 | scripts/autoload/synergy_manager.gd | test_synergy_manager, test_integration | Covered |
 | scripts/weapon_controller.gd | test_weapon_controller, test_integration | Covered |
-| scripts/weapons/weapon_fire.gd | test_weapon_fire, test_integration, test_comprehensive, test_sentinel_totem | Covered |
+| scripts/weapons/weapon_fire.gd | test_weapon_fire, test_integration, test_comprehensive, test_sentinel_totem, test_weapon_lv3_transforms | Covered |
 | scripts/weapons/weapon_registry.gd | test_weapon_registry, test_weapon_evolution, test_sentinel_totem | Covered |
 | scripts/weapons/boomerang.gd | test_boomerang, test_evolved_weapon_sprites | Covered |
 | scripts/weapons/weapon_effects.gd | test_integration | Covered |
-| scripts/projectile.gd | test_projectile, test_evolved_weapon_sprites | Covered |
+| scripts/projectile.gd | test_projectile, test_evolved_weapon_sprites, test_weapon_lv3_transforms | Covered |
 | scripts/enemy_bullet.gd | test_enemy_bullet | Covered |
 | scripts/xp_gem.gd | test_xp_gem | Covered |
 | scripts/pickup_manager.gd | test_endless_mode (indirect) | Covered |

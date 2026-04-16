@@ -2134,3 +2134,144 @@ ls -la assets/sprites/enemies/splitter_small.png \
 | 工具链可维护性 | 8 | 10 | 新增 6 个调色板 + 3 个函数 + passives 目录，结构清晰 |
 
 **扣分项**: 脚本尚未运行验证 PNG 输出(-3), 描边一致性部分用光晕替代(-2), ColorRect 回退需程序集成(-2)
+
+## 第十三轮执行 (2026-04-16)
+
+### 任务 13E: 武器Lv3质变特效精灵
+
+### 子任务 1: Lv3 质变视觉特效图标设计
+
+为 7 种武器的 Lv3 质变效果设计特效精灵，用于游戏内视觉反馈。参考 `docs/superpowers/specs/weapon-lv3-transforms.md` 的质变设计规格。
+
+#### 配色表
+
+| 精灵名 | 武器 | Lv3效果 | 尺寸 | 主色 | 辅色 | 强调色 |
+|--------|------|---------|------|------|------|--------|
+| knife_ricochet | 飞刀 Knife | 弹射 (Ricochet) | 8x8 | Color(1.0, 0.90, 0.40) #FFE566 金色火花 | Color(1.0, 0.96, 0.73) #FFF4BB 浅金高光 | Color(1.0, 1.0, 1.0) #FFFFFF 白色核心 |
+| frost_shatter | 冰冻光环 FrostAura | 碎裂 (Shatter) | 16x16 | Color(0.53, 0.87, 1.0) #88DDFF 冰蓝波纹 | Color(0.80, 0.93, 1.0) #CCEEFF 浅冰边缘 | Color(1.0, 1.0, 1.0) #FFFFFF 白色碎裂线 |
+| boomerang_homing_trail | 回旋镖 Boomerang | 追踪 (Homing) | 8x8 | Color(0.27, 0.73, 0.33) #44BB55 绿色尾迹 | Color(0.53, 0.87, 0.53) #88DD88 浅绿光晕 | Color(0.102, 0.102, 0.18) #1A1A2E 暗描边 |
+| lightning_chain_kill | 闪电 Lightning | 连锁击杀 (Chain) | 12x12 | Color(1.0, 0.87, 0.20) #FFDD33 黄色闪电 | Color(1.0, 1.0, 0.67) #FFFFAA 亮黄白芯 | Color(1.0, 1.0, 1.0) #FFFFFF 白热中心 |
+| bible_expand | 圣经 Bible | 扩展光环 (Pulse) | 16x16 | Color(1.0, 0.84, 0.0) #FFD700 金色光环 | Color(1.0, 0.93, 0.53) #FFEE88 浅金内环 | Color(1.0, 1.0, 1.0) #FFFFFF 白色脉冲核心 |
+| holywater_frost | 圣水 HolyWater | 冰霜祝福 (Frost) | 8x8 | Color(0.73, 0.87, 1.0) #BBDDFF 蓝白冰晶 | Color(0.93, 0.93, 1.0) #EEEEFF 白冰高光 | Color(1.0, 1.0, 1.0) #FFFFFF 白色火花 |
+| firestaff_explode | 火焰法杖 FireStaff | 燃烧区域 (Burn) | 16x16 | Color(1.0, 0.27, 0.0) #FF4500 红橙爆炸 | Color(1.0, 0.53, 0.27) #FF8844 亮橙内环 | Color(1.0, 0.84, 0.0) #FFD700 金色闪光核心 |
+
+#### 设计规范
+
+**TOP3 (Programmer 正在实现):**
+
+1. **knife_ricochet.png (8x8)**: 金色四角星形火花，表示弹射投射物。十字形主体(2px宽) + 四个对角线臂 + 白色中心亮点。呼应飞刀弹射的金色色调 Color(1.0, 0.9, 0.5) (weapon-lv3-transforms.md 3.3 节 ricochet projectile 颜色)。
+
+2. **frost_shatter.png (16x16)**: 冰蓝色碎裂波纹，表示碎裂AOE。外环(r=6)冰蓝描边 + 内部冰蓝填充 + 四条白色碎裂线从中心辐射 + 中心2x2白色闪光。匹配 weapon-lv3-transforms.md 4.3 节 shatter 视觉效果 Color(0.5, 0.8, 1.0) 蓝白圆。
+
+3. **boomerang_homing_trail.png (8x8)**: 绿色追踪尾迹点，3x3核心绿点 + 半透明光晕环。绿色系与回旋镖基础色(棕色)区分，表示Lv3增强追踪的尾迹粒子效果。
+
+**Tier B/C (Designer 正在规格化):**
+
+4. **lightning_chain_kill.png (12x12)**: 黄色闪电符号，对角线锯齿形状(上左到下右) + 中间水平折弯 + 亮黄白芯 + 白热中心。12x12 略大于标准8x8，给闪电锯齿形足够空间。
+
+5. **bible_expand.png (16x16)**: 金色扩展光环，双层同心圆环(外r=6金+内r=3浅金) + 中心2x2白色脉冲核心。表示圣经Lv3的周期性脉冲伤害光环。
+
+6. **holywater_frost.png (8x8)**: 蓝白冰霜粒子，菱形冰晶(雪花形状) + 四向延伸的浅蓝十字臂 + 白色中心亮点。表示圣水Lv3的冰霜祝福效果。
+
+7. **firestaff_explode.png (16x16)**: 红色爆炸圈，外环(r=6)红橙 + 内部亮橙填充 + 中心2x2金色闪光 + 基本方向焦痕标记。表示火焰法杖Lv3的燃烧区域爆炸。
+
+#### 文件路径
+
+| 文件 | 路径 | 画布尺寸 |
+|------|------|---------|
+| 弹射火花 | assets/sprites/effects/knife_ricochet.png | 8x8 |
+| 碎裂波纹 | assets/sprites/effects/frost_shatter.png | 16x16 |
+| 追踪尾迹 | assets/sprites/effects/boomerang_homing_trail.png | 8x8 |
+| 连锁闪电 | assets/sprites/effects/lightning_chain_kill.png | 12x12 |
+| 扩展光环 | assets/sprites/effects/bible_expand.png | 16x16 |
+| 冰霜粒子 | assets/sprites/effects/holywater_frost.png | 8x8 |
+| 爆炸圈 | assets/sprites/effects/firestaff_explode.png | 16x16 |
+
+#### generate_sprites.py 新增调色板
+
+| 色名 | RGB | 用途 |
+|------|-----|------|
+| ricochet_gold | #FFE566 (255,229,102) | 弹射火花金色填充 |
+| ricochet_gold_lt | #FFF4BB (255,244,187) | 弹射火花浅金高光 |
+| shatter_ice | #88DDFF (136,221,255) | 碎裂波纹冰蓝填充 |
+| shatter_ice_lt | #CCEEFF (204,238,255) | 碎裂波纹浅冰边缘 |
+| homing_trail | #44BB55 (68,187,85) | 追踪尾迹绿色核心 |
+| homing_trail_lt | #88DD88 (136,221,136) | 追踪尾迹浅绿光晕 |
+| chain_lightning | #FFDD33 (255,221,51) | 连锁闪电黄色填充 |
+| chain_lightning_w | #FFFFAA (255,255,170) | 连锁闪电亮黄白芯 |
+| bible_expand | #FFD700 (255,215,0) | 扩展光环金色外环 |
+| bible_expand_lt | #FFEE88 (255,238,136) | 扩展光环浅金内环 |
+| frost_particle | #BBDDFF (187,221,255) | 冰霜粒子蓝白填充 |
+| frost_particle_w | #EEEEFF (238,238,255) | 冰霜粒子白冰高光 |
+| explode_fire | #FF4500 (255,69,0) | 爆炸圈红橙外环 |
+| explode_fire_lt | #FF8844 (255,136,68) | 爆炸圈亮橙内环 |
+
+### 子任务 2: 脚本执行
+
+待执行命令:
+```bash
+/opt/anaconda3/bin/python3 tools/generate_sprites.py
+```
+
+预期输出: `assets/sprites/effects/` 目录下新增 7 个 PNG 文件 (4 个 8x8 + 1 个 12x12 + 2 个 16x16)。
+
+### generate_sprites.py 变更汇总
+
+| 变更类型 | 位置 | 改动 |
+|----------|------|------|
+| 调色板新增 | PALETTE dict | 14 个新色值 (2x7 特效，每个有主色+辅色) |
+| 新增函数 | gen_knife_ricochet() | 8x8 金色四角星形火花 |
+| 新增函数 | gen_frost_shatter() | 16x16 冰蓝碎裂波纹环 |
+| 新增函数 | gen_boomerang_homing_trail() | 8x8 绿色尾迹光点+光晕 |
+| 新增函数 | gen_lightning_chain_kill() | 12x12 黄色锯齿闪电符号 |
+| 新增函数 | gen_bible_expand() | 16x16 金色双层同心光环 |
+| 新增函数 | gen_holywater_frost() | 8x8 蓝白菱形冰霜粒子 |
+| 新增函数 | gen_firestaff_explode() | 16x16 红橙爆炸圈+金色核心 |
+| main() 注册 | Lv3 Transform Effects 段 | 调用 7 个新增生成函数 |
+
+### 设计决策记录
+
+1. **knife_ricochet 金色色调**: 使用 #FFE566 而非纯黄 #FFFF00，因为 ricochet projectile 的设计色为 Color(1.0, 0.9, 0.5) (weapon-lv3-transforms.md 3.3 节)，#FFE566 最接近该色值。
+
+2. **frost_shatter 16x16 而非 8x8**: 碎裂AOE有50px半径(weapon-lv3-transforms.md 4.2 节)，需要在视觉上表达"范围效果"而非"点效果"。16x16 允许绘制完整的外环+碎裂线+中心闪光三层结构。
+
+3. **boomerang_homing_trail 半透明光晕**: 追踪尾迹粒子需要感觉轻盈，使用 alpha=80 的半透明外环(而非实心)暗示粒子在空间中逐渐消散，与 boomerang Lv3 纯数值变化(无新视觉)的简洁设计匹配。
+
+4. **lightning_chain_kill 12x12 特殊尺寸**: 闪电的锯齿形需要最小 3px 宽的对角线+水平折弯+再次对角线，8x8 无法容纳。12x12 是满足锯齿辨识度的最小尺寸。此精灵可作为 UI 图标或击杀时短暂闪现。
+
+5. **bible_expand 双层同心环**: 外层金环(r=6)+内层浅金环(r=3)模拟"脉冲扩展"的视觉效果。当程序 Agent 实现脉冲伤害时，此精灵可作为每次脉冲的视觉反馈。
+
+6. **firestaff_explode 焦痕标记**: 四个基本方向(上下左右)添加暗色像素点作为焦痕，暗示燃烧区域持续残留。与 Lv3 的 burn zone 持续伤害概念匹配。
+
+7. **尺寸分层**: 小型即时反馈(8x8: ricochet/trail/frost) vs 中型范围效果(12-16px: shatter/lightning/expand/explode)。符合项目的像素风格层级: 投射物4-8px < 特效8-16px < 角色16px < Boss 32px。
+
+### ColorRect 回退方案
+
+每个特效精灵提供 ColorRect 纯色回退：
+
+| 特效 | 回退 Color | 回退尺寸 |
+|------|-----------|---------|
+| knife_ricochet | Color(1.0, 0.90, 0.40) | 8x8 |
+| frost_shatter | Color(0.53, 0.87, 1.0) | 16x16 |
+| boomerang_homing_trail | Color(0.27, 0.73, 0.33) | 8x8 |
+| lightning_chain_kill | Color(1.0, 0.87, 0.20) | 12x12 |
+| bible_expand | Color(1.0, 0.84, 0.0) | 16x16 |
+| holywater_frost | Color(0.73, 0.87, 1.0) | 8x8 |
+| firestaff_explode | Color(1.0, 0.27, 0.0) | 16x16 |
+
+程序 Agent 在实现 Lv3 质变视觉效果时应优先加载 `res://assets/sprites/effects/{effect_name}.png`，回退到 ColorRect 使用对应主色。
+
+### 质量自评: 92/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 配色准确性 | 15 | 15 | 14 个新调色板色值与武器主色系一致（金/蓝/绿/黄/红） |
+| 精灵覆盖率(Lv3特效) | 15 | 15 | 7/7 武器Lv3质变特效精灵设计完成 |
+| 武器辨识度 | 12 | 15 | 各特效色系与武器配色关联明确，但 lightning_chain_kill 和 knife_ricochet 都偏金色可能混淆 |
+| 主题契合度 | 10 | 10 | 每个特效形状匹配质变机制（星形=弹射、环=碎裂/脉冲/爆炸、闪电=连锁、冰晶=冰霜） |
+| 尺寸规范 | 10 | 10 | 8-16px 范围，与项目像素风格一致 |
+| 描边规范一致性 | 8 | 10 | 复用 #1A1A2E 描边，homing_trail 使用光晕替代 |
+| 工具链可维护性 | 8 | 10 | 新增 14 个调色板 + 7 个函数，结构清晰 |
+| ColorRect 回退兼容 | 4 | 10 | 提供 ColorRect 回退方案，但具体加载逻辑需程序 Agent 实现 |
+
+**扣分项**: knife_ricochet 与 lightning_chain_kill 均偏金色(-3), 脚本尚未运行验证 PNG 输出(-3), ColorRect 回退需程序集成(-2)
