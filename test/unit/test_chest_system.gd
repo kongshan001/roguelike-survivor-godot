@@ -301,9 +301,6 @@ func test_chest_scene_collision_layer():
 
 
 func test_chest_builds_visual_on_ready():
-	# NOTE: Pending until chest.png sprite is added to project.
-	# _ready() loads missing asset causing engine error in GUT headless mode.
-	pending("BUG: chest.png sprite missing, _ready() load fails")
 	var chest: Area2D = _create_chest()
 	var has_visual: bool = false
 	var has_collision: bool = false
@@ -322,8 +319,6 @@ func test_chest_builds_visual_on_ready():
 
 
 func test_chest_prompt_hidden_initially():
-	# NOTE: Pending until chest.png sprite is added to project.
-	pending("BUG: chest.png sprite missing, _ready() load fails")
 	var chest: Area2D = _create_chest()
 	var prompt: Label = chest.get_node_or_null("PromptLabel")
 	assert_not_null(prompt, "PromptLabel should exist")

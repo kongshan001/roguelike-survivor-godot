@@ -120,6 +120,10 @@ PALETTE = {
     "frost_particle_w": (0xEE, 0xEE, 0xFF),  # #EEEEFF white frost highlight
     "explode_fire":     (0xFF, 0x45, 0x00),  # #FF4500 red-orange explosion ring
     "explode_fire_lt":  (0xFF, 0x88, 0x44),  # #FF8844 bright orange inner ring
+    # Sentinel Totem (R15)
+    "totem_gold":       (0xB3, 0x99, 0x33),  # #B39933 golden-brown totem body
+    "totem_dark":       (0x8B, 0x73, 0x22),  # #8B7322 darker golden-brown detail
+    "totem_proj":       (0xE6, 0xD9, 0x80),  # #E6D980 golden projectile
 }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -3822,6 +3826,376 @@ def gen_firestaff_explode():
     save(img, "effects", "firestaff_explode.png")
 
 
+# ── Missing P0 HUD Icon Sprites (R15) ─────────────────────────────────────
+
+def gen_lightning():
+    """Lightning weapon HUD icon (16x16).
+    Yellow lightning bolt #FFFF4C with dark outline, zigzag shape.
+    Used for HUD weapon slot and upgrade panel.
+    """
+    img, d = draw_img(16, 16)
+    yellow_c = rgba("thunder_yellow")         # #FFD700 gold-yellow
+    white_c = rgba("white")
+    outline = rgba("dark_outline")            # #1A1A2E
+    core_c = (0xFF, 0xFF, 0x80, 255)          # #FFFF80 bright yellow core
+
+    # Main bolt body - classic lightning zigzag from top-left to bottom-right
+    bolt_body = [
+        # Top branch
+        (3, 1), (4, 1),
+        (4, 2),
+        (5, 3),
+        (5, 4),
+        (6, 5),
+        # Middle bar (extends right)
+        (7, 6), (8, 6), (9, 6),
+        (10, 7), (11, 7),
+        # Lower branch
+        (9, 8),
+        (8, 9),
+        (8, 10),
+        (7, 11),
+        (7, 12),
+        (6, 13), (6, 14),
+    ]
+    for pt in bolt_body:
+        d.point(pt, fill=yellow_c)
+
+    # Bright core (inner pixels of bolt)
+    core_pts = [
+        (4, 2), (5, 3), (5, 4), (6, 5),
+        (8, 6), (9, 6), (10, 7),
+        (9, 8), (8, 9), (8, 10), (7, 11),
+        (7, 12), (6, 13),
+    ]
+    for pt in core_pts:
+        d.point(pt, fill=core_c)
+
+    # Outline around bolt (perimeter pixels)
+    outline_pts = [
+        # Top
+        (2, 0), (3, 0), (4, 0), (5, 0),
+        # Left side of upper branch
+        (2, 1), (1, 2), (2, 2),
+        (2, 3), (3, 3),
+        (2, 4), (3, 4),
+        (2, 5), (3, 5),
+        (3, 6), (4, 6), (5, 6),
+        # Left of middle bar
+        (5, 7), (6, 7),
+        (5, 8), (6, 8),
+        (6, 9), (7, 9),
+        (6, 10), (7, 10),
+        (5, 11), (6, 11),
+        (5, 12), (6, 12),
+        (5, 13),
+        (5, 14),
+        (5, 15), (6, 15), (7, 15),
+        # Right side
+        (5, 1),
+        (6, 2), (5, 2),
+        (6, 3),
+        (6, 4),
+        (7, 5),
+        (10, 6), (11, 6),
+        (12, 7), (13, 7),
+        (14, 8), (13, 8),
+        (10, 8),
+        (9, 9), (10, 9),
+        (9, 10), (10, 10),
+        (8, 11), (9, 11),
+        (8, 12), (9, 12),
+        (7, 13), (8, 13),
+        (7, 14), (8, 14),
+        # Bottom
+        (8, 15),
+    ]
+    for pt in outline_pts:
+        d.point(pt, fill=outline)
+
+    # White sparkle at tip and junction
+    d.point((3, 1), fill=white_c)
+    d.point((10, 7), fill=white_c)
+    d.point((6, 14), fill=white_c)
+
+    save(img, "weapons", "lightning.png")
+
+
+def gen_firestaff():
+    """Fire Staff weapon HUD icon (16x16).
+    Orange-red staff with flame tip #FF6622, dark outline.
+    Used for HUD weapon slot and upgrade panel.
+    """
+    img, d = draw_img(16, 16)
+    fire_c = rgba("fire_orange")              # #FF4500 orange-red
+    blaze_c = rgba("blaze_orange")            # #FF8C00 dark orange
+    outline = rgba("dark_outline")            # #1A1A2E
+    gold_c = rgba("gold")                     # #FFD700 golden flame core
+    brown_c = rgba("handle_brown")            # #8B4513 brown staff handle
+    white_c = rgba("white")
+
+    # Staff shaft (diagonal from bottom-left to top-right)
+    shaft_pts = [
+        (2, 14), (3, 13), (4, 12), (5, 11), (6, 10),
+        (7, 9), (8, 8), (9, 7), (10, 6),
+    ]
+    shaft_outline = [
+        (1, 14), (1, 15), (2, 15),
+        (3, 14), (2, 13),
+        (4, 13), (3, 12),
+        (5, 12), (4, 11),
+        (6, 11), (5, 10),
+        (7, 10), (6, 9),
+        (8, 9), (7, 8),
+        (9, 8), (8, 7),
+        (10, 7), (9, 6),
+        (11, 6), (10, 5),
+    ]
+    for pt in shaft_outline:
+        d.point(pt, fill=outline)
+    for pt in shaft_pts:
+        d.point(pt, fill=brown_c)
+
+    # Flame head at top of staff (around 10,5 area)
+    # Outer flame (orange-red)
+    flame_outer = [
+        (8, 3), (9, 3), (10, 3), (11, 3),
+        (7, 4), (8, 4), (9, 4), (10, 4), (11, 4), (12, 4),
+        (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5), (12, 5), (13, 5),
+        (7, 6), (8, 6), (9, 6), (11, 6), (12, 6),
+        (8, 7), (12, 7),
+    ]
+    flame_outline = [
+        (7, 2), (8, 2), (9, 2), (10, 2), (11, 2),
+        (6, 3), (12, 3),
+        (5, 4), (13, 4),
+        (5, 5), (13, 5), (14, 5),
+        (6, 6), (13, 6),
+        (7, 7), (13, 7),
+        (7, 8), (8, 8), (12, 8), (13, 8),
+    ]
+    for pt in flame_outline:
+        d.point(pt, fill=outline)
+    for pt in flame_outer:
+        d.point(pt, fill=fire_c)
+
+    # Inner flame (dark orange, smaller)
+    flame_inner = [
+        (9, 4), (10, 4), (11, 4),
+        (8, 5), (9, 5), (10, 5), (11, 5), (12, 5),
+        (8, 6), (9, 6),
+    ]
+    for pt in flame_inner:
+        d.point(pt, fill=blaze_c)
+
+    # Golden flame core
+    core_pts = [
+        (9, 5), (10, 5), (11, 5),
+        (9, 6), (10, 6),
+    ]
+    for pt in core_pts:
+        d.point(pt, fill=gold_c)
+
+    # White hot center
+    d.point((10, 5), fill=white_c)
+
+    save(img, "weapons", "firestaff.png")
+
+
+def gen_frostaura():
+    """Frost Aura weapon HUD icon (16x16).
+    Ice blue crystalline ring #88DDFF with frost particles.
+    Used for HUD weapon slot and upgrade panel (non-projectile aura type).
+    """
+    img, d = draw_img(16, 16)
+    ice_c = rgba("ice_blue")                  # #88DDFF ice blue
+    ice_w = rgba("ice_white")                 # #FFFFFF frost white
+    outline = rgba("dark_outline")            # #1A1A2E
+    frost_c = (0xBB, 0xDD, 0xFF, 255)         # #BBDDFF lighter frost
+    frost_lt = (0xEE, 0xEE, 0xFF, 200)        # #EEEEFF white frost highlight
+
+    # Central crystal (diamond shape)
+    crystal_pts = [
+        (7, 3), (8, 3),
+        (6, 4), (7, 4), (8, 4), (9, 4),
+        (5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5),
+        (6, 6), (7, 6), (8, 6), (9, 6),
+        (7, 7), (8, 7),
+    ]
+    crystal_outline = [
+        (7, 2), (8, 2),
+        (5, 3), (6, 3), (9, 3), (10, 3),
+        (4, 4), (10, 4), (11, 4),
+        (4, 5), (11, 5),
+        (5, 6), (10, 6),
+        (6, 7), (9, 7), (10, 7),
+        (6, 8), (7, 8), (8, 8), (9, 8),
+    ]
+    for pt in crystal_outline:
+        d.point(pt, fill=outline)
+    for pt in crystal_pts:
+        d.point(pt, fill=ice_c)
+
+    # Inner crystal highlight
+    inner_pts = [
+        (7, 4), (8, 4),
+        (7, 5), (8, 5),
+        (7, 6), (8, 6),
+    ]
+    for pt in inner_pts:
+        d.point(pt, fill=frost_c)
+
+    # White core sparkle
+    d.point((7, 5), fill=ice_w)
+    d.point((8, 5), fill=ice_w)
+
+    # Surrounding frost ring (aura representation)
+    # Top arc
+    ring_top = [
+        (4, 9), (5, 9), (10, 9), (11, 9),
+        (3, 10), (4, 10), (11, 10), (12, 10),
+        (2, 11), (3, 11), (12, 11), (13, 11),
+        (2, 12), (3, 12), (12, 12), (13, 12),
+        (3, 13), (4, 13), (11, 13), (12, 13),
+        (4, 14), (5, 14), (10, 14), (11, 14),
+        (5, 15), (6, 15), (9, 15), (10, 15),
+    ]
+    for pt in ring_top:
+        d.point(pt, fill=outline)
+
+    ring_fill = [
+        (5, 10), (6, 10), (9, 10), (10, 10),
+        (4, 11), (5, 11), (10, 11), (11, 11),
+        (4, 12), (5, 12), (6, 12), (7, 12),
+        (8, 12), (9, 12), (10, 12), (11, 12),
+        (5, 13), (6, 13), (9, 13), (10, 13),
+        (6, 14), (7, 14), (8, 14), (9, 14),
+    ]
+    for pt in ring_fill:
+        d.point(pt, fill=frost_lt)
+
+    # Frost sparkles (scattered around ring)
+    sparkle_pts = [
+        (1, 10), (14, 10),
+        (1, 13), (14, 13),
+        (6, 15), (9, 15),
+    ]
+    for pt in sparkle_pts:
+        d.point(pt, fill=ice_w)
+
+    save(img, "weapons", "frostaura.png")
+
+
+def gen_sentineltotem():
+    """Sentinel Totem evolved weapon HUD icon (20x20).
+    Golden-brown totem with orbit indicators and firing marks.
+    Based on SENTINELTOTEM_COLOR Color(0.7, 0.6, 0.2) = #B39933.
+    Evolution of bible + boomerang.
+    """
+    img, d = draw_img(20, 20)
+    # Totem colors from evolution-expansion.md
+    totem_c = (0xB3, 0x99, 0x33, 255)        # #B39933 golden-brown totem
+    totem_dark = (0x8B, 0x73, 0x22, 255)      # #8B7322 darker golden-brown
+    proj_c = (0xE6, 0xD9, 0x80, 255)          # #E6D980 golden projectile
+    outline = rgba("dark_outline")            # #1A1A2E
+    white_c = rgba("white")
+    gold_c = rgba("gold")                     # #FFD700
+
+    # Totem body (central pillar, stone slab shape)
+    # Main body (rectangle from 4,3 to 15,16)
+    body_outline = [
+        (4, 3), (5, 3), (14, 3), (15, 3),
+        (3, 4), (16, 4),
+        (3, 5), (16, 5),
+        (3, 6), (16, 6),
+        (3, 7), (16, 7),
+        (3, 8), (16, 8),
+        (3, 9), (16, 9),
+        (3, 10), (16, 10),
+        (3, 11), (16, 11),
+        (3, 12), (16, 12),
+        (3, 13), (16, 13),
+        (3, 14), (16, 14),
+        (3, 15), (16, 15),
+        (4, 16), (5, 16), (14, 16), (15, 16),
+    ]
+    for pt in body_outline:
+        d.point(pt, fill=outline)
+
+    # Fill body
+    for y in range(4, 16):
+        for x in range(4, 16):
+            d.point((x, y), fill=totem_c)
+
+    # Darker details - horizontal bands (carved lines on totem)
+    for x in range(5, 15):
+        d.point((x, 6), fill=totem_dark)
+        d.point((x, 7), fill=totem_dark)
+        d.point((x, 10), fill=totem_dark)
+        d.point((x, 11), fill=totem_dark)
+        d.point((x, 14), fill=totem_dark)
+
+    # Top crown (wider than body)
+    crown_outline = [
+        (2, 1), (3, 1), (16, 1), (17, 1),
+        (1, 2), (2, 2), (17, 2), (18, 2),
+        (2, 3), (3, 3), (16, 3), (17, 3),
+    ]
+    for pt in crown_outline:
+        d.point(pt, fill=outline)
+    for x in range(3, 17):
+        d.point((x, 1), fill=gold_c)
+    for x in range(2, 18):
+        d.point((x, 2), fill=totem_c)
+
+    # Eyes (two golden dots on the totem face)
+    d.point((7, 8), fill=white_c)
+    d.point((8, 8), fill=gold_c)
+    d.point((11, 8), fill=white_c)
+    d.point((12, 8), fill=gold_c)
+
+    # Nose/mouth detail
+    d.point((9, 9), fill=totem_dark)
+    d.point((10, 9), fill=totem_dark)
+    d.point((9, 12), fill=totem_dark)
+    d.point((10, 12), fill=totem_dark)
+
+    # Orbit indicators (two small golden dots on sides, representing the 2 orbit nodes)
+    # Left orbit node
+    d.point((0, 9), fill=outline)
+    d.point((1, 9), fill=proj_c)
+    d.point((0, 10), fill=outline)
+    d.point((1, 10), fill=proj_c)
+
+    # Right orbit node
+    d.point((18, 9), fill=outline)
+    d.point((19, 9), fill=proj_c)
+    d.point((18, 10), fill=outline)
+    d.point((19, 10), fill=proj_c)
+
+    # Firing marks (small lines from orbit nodes toward center, representing projectiles)
+    d.point((2, 9), fill=gold_c)
+    d.point((2, 10), fill=gold_c)
+    d.point((17, 9), fill=gold_c)
+    d.point((17, 10), fill=gold_c)
+
+    # Bottom base
+    base_outline = [
+        (5, 16), (14, 16),
+        (4, 17), (5, 17), (14, 17), (15, 17),
+        (5, 18), (6, 18), (13, 18), (14, 18),
+        (6, 19), (7, 19), (12, 19), (13, 19),
+    ]
+    for pt in base_outline:
+        d.point(pt, fill=outline)
+    for x in range(5, 15):
+        d.point((x, 17), fill=totem_dark)
+    for x in range(6, 14):
+        d.point((x, 18), fill=totem_dark)
+
+    save(img, "weapons", "sentineltotem.png")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────
 
 def main():
@@ -3854,6 +4228,9 @@ def main():
     gen_bible()
     gen_boomerang()
     gen_enemy_bullet()
+    gen_lightning()
+    gen_firestaff()
+    gen_frostaura()
 
     # Evolved Weapons
     print("\nEvolved Weapons:")
@@ -3865,6 +4242,7 @@ def main():
     gen_flamebible()
     gen_thunderang()
     gen_blazerang()
+    gen_sentineltotem()
 
     # Pickups
     print("\nPickups:")

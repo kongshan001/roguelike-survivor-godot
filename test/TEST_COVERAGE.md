@@ -1,16 +1,16 @@
 # Test Coverage Report
 
-Generated: 2026-04-17 R14
-QA Agent: Task 14 (Orphan Fix + Lv3 Transform Validation + Regression)
+Generated: 2026-04-17 R15
+QA Agent: Task 15 (Sprite Migration Validation + Regression)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total test files | 43 |
-| Total test functions | 1070 |
-| Assertions | 2612 |
-| Passing | 1068 |
+| Total test files | 44 |
+| Total test functions | 1112 |
+| Assertions | 2697 |
+| Passing | 1110 |
 | Pending | 2 (chest.png missing) |
 | Failing | 0 |
 | Orphans | 0 |
@@ -73,10 +73,11 @@ QA Agent: Task 14 (Orphan Fix + Lv3 Transform Validation + Regression)
 | test_achievement_screen.gd | 37 | Achievement scene, quest tab, achievement tab, hidden achievements, navigation, categories (orphan fix: added after_each with await) |
 | test_difficulty_data.gd | 5 | DifficultyData resource |
 
-### Integration & Specialized (8 files)
+### Integration & Specialized (9 files)
 
 | File | Tests | Module Coverage |
 |------|-------|----------------|
+| test_sprite_migration.gd | 42 | Sprite2D type validation (player/enemy/projectile/xp_gem/item_crate/enemy_bullet/boomerang), texture paths, scale by size, centered flag, modulate color, asset existence regression |
 | test_integration.gd | 39 | All 7 base weapons fire, 8 evolved weapons fire, all 7 passives apply, core game flow, synergy smoke tests, evolution recipes, visual effects regression |
 | test_comprehensive_coverage.gd | 48 | Character skill E2E (mage elemental burst 6, warrior shield charge 5, ranger arrow rain 4), passive E2E (mana attunement 3, iron will 5, keen eye 5), all 6 weapon types baseline dispatch, synergy E2E effects (10), wave boundary tests (8) |
 | test_endless_mode.gd | 42 | die() refactoring, boss kill bonus, passive gold income, retreat button, soul fragment multiplier, splitter, food drop, game over screen, HUD retreat |
@@ -86,7 +87,8 @@ QA Agent: Task 14 (Orphan Fix + Lv3 Transform Validation + Regression)
 | test_chest_system.gd | 36 | Chest spawner timer, max concurrent, gold threshold, rewards, speed buff decay, cleanup |
 | test_enemy_bullet.gd | 14 | Bullet direction, speed, damage, lifetime |
 | test_spin_blade.gd | 12 | Spin blade creation, angle, upgrade scaling |
-| test_xp_gem.gd | 14 | XP gem tiers, pickup |
+| test_xp_gem.gd | 14 | XP gem tiers, pickup, sprite texture validation |
+| test_sprite_migration.gd | 42 | Sprite2D migration: type/texture/scale/color/asset existence |
 | test_food_pickup.gd | 6 | Food drop, pickup |
 | test_item_crate.gd | 13 | Crate types, collection, probability |
 
@@ -198,8 +200,8 @@ QA Agent: Task 14 (Orphan Fix + Lv3 Transform Validation + Regression)
 
 | Source File | Test File(s) | Status |
 |-------------|-------------|--------|
-| scripts/player.gd | test_player_logic, test_player_dash, test_character_skills, test_comprehensive | Covered |
-| scripts/enemy.gd | test_enemy_logic, test_endless_mode, test_fire_slime, test_weapon_lv3_transforms | Covered |
+| scripts/player.gd | test_player_logic, test_player_dash, test_character_skills, test_comprehensive, test_sprite_migration | Covered |
+| scripts/enemy.gd | test_enemy_logic, test_endless_mode, test_fire_slime, test_weapon_lv3_transforms, test_sprite_migration | Covered |
 | scripts/enemy_spawner.gd | test_enemy_spawner | Covered |
 | scripts/arena.gd | test_arena_screen_shake, test_chest_system | Covered |
 | scripts/hud.gd | test_hud, test_hud_skill_button, test_hud_toast | Covered |
@@ -216,14 +218,36 @@ QA Agent: Task 14 (Orphan Fix + Lv3 Transform Validation + Regression)
 | scripts/weapon_controller.gd | test_weapon_controller, test_integration | Covered |
 | scripts/weapons/weapon_fire.gd | test_weapon_fire, test_integration, test_comprehensive, test_sentinel_totem, test_weapon_lv3_transforms | Covered |
 | scripts/weapons/weapon_registry.gd | test_weapon_registry, test_weapon_evolution, test_sentinel_totem | Covered |
-| scripts/weapons/boomerang.gd | test_boomerang, test_evolved_weapon_sprites | Covered |
+| scripts/weapons/boomerang.gd | test_boomerang, test_evolved_weapon_sprites, test_sprite_migration | Covered |
 | scripts/weapons/weapon_effects.gd | test_integration | Covered |
-| scripts/projectile.gd | test_projectile, test_evolved_weapon_sprites, test_weapon_lv3_transforms | Covered |
-| scripts/enemy_bullet.gd | test_enemy_bullet | Covered |
-| scripts/xp_gem.gd | test_xp_gem | Covered |
+| scripts/projectile.gd | test_projectile, test_evolved_weapon_sprites, test_weapon_lv3_transforms, test_sprite_migration | Covered |
+| scripts/enemy_bullet.gd | test_enemy_bullet, test_sprite_migration | Covered |
+| scripts/xp_gem.gd | test_xp_gem, test_sprite_migration | Covered |
+| scripts/item_crate.gd | test_item_crate, test_sprite_migration | Covered |
 | scripts/pickup_manager.gd | test_endless_mode (indirect) | Covered |
 | scripts/save_manager.gd | test_save_manager | Covered |
 | scripts/enemies/boss_ai.gd | test_boss_ai | Covered |
+
+## Coverage Matrix: Sprite2D Migration (R15)
+
+| Entity | Type Check | Centered | Texture | Scale by Size | Modulate | Asset Exists |
+|--------|-----------|----------|---------|---------------|----------|-------------|
+| Player (default) | X | X | - | - | - | - |
+| Player (warrior) | X | X | X | - | - | X |
+| Player (mage) | X | X | X | - | - | X |
+| Player (ranger) | X | X | X | - | - | X |
+| Enemy (16px) | X | X | X | X (1.0) | - | X |
+| Enemy (32px boss) | X | X | X | X (2.0) | - | X |
+| Projectile | X | X | X | X (1.0) | X | X |
+| XP Gem small | X | X | X | - | - | X |
+| XP Gem medium | X | X | X | - | - | X |
+| XP Gem large | X | X | X | - | - | X |
+| XP Gem boundary 9/10/14/15 | - | - | X | - | - | - |
+| ItemCrate heal | X | X | X | - | - | X |
+| ItemCrate xp | - | - | X | - | - | X |
+| ItemCrate speed | - | - | X | - | - | X |
+| EnemyBullet | X | X | X | X (0.5) | X | X |
+| Boomerang | X | X | X | X (1.0) | - | X |
 
 ## Identified Gaps
 

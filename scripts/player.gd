@@ -395,13 +395,13 @@ func apply_passive(passive_id: String):
 
 func _spawn_afterimages() -> void:
 	for i in range(dash_afterimage_count):
-		var afterimage: ColorRect = ColorRect.new()
-		afterimage.size = Vector2(32, 32)
-		afterimage.position = Vector2(-16, -16)
-		afterimage.color = Color(_char_color.r, _char_color.g, _char_color.b, AFTERIMAGE_ALPHA)
+		var afterimage: Sprite2D = Sprite2D.new()
+		afterimage.texture = sprite.texture
+		afterimage.centered = true
+		afterimage.modulate = Color(_char_color.r, _char_color.g, _char_color.b, AFTERIMAGE_ALPHA)
 		afterimage.z_index = -1
 		get_parent().call_deferred("add_child", afterimage)
 		var tween: Tween = afterimage.create_tween()
 		tween.tween_interval(i * AFTERIMAGE_DELAY)
-		tween.tween_property(afterimage, "color:a", 0.0, AFTERIMAGE_FADE_DURATION)
+		tween.tween_property(afterimage, "modulate:a", 0.0, AFTERIMAGE_FADE_DURATION)
 		tween.tween_callback(afterimage.queue_free)

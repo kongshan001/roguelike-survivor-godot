@@ -4317,3 +4317,275 @@ if weapon_id == "holywater":
 **待改进**:
 - C1 标记为 pending verification -- 需确认 Godot 4.6 是否实际支持三引号; 如果支持则降级为 Medium (风格问题)
 - enemy.gd 462 行已持续 2 轮, 作为 P3 风险应推动拆分而非持续观察
+
+---
+
+## R15 审核 (2026-04-17)
+
+### 审核范围
+
+- R14 遗留验证: C1 weapon_effects.gd 三引号 / C2 boomerang.gd weapon_id / M1 未使用常量 / M2 死代码 / test_achievement_screen 孤儿修复
+- 精灵迁移前代码审计: 6 个场景 + 7 个脚本的 ColorRect -> Sprite2D 迁移状态评估
+- 测试覆盖影响评估: 搜索测试中 ColorRect/Sprite 相关引用
+- 技术债务更新
+
+---
+
+### 任务 1: R14 遗留验证
+
+#### 1.1 weapon_effects.gd 三引号 (R14 C1)
+
+**状态: RESOLVED**
+
+`scripts/weapons/weapon_effects.gd` 第 28-49 行已使用字符串拼接替代三引号:
+
+```gdscript
+script.source_code = (
+    "extends Node2D\n"
+    + "var dir_angle: float = 0.0\n"
+    + ...
+)
+```
+
+与 enemy.gd BUG-101 的修复方案完全一致。create_cone_effect() 现在可以正确生成锥形视觉效果。
+
+#### 1.2 boomerang.gd weapon_id 属性 (R14 C2)
+
+**状态: RESOLVED**
+
+`scripts/weapons/boomerang.gd` 第 12 行: `var weapon_id: String = ""` -- 属性已声明。
+第 138 行: `body.take_damage(damage, weapon_id if weapon_id != "" else "boomerang", is_crit)` -- 使用属性值, 而非硬编码 "boomerang"。
+
+进化回旋镖 (thunderang/blazerang) 现在通过 weapon_boomerang_fire.gd 第 358 行 `bm.weapon_id = wpn_id` 正确设置 weapon_id。击杀归属可以正确传播到成就追踪系统。
+
+#### 1.3 spin_blade.gd weapon_level 字段
+
+**状态: PARTIAL -- 字段存在但未被使用**
+
+`scripts/spin_blade.gd` 第 12 行: `var weapon_level: int = 1` -- 已声明。
+但该变量在 spin_blade.gd 的 `_physics_process()` 和 `_draw()` 中从未被读取。
+
+`scripts/weapons/weapon_fire.gd` 第 189 行仍为 holywater orbit 实例赋值 weapon_level:
+```gdscript
+instance.weapon_level = level
+```
+
+这是死代码 -- 赋值无实际效果。`weapon_level` 存在但从未影响 spin_blade 的行为。如果未来需要为 holywater 实现基于等级的视觉/效果变化, 此字段已准备就绪。
+
+#### 1.4 test_achievement_screen.gd 孤儿修复
+
+**状态: RESOLVED -- 正确的修复方案**
+
+`test/unit/test_achievement_screen.gd` 第 8-10 行:
+```gdscript
+func after_each():
+    await get_tree().process_frame
+```
+
+通过在 GUT autofree 之前等待一帧, 确保 `_clear_content()` 中的 `queue_free()` 调用完成。这是处理异步节点清理的标准 GUT 模式。
+
+---
+
+### 任务 2: 精灵迁移状态审计
+
+#### 关键发现: 6 个目标场景已完成 Sprite2D 迁移
+
+所有 6 个即将迁移的场景文件已经使用 Sprite2D 而非 ColorRect:
+
+| 场景 | 节点类型 | centered | 纹理来源 | 迁移状态 |
+|------|----------|----------|----------|----------|
+| `scenes/player.tscn` | Sprite2D | true | player.gd preload (warrior.png/mage.png/ranger.png) | **已完成** |
+| `scenes/enemy.tscn` | Sprite2D | true | enemy.gd 动态加载 `enemies/%s.png` | **已完成** |
+| `scenes/projectile.tscn` | Sprite2D | true | projectile.gd 动态加载 `weapons/%s.png` | **已完成** |
+| `scenes/xp_gem.tscn` | Sprite2D | true | xp_gem.gd preload (xp_gem_small/medium/large.png) | **已完成** |
+| `scenes/enemy_bullet.tscn` | Sprite2D | true | enemy_bullet.gd preload (enemy_bullet.png) | **已完成** |
+| `scenes/item_crate.tscn` | Sprite2D | true | item_crate.gd preload (crate_heal/xp/speed.png) | **已完成** |
+
+**结论**: R15 任务描述中提到的 "ColorRect -> Sprite2D 精灵迁移" 实际上已在之前的轮次中完成。这 6 个场景中不存在 ColorRect 节点。
+
+#### 脚本中仍存在的 ColorRect 使用
+
+ColorRect 仍然在以下位置使用, 这些属于 UI 元素而非游戏精灵, **不需要迁移到 Sprite2D**:
+
+| 文件 | 使用场景 | 是否需要迁移 |
+|------|----------|-------------|
+| `scripts/skill_effects.gd` (6处) | 技能特效: 扩展环/残影/警告/箭矢/闪光 | **否** -- 这些是临时视觉效果, 使用 ColorRect + Tween 是合理的 |
+| `scripts/hud.gd` (6处) | HUD 元素: 波次进度条背景/填充 | **否** -- UI 元素 |
+| `scripts/hud_skill_button.gd` (4处) | 技能按钮: 背景/冷却覆盖 | **否** -- UI 元素 |
+| `scripts/weapons/weapon_effects.gd` (1处) | 进化闪光效果 | **否** -- 临时全屏白色闪烁 |
+| `scripts/achievement_screen.gd` (1处) | 成就页面背景 | **否** -- UI 元素 |
+| `scripts/character_select.gd` (1处) | 角色选择图标 | **建议迁移** -- 可改用 TextureRect + 角色精灵 |
+| `scripts/weapon_select.gd` (1处) | 武器选择图标 | **建议迁移** -- 可改用 TextureRect + 武器精灵 |
+| `scripts/enemy.gd` (1处) | **食物拾取物** (`_spawn_food_at` 第 416 行) | **应迁移** -- 游戏实体使用 Sprite2D + food.png |
+
+#### 食物拾取物迁移风险 (唯一未迁移的游戏实体)
+
+`scripts/enemy.gd` 第 407-422 行 `_spawn_food_at()`:
+
+当前代码:
+```gdscript
+var sprite: ColorRect = ColorRect.new()
+sprite.size = Vector2(8, 8)
+sprite.position = Vector2(-4, -4)
+sprite.color = Color(0.4, 0.9, 0.3)
+food.add_child(sprite)
+```
+
+迁移后应为:
+```gdscript
+var sprite: Sprite2D = Sprite2D.new()
+sprite.texture = preload("res://assets/sprites/pickups/food.png")
+sprite.centered = true
+food.add_child(sprite)
+```
+
+| 属性 | ColorRect 当前值 | Sprite2D 需设值 | 风险 |
+|------|-----------------|----------------|------|
+| size | Vector2(8, 8) | 不需要 (由纹理决定) | Low |
+| position | Vector2(-4, -4) | centered=true 自动处理 | Low |
+| color | Color(0.4, 0.9, 0.3) | texture + modulate | Low |
+| food.png | 不需要 | 需确认文件存在 | **已确认存在** |
+
+`assets/sprites/pickups/food.png` 已存在。迁移只需 3 行代码修改, 无功能风险。
+
+#### character_select.gd / weapon_select.gd 图标迁移
+
+这两处使用 `ColorRect.new()` 显示武器/角色的颜色图标。当前已有对应精灵文件:
+
+| 文件 | 当前方式 | 可用精灵 |
+|------|---------|---------|
+| `character_select.gd:70` | ColorRect + data.color | characters/warrior.png, mage.png, ranger.png |
+| `weapon_select.gd:39` | ColorRect + data.color | weapons/knife.png, bible.png 等 |
+
+迁移方案: 替换为 TextureRect, 加载对应精灵, 保持 fallback 到 color 模式。这与 R12 的 hud_skill_button.gd TextureRect 改造方案完全一致。
+
+---
+
+### 任务 3: 测试覆盖影响评估
+
+#### 测试中的 ColorRect 引用
+
+搜索 `test/unit/` 中所有 ColorRect/Sprite/modulate 相关引用:
+
+| 文件 | 行号 | 引用内容 | 影响评估 |
+|------|------|---------|---------|
+| `test_hud_skill_button.gd` | 70 | 注释: "_skill_bg is the outer ColorRect" | 无影响 -- 注释 |
+| `test_hud_skill_button.gd` | 146-147 | `assert _hud._skill_bg is ColorRect` | **需修改** -- 如果 _skill_bg 改为其他类型 |
+| `test_achievement_screen.gd` | 40-41 | `get_node_or_null("Background") as ColorRect` | 无影响 -- 成就屏幕背景不迁移 |
+
+**受迁移影响的测试仅 1 个**: `test_hud_skill_button.gd` 第 146-147 行检查 `_skill_bg is ColorRect`。但 _skill_bg 属于 UI 元素 (技能按钮背景), 不在此次迁移范围内, 因此 **无需修改任何测试**。
+
+#### 迁移对测试覆盖的影响: 无
+
+6 个已迁移的场景使用 Sprite2D 后, 现有测试的通过不受影响:
+- 场景加载测试 (load/instantiate) -- 不检查具体节点类型
+- 脚本编译测试 -- 不涉及 ColorRect
+- 数值逻辑测试 (weapon_fire, enemy_logic 等) -- 不涉及视觉节点
+
+---
+
+### 任务 4: TOP 5 技术债务更新
+
+| 优先级 | 描述 | 文件 | 来源 | R15 评估 |
+|--------|------|------|------|----------|
+| ~~P1~~ | ~~boomerang.gd 硬编码 weapon_id~~ | boomerang.gd | R14->R15 | **RESOLVED** -- 使用属性值 + fallback |
+| ~~P1~~ | ~~weapon_effects.gd 三引号~~ | weapon_effects.gd | R14->R15 | **RESOLVED** -- 已改为字符串拼接 |
+| **P2** | weapon_fire.gd 残留未使用常量 (BOOMERANG_MAX_COUNT:26, BOOMERANG_LV3_TRACK_ANGLE_MUL:31) | weapon_fire.gd | R14 | 未修复 -- 死代码 |
+| **P2** | weapon_fire.gd:189 holywater weapon_level 赋值为死代码 | weapon_fire.gd | R14 | 未修复 -- spin_blade 未读取 |
+| **P2** | _spawn_food_at() 使用 ColorRect 而非 Sprite2D | enemy.gd:416 | R3->R15 (12 轮) | food.png 已存在, 3 行可修 |
+| **P2** | test_chest_system.gd 2 个测试因过时 pending() 未执行 | test_chest_system.gd:306,326 | R15 新发现 | chest.png 已存在, pending 应移除 |
+| **P2** | character_select.gd / weapon_select.gd 使用 ColorRect 图标 | character_select.gd:70, weapon_select.gd:39 | R15 新发现 | 精灵已存在, 可迁移到 TextureRect |
+| **P3** | 动态脚本创建模式 (GDScript.new + source_code + reload) | enemy.gd:291, weapon_effects.gd:27 | R8->R15 | 不可测试/不可静态分析 |
+| **P3** | enemy.gd 接近 500 行上限 (462 行) | enemy.gd | R12->R15 | 3 轮未变 |
+| **P3** | enemy_bullet.gd take_damage 签名不一致 | enemy_bullet.gd:35 | R2->R15 (13 轮) | 低优先级 |
+
+---
+
+### 按角色分类建议
+
+#### 程序 (Programmer)
+
+| 优先级 | 建议 | 文件 | 工作量 |
+|--------|------|------|--------|
+| **P2** | `_spawn_food_at()` 改用 Sprite2D + food.png | scripts/enemy.gd:416 | 3 行修改 |
+| **P2** | 移除 test_chest_system.gd 过时的 pending() | test/unit/test_chest_system.gd:306,326 | 2 行删除 |
+| **P2** | character_select.gd / weapon_select.gd 图标改用 TextureRect | scripts/character_select.gd:70, scripts/weapon_select.gd:39 | 约 10 行/文件 |
+| **P2** | 清理 weapon_fire.gd 未使用常量 | scripts/weapons/weapon_fire.gd:26,31 | 2 行删除 |
+| **P2** | 清理 weapon_fire.gd:189 死代码 | scripts/weapons/weapon_fire.gd:189 | 2 行删除 |
+| **P3** | 将动态脚本替换为预定义场景/脚本 | scripts/enemy.gd:291, scripts/weapons/weapon_effects.gd:27 | 约 1 天 |
+
+#### 美术 (Art)
+
+无新增建议。所有精灵文件已齐全, 包括 food.png, chest.png, 8 种进化武器, 3 种角色, 8+ 种敌人。
+
+#### QA
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P3 | 运行 ./run_tests.sh 确认 1070 测试全部通过 | R14 声称 0 失败 0 孤儿, 需验证 |
+
+#### 策划 (Designer)
+
+无新增建议。
+
+---
+
+### 项目健康状态 (R15)
+
+```
+代码量:        ~4,500 行 GDScript (50+ 源文件)
+测试覆盖:      1070 测试 / 0 失败 / 0 孤儿 (R14 基线)
+功能完成度:    Phase 0-14 完成, 9/9 进化武器, 18/18 协同, 3/3 Lv3 质变
+技术债务:      0 个 Critical/P1, 5 个 P2, 3 个 P3
+已知Bug:       0 个 Critical, 0 个 Medium
+精灵迁移状态:  6/6 核心场景已完成 Sprite2D 迁移; 仅 _spawn_food_at() 残留 ColorRect
+```
+
+---
+
+### 精灵迁移风险清单
+
+由于 6 个核心场景的 Sprite2D 迁移已完成, R15 的 "精灵迁移" 任务实际上是 **验证已完成迁移的正确性** 而非执行迁移。以下列出残留的 ColorRect 使用及其迁移风险评估:
+
+| # | 位置 | 类型 | 迁移复杂度 | 风险 |
+|---|------|------|-----------|------|
+| 1 | enemy.gd:416 _spawn_food_at() | 游戏实体 | **低** (3 行) | food.png 已存在, 只需替换 ColorRect -> Sprite2D |
+| 2 | character_select.gd:70 角色图标 | UI 图标 | **低** (5 行) | 3 种角色精灵已存在, 参照 hud_skill_button.gd TextureRect 模式 |
+| 3 | weapon_select.gd:39 武器图标 | UI 图标 | **低** (5 行) | 7 种武器精灵已存在, 同上 |
+| 4 | skill_effects.gd:57 扩展环 | 技能特效 | **中** | 需要创建 ring.png 或保持 ColorRect (动态 size 变化) |
+| 5 | skill_effects.gd:94 残影 | 技能特效 | **不建议** | 临时渐隐效果, ColorRect + Tween 是最佳方案 |
+| 6 | skill_effects.gd:133 警告圈 | 技能特效 | **中** | 需要创建 warning.png 或保持 ColorRect |
+| 7 | skill_effects.gd:159 箭矢 | 技能特效 | **低** | assets/sprites/effects/arrow.png 已存在, 可替换 |
+| 8 | hud.gd:279,289 波次进度条 | HUD 元素 | **不建议** | 纯色条形 UI, ColorRect 是正确选择 |
+| 9 | hud_skill_button.gd 背景/覆盖 | HUD 元素 | **不建议** | UI 按钮, ColorRect 是正确选择 |
+| 10 | weapon_effects.gd:63 进化闪光 | 全屏特效 | **不建议** | 临时白色闪烁, ColorRect 是正确选择 |
+
+**总结**: 10 个残留 ColorRect 中, 仅 #1-#3 和 #7 应考虑迁移, 其余使用 ColorRect 是合理选择。
+
+---
+
+### 审核人自评: 88/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| R14 遗留验证准确性 | 25 | 25 | C1 三引号 + C2 weapon_id + spin_blade weapon_level + test_achievement_screen 孤儿修复, 全部逐行验证 |
+| 精灵迁移状态评估 | 22 | 25 | 发现 6 个核心场景已完成迁移, 准确识别残留 ColorRect 位置并评估迁移必要性 |
+| 测试覆盖影响评估 | 18 | 20 | 搜索全部测试文件 ColorRect 引用, 确认无测试需要修改 |
+| 技术债务追踪 | 13 | 15 | R14 的 2 个 P1 已标记 RESOLVED, 新增 1 个 P2 (图标 ColorRect), 更新债务轮次 |
+| 按时序完成 | 10 | 15 | 先做 R14 遗留审计, 再进行 R15 全面审查 |
+
+**加分项**:
+- 精确识别 R15 任务描述中的 "ColorRect -> Sprite2D 精灵迁移" 实际上已在之前轮次完成, 避免了重复工作的浪费
+- 将 10 个残留 ColorRect 按迁移必要性分类 ("应迁移" / "可迁移" / "不应迁移"), 为 Programmer 提供了清晰的优先级排序
+- 发现 skill_effects.gd:159 的箭矢可使用已存在的 arrow.png 替换, 之前未被识别为迁移目标
+
+**待改进**:
+- 未能在 Godot 环境中实际运行 1070 测试确认 0 失败基线
+
+#### 追加发现: chest.png 已存在但测试仍 Pending
+
+`assets/sprites/pickups/chest.png` 文件已存在 (含 .import 文件), 但 `test/unit/test_chest_system.gd` 第 306 行和第 326 行仍然调用 `pending("BUG: chest.png sprite missing")`。这 2 个测试应该移除 `pending()` 调用并恢复正常断言执行。
+
+**严重度: Medium** -- 2 个测试因过时的 pending() 而未实际验证 chest 场景的视觉/交互正确性。
+
+**建议**: Programmer 在下轮移除 test_chest_system.gd:306 和 test_chest_system.gd:326 的 `pending()` 调用, 并运行测试确认 chest _ready() 可以正确加载 chest.png。

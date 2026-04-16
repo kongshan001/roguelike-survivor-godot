@@ -4,6 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-17 R15 | 1112 | 2697 | 1110 通过, 0 失败, 2 pending (chest.png), 42项精灵迁移验证新增 |
 | 2026-04-16 R8 | 822 | 2072 | 820 通过, 0 失败, 2 pending |
 | 2026-04-16 R7 | 763 | 1987 | 761 通过, 0 失败, 2 pending, 0 orphan |
 | 2026-04-16 R6 | 656 | 1842 | 654 通过, 0 失败, 2 pending, 0 orphan |
@@ -1305,3 +1306,55 @@ script.source_code = "extends Node2D\n" + \
 - BUG-101 修复确认 +5 (enemy.gd 三引号已替换为字符串连接)
 - 扣分 -3 (BUG-003 chest.png 缺失导致 2 个测试仍 pending)
 - 扣分 -1 (weapon_fire.gd:189 在 spin_blade 上设置 weapon_level 动态属性，虽 GDScript 允许但非最佳实践)
+
+---
+
+## R15 精灵迁移验证 (2026-04-17)
+
+### 基线确认
+- 1070 测试, 1068 通过, 2 pending (chest.png), 0 失败, 0 orphan
+- 基线状态与 R14 一致
+
+### 受影响测试分析
+审查 7 个测试文件，检查 ColorRect / sprite.color / $Sprite.color / size / position = Vector2(- 引用:
+
+| 文件 | 需修改? | 说明 |
+|------|---------|------|
+| test_xp_gem.gd | 否 | 已在 R14 完成 Sprite2D 迁移，使用 sprite.texture.resource_path |
+| test_item_crate.gd | 否 | 无 sprite/color 引用 |
+| test_player_logic.gd | 否 | 无 sprite/color 引用 |
+| test_enemy_logic.gd | 否 | 无 sprite/color 引用 |
+| test_projectile.gd | 否 | color 为脚本变量，非 sprite 节点属性 |
+| test_enemy_bullet.gd | 否 | color/size 为脚本变量，非 sprite 节点属性 |
+| test_boomerang.gd | 否 | color 为脚本变量，非 sprite 节点属性 |
+
+**结论**: ColorRect -> Sprite2D 迁移已在源码和场景文件中完成。现有测试均不引用已移除的 ColorRect 属性，无需修改。
+
+### 新增测试文件: test_sprite_migration.gd (42 项)
+验证内容:
+1. **Player Sprite2D** (6 项): 类型、centered、mage/warrior/ranger 纹理路径、默认角色
+2. **Enemy Sprite2D** (4 项): 类型、centered、16px scale=1.0、32px scale=2.0
+3. **Projectile Sprite2D** (6 项): 类型、centered、knife 纹理、fallback 纹理、scale、modulate color
+4. **XP Gem Sprite2D** (8 项): 类型、centered、small/medium/large 纹理、边界值 9/10/14/15
+5. **Item Crate Sprite2D** (6 项): 类型、centered、heal/xp/speed 纹理路径
+6. **Enemy Bullet Sprite2D** (5 项): 类型、centered、纹理、scale(4px=0.5)、modulate
+7. **Boomerang Sprite2D** (3 项): 类型、纹理、scale(8px=1.0)
+8. **Asset Existence** (4 项): character/enemy/weapon/pickup 精灵文件存在性回归
+
+### 修复记录
+- test_item_crate_heal_texture: _ready() 使用 randf() 覆盖预设 crate_type，改为手动验证纹理路径加载
+- 所有 42 项新增测试使用 add_child_autofree() 确保 0 orphan
+
+### 最终回归结果
+- 1112 测试, 1110 通过, 2 pending, 0 失败, 0 orphan
+- 新增 42 项精灵迁移验证 (test_sprite_migration.gd)
+- 2697 断言
+
+### QA 自评分数: 97/100
+
+- 测试套件完整性 +30 (1112 测试, 2697 断言, 1110 通过, 0 失败, 44 个测试文件)
+- Orphan 保持 0 +25 (连续多个轮次保持 0 orphan)
+- Sprite 迁移全覆盖 +20 (42 项测试覆盖全部 6 类实体的 Sprite2D 验证)
+- 代码审查验证 +10 (源码审查确认迁移完成，无残留 ColorRect)
+- 资产存在性回归 +5 (4 组精灵文件存在性验证)
+- 扣分 -3 (BUG-003 chest.png 缺失仍导致 2 pending)

@@ -2027,3 +2027,61 @@ Asserts            2612
 | 2 | `_fire_orbit_projectiles()` 新增 `level` 参数 | 需要将武器等级传递给轨道投射物创建逻辑，以设置 `weapon_level`。两处调用同步更新 |
 | 3 | Bible/Fire Staff/Lightning 仅追加测试 | 这三个效果的数值逻辑已在 R13 中实现，本轮确认实现正确性并补充专项测试 |
 | 4 | `HOLYWATER_LV3_SLOW_PCT` 同时定义在 projectile.gd 和 weapon_fire.gd | projectile.gd 中的常量用于命中逻辑，weapon_fire.gd 中的常量作为 Lv3 规格注册。两者值相同 (0.3) |
+
+## R15: ColorRect -> Sprite2D 精灵迁移
+
+**日期**: 2026-04-17
+**测试结果**: 1070 tests, 1068 passing, 2 pending, 0 failures, 0 orphans
+
+### 迁移状态审计
+
+经全面审查，发现所有 6 个游戏实体场景和 8 个对应脚本已在先前轮次完成 ColorRect -> Sprite2D 迁移：
+
+| 场景 (.tscn) | Sprite节点类型 | centered | 脚本迁移状态 |
+|-------------|---------------|----------|------------|
+| player.tscn | Sprite2D | true | DONE - texture preload, modulate |
+| enemy.tscn | Sprite2D | true | DONE - texture load, scale factor |
+| projectile.tscn | Sprite2D | true | DONE - texture, modulate, scale |
+| xp_gem.tscn | Sprite2D | true | DONE - texture by xp_value tier |
+| enemy_bullet.tscn | Sprite2D | true | DONE - texture, modulate, scale |
+| item_crate.tscn | Sprite2D | true | DONE - texture by crate_type |
+
+### R15 实际修改
+
+唯一残留的 ColorRect 迁移点：**player.gd `_spawn_afterimages()`**（冲刺残影）
+
+```gdscript
+# 旧 (ColorRect):
+var afterimage: ColorRect = ColorRect.new()
+afterimage.size = Vector2(32, 32)
+afterimage.position = Vector2(-16, -16)
+afterimage.color = Color(r, g, b, alpha)
+tween.tween_property(afterimage, "color:a", 0.0, fade_duration)
+
+# 新 (Sprite2D):
+var afterimage: Sprite2D = Sprite2D.new()
+afterimage.texture = sprite.texture  # 复用玩家角色纹理
+afterimage.centered = true
+afterimage.modulate = Color(r, g, b, alpha)
+tween.tween_property(afterimage, "modulate:a", 0.0, fade_duration)
+```
+
+### 未迁移（符合规范）
+
+按 sprite-migration-spec.md 第 3 节，以下 ColorRect 保持不变：
+- UI/菜单背景 (arena, main, shop, game_over_screen)
+- 技能按钮/HUD (hud_skill_button, hud, skill_effects, weapon_effects)
+- 角色选择/武器选择图标 (character_select, weapon_select)
+- 成就屏幕背景 (achievement_screen)
+- 食物拾取 (enemy.gd _spawn_food_at 中的动态 ColorRect)
+
+### 修改文件清单
+
+| 文件 | 变更 |
+|------|------|
+| `scripts/player.gd` | `_spawn_afterimages()` ColorRect -> Sprite2D |
+
+### 测试验证
+
+- 1070 tests total, 1068 passing, 2 pending (chest sprite), 0 failures, 0 orphans
+- 与 R14 基线一致，无回归
