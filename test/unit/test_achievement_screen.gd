@@ -5,6 +5,11 @@ extends GutTest
 ## hidden achievement "???" display, back button navigation, category structure
 
 
+func after_each():
+	# Ensure all queue_free() calls from _clear_content complete before GUT autofree
+	await get_tree().process_frame
+
+
 # =====================================================================
 # Scene and Script Loading
 # =====================================================================

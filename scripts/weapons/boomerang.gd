@@ -135,7 +135,7 @@ func _get_nearest_enemy_in_cone() -> Node2D:
 
 func _on_body_entered(body: Node2D):
 	if body.is_in_group("enemies") and body.has_method("take_damage") and not body in _hit_enemies:
-		body.take_damage(damage, "boomerang", is_crit)
+		body.take_damage(damage, weapon_id if weapon_id != "" else "boomerang", is_crit)
 		_hit_enemies.append(body)
 		# Clear hit list on return to allow re-hitting
 		if _returning:

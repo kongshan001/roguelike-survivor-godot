@@ -3661,30 +3661,28 @@ def gen_bible_expand():
     for pt in outer_fill:
         d.point(pt, fill=gold_c)
 
-    # Inner ring (radius ~3, lighter gold)
-    inner_fill = [
-        (6, 4), (7, 4), (8, 4), (9, 4),
-        (4, 6), (4, 7), (4, 8), (4, 9),
-        (6, 5), (7, 5), (8, 5), (9, 5),
-        (5, 6), (5, 7), (5, 8), (5, 9),
-        (6, 6), (7, 6), (8, 6), (9, 6),
-        (6, 7), (7, 7), (8, 7), (9, 7),
-        (6, 8), (7, 8), (8, 8), (9, 8),
-        (6, 9), (7, 9), (8, 9), (9, 9),
-        (6, 10), (7, 10), (8, 10), (9, 10),
-        (10, 6), (10, 7), (10, 8), (10, 9),
-        (11, 6), (11, 7), (11, 8), (11, 9),
-    ]
+    # Inner ring (radius ~3, lighter gold) -- proper circular fill
+    # Circle at center (7.5, 7.5) radius 3: fill all points within distance 3.5
+    inner_fill = []
+    for iy in range(5, 11):
+        for ix in range(5, 11):
+            dx = ix - 7.5
+            dy = iy - 7.5
+            if dx * dx + dy * dy <= 12.25:  # r=3.5 squared
+                inner_fill.append((ix, iy))
     for pt in inner_fill:
         d.point(pt, fill=gold_lt)
 
-    # Inner ring outline
-    inner_outline = [
-        (5, 4), (10, 4),
-        (4, 5), (11, 5),
-        (4, 10), (11, 10),
-        (5, 11), (10, 11),
-    ]
+    # Inner ring outline -- proper circular outline
+    inner_outline = []
+    for iy in range(5, 11):
+        for ix in range(5, 11):
+            dx = ix - 7.5
+            dy = iy - 7.5
+            dist_sq = dx * dx + dy * dy
+            # Outline pixels: on the edge of the circle (9.5 < dist_sq <= 12.25)
+            if dist_sq > 9.5 and dist_sq <= 12.25:
+                inner_outline.append((ix, iy))
     for pt in inner_outline:
         d.point(pt, fill=outline)
 

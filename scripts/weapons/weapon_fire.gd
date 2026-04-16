@@ -25,6 +25,24 @@ const CRIT_KNIFE_LIFETIME: float = 1.0
 # Boomerang
 const BOOMERANG_MAX_COUNT: int = 8
 
+# --- Weapon Lv3 Quality-Change Constants ---
+
+# Boomerang Lv3: Homing Tweak
+const BOOMERANG_LV3_TRACK_ANGLE_MUL: float = 1.5
+
+# Bible Lv3: Expanding Radius
+const BIBLE_LV3_RADIUS_MUL: float = 1.5
+
+# Holy Water Lv3: Frost Blessing (slow)
+const HOLYWATER_LV3_SLOW_PCT: float = 0.3
+
+# Fire Staff Lv3: Burst Burn
+const FIRESTAFF_LV3_BURN_DPS: float = 3.0
+const FIRESTAFF_LV3_BURN_DURATION: float = 2.0
+
+# Lightning Lv3: Chain Boost
+const LIGHTNING_LV3_CHAIN_BONUS: int = 2
+
 var _controller: Node = null
 var _boomerang_fire: RefCounted = null
 
@@ -139,6 +157,8 @@ func update_orbit(weapon_id: String, data: WeaponData, level: int, player: Chara
 	elif weapon_id == "bible":
 		orbit_count = 1
 		radius = 80.0 + (level - 1) * 20.0
+		if level >= 3:
+			radius = radius * BIBLE_LV3_RADIUS_MUL
 		if SynergyManager and SynergyManager.has_synergy("bible_boots"):
 			radius += SynergyManager.get_synergy_value("bible_boots", "radius_bonus", 20.0)
 		damage = (1.0 if level < 3 else 2.0) * dmg_bonus
@@ -154,7 +174,7 @@ func update_orbit(weapon_id: String, data: WeaponData, level: int, player: Chara
 		else:
 			existing.damage = damage
 			existing.global_position = player.global_position
-			_fire_orbit_projectiles(weapon_id, data, player, dmg_bonus, orbit_instances, weapon_timers)
+			_fire_orbit_projectiles(weapon_id, data, level, player, dmg_bonus, orbit_instances, weapon_timers)
 			return orbit_instances
 
 	var instance := Node2D.new()
@@ -165,16 +185,18 @@ func update_orbit(weapon_id: String, data: WeaponData, level: int, player: Chara
 		rot_speed *= SynergyManager.get_synergy_value("bible_boots", "value", 1.5)
 	instance.rotation_speed = rot_speed
 	instance.weapon_id = weapon_id
+	if weapon_id == "holywater":
+		instance.weapon_level = level
 	var pm: Node = _get_pm(player)
 	if pm:
 		pm.call_deferred("add_child", instance)
 	instance.global_position = player.global_position
 	orbit_instances[key] = instance
-	_fire_orbit_projectiles(weapon_id, data, player, dmg_bonus, orbit_instances, weapon_timers)
+	_fire_orbit_projectiles(weapon_id, data, level, player, dmg_bonus, orbit_instances, weapon_timers)
 	return orbit_instances
 
 
-func _fire_orbit_projectiles(weapon_id: String, data: WeaponData, player: CharacterBody2D, dmg_bonus: float, orbit_instances: Dictionary, weapon_timers: Dictionary) -> void:
+func _fire_orbit_projectiles(weapon_id: String, data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus: float, orbit_instances: Dictionary, weapon_timers: Dictionary) -> void:
 	if data.orbit_fire_rate <= 0.0 or not orbit_instances.has(weapon_id):
 		return
 	var delta: float = _controller.get_process_delta_time()
@@ -198,6 +220,8 @@ func _fire_orbit_projectiles(weapon_id: String, data: WeaponData, player: Charac
 		var proj_scene: PackedScene = preload("res://scenes/projectile.tscn")
 		var proj: Area2D = proj_scene.instantiate()
 		proj.weapon_id = data.weapon_id
+		if weapon_id == "holywater":
+			proj.weapon_level = level
 		proj.setup(fire_pos, target.global_position, data.projectile_speed, data.damage * dmg_bonus, 0, Color(0.9, 0.85, 0.5), data.projectile_size)
 		var pm: Node = _get_pm(player)
 		if pm:
@@ -253,8 +277,8 @@ func fire_cone(data: WeaponData, level: int, player: CharacterBody2D, dmg_bonus:
 	var burn: float = 0.0
 	var burn_dur: float = 0.0
 	if level >= 3:
-		burn = BURN_DPS
-		burn_dur = BURN_DURATION
+		burn = FIRESTAFF_LV3_BURN_DPS
+		burn_dur = FIRESTAFF_LV3_BURN_DURATION
 
 	if SynergyManager and SynergyManager.has_synergy("firestaff_armor"):
 		angle += SynergyManager.get_synergy_value("firestaff_armor", "angle", 40.0)

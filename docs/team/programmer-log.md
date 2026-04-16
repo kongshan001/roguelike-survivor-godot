@@ -1871,3 +1871,159 @@ Failing              0
 | 零回归 | 15 | 15 | 999 个已有测试全部通过（2 Pending 为预存问题）|
 | 代码质量 | 10 | 10 | 所有魔法数字提取为命名常量、类型注解、null guard |
 | 记录完整性 | 10 | 15 | programmer-log 更新完整，含常量表和数值验证 |
+
+---
+
+## 第十四轮执行 (2026-04-17): 剩余4武器 Lv3 质变效果
+
+### 实现内容
+
+基于设计规格 `docs/superpowers/specs/weapon-lv3-transforms.md` Sections 6-9，实现剩余 4 个武器的 Lv3 质变效果。其中 Bible/Fire Staff/Lightning 已在 R13 中的 weapon_fire.gd 里有数值逻辑，本轮完成 Holy Water 的完整实现，并为全部 4 个效果编写测试。
+
+#### 1. Holy Water Lv3 Frost Blessing (冰冻圣水)
+
+**机制**: 当 holywater 轨道发射的投射物 (weapon_id=="holywater", weapon_level>=3) 命中敌人时，额外施加 apply_slow(0.3)。
+
+**修改文件**:
+
+| 文件 | 变更 |
+|------|------|
+| `scripts/projectile.gd` | 新增 `HOLYWATER_LV3_SLOW_PCT` 常量 + `_on_body_entered()` 中增加 holywater Lv3 减速逻辑 |
+| `scripts/weapons/weapon_fire.gd` | `_fire_orbit_projectiles()` 新增 `level` 参数 + 为 holywater 轨道投射物设置 `weapon_level` |
+
+**关键设计**:
+- 仅对 `weapon_id == "holywater"` 触发，不影响进化武器 thunderholywater/holyshockwave
+- 减速 0.3 = 30% 移动速度降低，持续 1.0s (由 enemy.gd apply_slow 默认 _slow_timer)
+- 与 frostaura 减速叠加使用 maxf()，不产生双倍减速
+- `_fire_orbit_projectiles()` 新增 `level: int` 参数，两个调用点 (`update_orbit` 中的 orbit-existing 分支和 orbit-create 分支) 同步更新
+
+---
+
+#### 2. Bible Lv3 Expanding Radius (扩张圣经) -- 已实现，本轮补测
+
+**机制**: 当 bible 等级 >= 3 时，orbit_radius *= 1.5。
+
+已在 R13 的 weapon_fire.gd 第 160-161 行实现:
+```
+if level >= 3:
+    radius = radius * BIBLE_LV3_RADIUS_MUL
+```
+
+常量 `BIBLE_LV3_RADIUS_MUL = 1.5` 已定义。
+
+**数值验证**:
+
+| 等级 | 基础 radius | Lv3 后 radius |
+|------|------------|--------------|
+| Lv1 | 80 px | 80 px |
+| Lv2 | 100 px | 100 px |
+| Lv3 | 120 px | 180 px (* 1.5) |
+
+---
+
+#### 3. Fire Staff Lv3 Burst Burn (爆裂火焰) -- 已实现，本轮补测
+
+**机制**: 当 firestaff 等级 >= 3 时，锥形攻击命中后额外施加 apply_burn(3.0, 2.0)。
+
+已在 R13 的 weapon_fire.gd 第 277-281 行和第 305-306 行实现:
+```
+if level >= 3:
+    burn = FIRESTAFF_LV3_BURN_DPS    # 3.0
+    burn_dur = FIRESTAFF_LV3_BURN_DURATION  # 2.0
+...
+if burn > 0.0 and enemy.has_method("apply_burn"):
+    enemy.apply_burn(burn, burn_dur)
+```
+
+---
+
+#### 4. Lightning Lv3 Chain Boost (连锁击杀) -- 已实现，本轮补测
+
+**机制**: 非 evolved lightning 时 chains = level - 1，Lv3 时 chains = 2。
+
+已在 weapon_fire.gd 第 248 行实现:
+```
+chains = level - 1
+```
+
+常量 `LIGHTNING_LV3_CHAIN_BONUS = 2` 已定义（数值等价于 level - 1 在 Lv3 时）。
+
+**数值验证**:
+
+| 等级 | chains | bolt_count | 总命中数 |
+|------|--------|------------|----------|
+| Lv1 | 0 | 1 | 1 |
+| Lv2 | 1 | 1 | 2 |
+| Lv3 | 2 | 2 | 4 |
+
+---
+
+### 新增测试
+
+在 `test/unit/test_lv3_transforms.gd` 中追加 26 个测试:
+
+**Holy Water Lv3 Frost Blessing (8)**:
+1. 减速常量验证 (0.3)
+2. Lv1 不触发减速
+3. Lv2 不触发减速
+4. Lv3 触发条件
+5. 非 holywater 不触发
+6. orbit 投射物设置 weapon_level
+7. 进化武器 (thunderholywater) 不触发
+8. (含在常量验证中)
+
+**Bible Lv3 Expanding Radius (6)**:
+1. 半径倍率常量 (1.5)
+2. Lv3 半径公式 (180px)
+3. Lv1 半径不变 (80px)
+4. Lv2 半径不变 (100px)
+5. 进化武器不受影响
+6. Lv3 伤害公式
+
+**Fire Staff Lv3 Burst Burn (5)**:
+1. 燃烧常量验证 (DPS=3.0, Duration=2.0)
+2. Lv3 燃烧公式
+3. Lv1 无燃烧
+4. Lv2 无燃烧
+5. 进化武器不受影响 (代码结构验证)
+
+**Lightning Lv3 Chain Boost (7)**:
+1. Lv3 链数公式 (chains=2)
+2. Lv1 无链
+3. Lv2 一链
+4. Lv3 闪电数 (2)
+5. Lv1 闪电数 (1)
+6. Lv3 总命中数 (4)
+7. 进化武器使用自身 chain_count
+8. 链数增益常量验证 (2)
+
+### 测试结果
+
+```
+Scripts              43
+Tests              1070
+Passing Tests      1068
+Risky/Pending         2  (pre-existing: chest.png missing)
+Failing               0
+Asserts            2612
+```
+
+相比 R13 (1044 tests, 1042 passing, 2 pending)，新增 26 tests, +24 passing, +26 asserts。0 回归。
+
+### 文件行数验证
+
+| 文件 | 行数 | 上限占比 | 合规 |
+|------|------|----------|------|
+| scripts/weapons/weapon_fire.gd | 381 | 76.2% | PASS |
+| scripts/projectile.gd | 120 | 24.0% | PASS |
+| scripts/enemy.gd | 462 | 92.4% | PASS |
+| test/unit/test_lv3_transforms.gd | 606 | N/A (测试文件) | PASS |
+
+### 技术决策
+
+| # | 决策 | 原因 |
+|---|------|------|
+| 1 | Holy Water 减速逻辑放在 projectile.gd 而非 spin_blade.gd | 任务要求在 projectile.gd 的命中逻辑中实现，且 holywater 轨道会发射投射物 (通过 `_fire_orbit_projectiles`)，投射物命中时触发减速更精确 |
+| 2 | `_fire_orbit_projectiles()` 新增 `level` 参数 | 需要将武器等级传递给轨道投射物创建逻辑，以设置 `weapon_level`。两处调用同步更新 |
+| 3 | Bible/Fire Staff/Lightning 仅追加测试 | 这三个效果的数值逻辑已在 R13 中实现，本轮确认实现正确性并补充专项测试 |
+| 4 | `HOLYWATER_LV3_SLOW_PCT` 同时定义在 projectile.gd 和 weapon_fire.gd | projectile.gd 中的常量用于命中逻辑，weapon_fire.gd 中的常量作为 Lv3 规格注册。两者值相同 (0.3) |

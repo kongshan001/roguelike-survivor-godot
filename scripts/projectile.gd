@@ -19,6 +19,9 @@ var weapon_id: String = ""
 var is_crit: bool = false
 var weapon_level: int = 1
 
+# Holy Water Lv3: Frost Blessing (slow on hit)
+const HOLYWATER_LV3_SLOW_PCT: float = 0.3
+
 # Knife Lv3 Ricochet constants
 const KNIFE_LV3_RICOCHET_RANGE: float = 100.0
 const KNIFE_LV3_RICOCHET_DAMAGE_MUL: float = 0.5
@@ -76,6 +79,11 @@ func _on_body_entered(body: Node2D):
 		if slow_pct > 0.0 and body.has_method("apply_slow"):
 			body.apply_slow(slow_pct)
 		_hit_enemies.append(body)
+
+		# Holy Water Lv3: Frost Blessing -- slow on hit
+		if weapon_id == "holywater" and weapon_level >= 3:
+			if body.has_method("apply_slow"):
+				body.apply_slow(HOLYWATER_LV3_SLOW_PCT)
 
 		# Knife Lv3 Ricochet: bounce to a nearby enemy
 		if weapon_id == "knife" and weapon_level >= 3:

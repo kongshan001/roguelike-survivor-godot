@@ -1317,3 +1317,254 @@ All three handlers follow the same pattern:
 | 18 | Fire Staff burst checks `_last_hit_by == "firestaff"` | Ensures burst only triggers from firestaff-inflicted burns, not from mage_crit_to_burn or fire_slime burns. Keeps the effect scoped to the weapon identity | Check only `_burn_timer > 0` (would trigger on any burn source, too broad) |
 | 19 | Fire Staff burst source is "firestaff_burst" | Same anti-recursion pattern as "lightning_cok". If burst kills a burning enemy, `_last_hit_by` on that enemy may still be "firestaff" (set before burst), allowing a 2-deep chain. The 2-deep chain is ACCEPTABLE and rewards the firestaff build | Strictly prevent all chains (would require a `_burst_depth` counter, unnecessary complexity) |
 | 20 | All three die()-time effects (Shatter, COK, Burst) use the same hook pattern | Consistent code structure. All three check a status condition + weapon ownership + weapon level, then search enemies and deal damage. This makes the code predictable and easy to extend for future Lv3 effects | Different patterns per effect (inconsistent, harder to maintain) |
+
+---
+
+## 13. R14 Implementation Verification (2026-04-17)
+
+### 13.1 TOP3 Implementation Status
+
+As of R14, the TOP3 (Knife Ricochet, Frost Aura Shatter, Boomerang Homing) have been implemented. The remaining 4 (Lightning Chain On Kill, Bible Expanding Aura, Holy Water Frost Blessing, Fire Staff Searing Burst) are designed but NOT yet implemented.
+
+**Verified implementations:**
+
+| Effect | File | Verified Match to Spec |
+|---|---|---|
+| Knife Ricochet | `scripts/projectile.gd` lines 20-27, 81-82, 89-112 | Constants match (range 100, mul 0.5, speed 300, size 4, lifetime 0.5). Golden tint Color(1.0, 0.9, 0.5) matches. weapon_level field present. |
+| Frost Aura Shatter | `scripts/enemy.gd` lines 263-284, 287+ | Constants match (radius 50, damage 2.0). die() hook placement matches. _freeze_timer check matches. Source "frostaura" matches. |
+| Boomerang Homing | `scripts/weapons/weapon_boomerang_fire.gd` line 51-52 | **FILE CHANGE**: Boomerang logic was extracted from weapon_fire.gd to weapon_boomerang_fire.gd. The `if level >= 3: track_angle *= 1.5` logic matches spec exactly. Location changed from weapon_fire.gd line 366 to weapon_boomerang_fire.gd line 51. |
+
+### 13.2 Spec Accuracy Updates for Remaining 4
+
+Since the spec was written in R12/R13, the codebase has undergone refactoring. The following updates are needed for the remaining 4 implementations:
+
+**Boomerang Homing (already implemented, location updated):**
+- Spec Section 5.3 says "scripts/weapons/weapon_fire.gd" -- actual location is `scripts/weapons/weapon_boomerang_fire.gd` line 51-52
+- No design change, just file path correction
+
+**Lightning Chain On Kill (not yet implemented):**
+- Spec Section 6.3 says "scripts/enemy.gd" -- still correct
+- Spec says `_find_player()` is used -- confirmed present in enemy.gd
+- Spec says `WeaponEffects.create_lightning_effect()` for visual -- the static call pattern `load("res://scripts/weapons/weapon_effects.gd").create_lightning_effect(...)` is recommended
+- die() hook location: currently at line 239, after _handle_shatter(). Spec says _handle_lightning_cok() should be placed after _handle_shatter(). Still valid.
+
+**Bible Expanding Aura (not yet implemented):**
+- Spec Section 7.3 says "scripts/weapon_controller.gd" -- still correct
+- Spec says "_bible_pulse_timer: float = 0.0" should be added -- weapon_controller.gd structure unchanged
+- Spec says "scripts/weapons/weapon_effects.gd" should get create_pulse_ring_effect() -- weapon_effects.gd still exists, unchanged
+- Timer placement in _physics_process -- weapon_controller.gd _physics_process structure unchanged
+
+**Holy Water Frost Blessing (not yet implemented):**
+- Spec Section 8.3 says "scripts/spin_blade.gd" -- still correct, spin_blade.gd exists
+- Spec says "scripts/weapons/weapon_fire.gd" update_orbit() -- weapon_fire.gd still has update_orbit(), confirmed
+- weapon_level property on spin_blade -- needs to be added (not yet added since holywater is not yet implemented)
+
+**Fire Staff Searing Burst (not yet implemented):**
+- Spec Section 9.4 says "scripts/enemy.gd" -- still correct
+- die() hook: currently _handle_shatter() at line 239. _handle_firestaff_burst() should be placed after future _handle_lightning_cok(), before _spawn_xp_gems()
+- _burn_timer check: enemy.gd already has _burn_timer variable (used for burn DOT). Still valid.
+- _last_hit_by check: enemy.gd already tracks this. Still valid.
+
+### 13.3 Updated die() Hook Order
+
+The current die() in enemy.gd (line 233):
+
+```
+_handle_kill_rewards()
+_handle_shatter()
+_spawn_xp_gems()
+_spawn_food_drop()
+_spawn_crate_drop()
+_handle_boss_death()
+_handle_splitter_death()
+```
+
+When all 4 remaining effects are implemented, the die() order should be:
+
+```
+_handle_kill_rewards()
+_handle_shatter()           # Frost Aura Lv3 (IMPLEMENTED)
+_handle_lightning_cok()     # Lightning Lv3 (TODO)
+_handle_firestaff_burst()   # Fire Staff Lv3 (TODO)
+_spawn_xp_gems()
+_spawn_food_drop()
+_spawn_crate_drop()
+_handle_boss_death()
+_handle_splitter_death()
+```
+
+All three die()-time effects use the same pattern:
+1. Check status condition (_freeze_timer / _last_hit_by / _burn_timer)
+2. Find player via _find_player()
+3. Check player.owned_weapons for weapon and level >= 3
+4. Search enemies in group within range
+5. Deal damage with distinct source ID (frostaura / lightning_cok / firestaff_burst)
+
+### 13.4 Implementation Priority Recommendation for Remaining 4
+
+Based on the current codebase state and the existing implementation patterns:
+
+| Priority | Effect | Rationale |
+|---|---|---|
+| 1 | Holy Water Frost Blessing | Lowest code (~6 lines), highest player visibility (freeze is very noticeable), enables cross-weapon synergy with Frost Aura Shatter |
+| 2 | Lightning Chain On Kill | ~32 lines, all in enemy.gd (same file as existing Shatter), uses established die()-hook pattern |
+| 3 | Fire Staff Searing Burst | ~42 lines, all in enemy.gd, uses established die()-hook pattern, slightly more complex visual |
+| 4 | Bible Expanding Aura | ~48 lines, spans 2 files (weapon_controller.gd + weapon_effects.gd), requires new visual function |
+
+The recommended order differs from the original Tier ranking because Holy Water's implementation cost dropped to 6 lines (lowest of all 7 effects) while its player experience value is high (freeze interaction with Shatter is immediately visible).
+
+---
+
+## 14. R14 Competitive Analysis: Weapon Evolution Path Comparison
+
+### 14.1 Analysis Scope
+
+This section compares the evolution/upgrade systems of Vampire Survivors, Brotato, HoloCure, and our project, specifically focusing on **weapon evolution paths** -- how weapons transform at max level, what strategic choices the evolution system creates, and how the design drives build diversity.
+
+### 14.2 Evolution System Comparison
+
+| Dimension | Vampire Survivors | Brotato | HoloCure | Our Project (9 Evolutions) |
+|---|---|---|---|---|
+| **Evolution trigger** | Weapon Lv8 + Passive Lv8 + Chest | No evolution; shop rarity upgrade | Stamp equipped on weapon | Dual Weapon Lv3 + Lv3 |
+| **Recipe visibility** | Hidden (discovery-driven) | N/A | Partially visible (stamp hints) | Hidden (discovery-driven) |
+| **Max weapons** | 6-7 | 6 | 6 | 6 |
+| **Evolution count** | 20+ | N/A | 30+ | 9 |
+| **Evolution slot** | Replaces base weapon | N/A | Modifies base weapon | Replaces both base weapons |
+| **Post-evolution upgrade** | No (fixed power) | N/A | No (stamp power scales) | No (fixed power) |
+| **Branching paths** | No (1:1 weapon:evolution) | N/A | Partial (some stamps work on multiple weapons) | Yes (knife has 3 evolutions) |
+| **Visual change** | Dramatic (sprite, VFX, particles) | Rarity glow | Sprite swap + stamp VFX | Color change + new behavior |
+
+### 14.3 Key Design Differences
+
+**1. Dual-Weapon Fusion vs Weapon+Passive**
+
+Our system is unique in requiring two active weapons at Lv3. VS requires a weapon + a passive. This has a significant strategic implication:
+
+- **VS approach**: Player must sacrifice a passive slot for evolution. This creates tension between "best passives" and "evolution-enabling passives." The evolution system is a secondary strategic layer on top of weapon selection.
+- **Our approach**: Player must sacrifice two weapon slots. Since the player can only hold 6 weapons, committing to an evolution means 2 of 6 slots are "locked" until the fusion. Post-evolution, the player gets 1 evolved weapon in exchange for 2 slots, freeing up 1 slot. This makes evolution a net-positive for slot economy (2 slots -> 1 slot = +1 free slot), which is a meaningful reward.
+- **Assessment**: Our dual-weapon fusion creates a more dramatic mid-game power spike (2 weapons disappear, 1 stronger weapon appears) compared to VS's passive-sacrifice approach. The slot-economy incentive is a clever design that rewards planning.
+
+**2. Branching Evolution Paths**
+
+Our system has 3 weapons (knife, lightning, firestaff) that appear in 3+ evolution recipes each. This is different from VS's 1:1 mapping:
+
+| Base Weapon | Evolution Options | Choice Point |
+|---|---|---|
+| knife | fireknife (knife+firestaff), frostknife (knife+frostaura), frostvortex (knife+frostaura, spec only), thunderbeam (knife+lightning, spec only) | Fire vs Frost vs Lightning theme |
+| lightning | thunderholywater, blizzard, thunderang, thunderbeam (spec only) | Orbit vs Aura vs Boomerang vs Beam type |
+| firestaff | fireknife, flamebible, blazerang, holyshockwave (spec only) | Projectile vs Orbit vs Boomerang vs Pulse type |
+
+VS does not have branching -- each weapon has exactly one evolution. Our branching creates genuine strategic decisions: "I have knife at Lv2 and both firestaff and frostaura at Lv2. Which do I max first?"
+
+**Assessment**: Branching is a strength of our design. However, the current 9-evolution roster only has knife appearing in 3 recipes (fireknife, frostknife, sentineltotem's recipe is bible+boomerang). The other weapons appear in 1-2 recipes. This means knife is disproportionately valuable as a "universal ingredient," which may make it feel mandatory.
+
+**3. Evolution as Discovery**
+
+VS hides evolution recipes and requires players to open chests. Our system hides recipes but reveals them in the upgrade pool (the evolved weapon appears as an option when both ingredients reach Lv3). This is simpler and more transparent than VS's chest-gating.
+
+**Assessment**: Our approach is more accessible (no chest dependency) but loses the "surprise chest moment" that VS players enjoy. A possible enhancement: add a brief "fusion animation" when the evolution offer appears in the upgrade pool, showing both base weapons combining.
+
+### 14.4 Our 9 Evolution Paths Audit
+
+| # | Recipe | Result | Type | Base A Alternative Evolutions | Base B Alternative Evolutions |
+|---|---|---|---|---|---|
+| 1 | holywater + lightning | thunderholywater | orbit | holywater: holydomain(3) | lightning: blizzard(4), thunderang(7) |
+| 2 | knife + firestaff | fireknife | projectile | knife: frostknife(5) | firestaff: flamebible(6), blazerang(8) |
+| 3 | bible + holywater | holydomain | orbit | bible: flamebible(6), sentineltotem(9) | holywater: thunderholywater(1) |
+| 4 | frostaura + lightning | blizzard | aura | frostaura: frostknife(5) | lightning: thunderholywater(1), thunderang(7) |
+| 5 | knife + frostaura | frostknife | projectile | knife: fireknife(2) | frostaura: blizzard(4) |
+| 6 | bible + firestaff | flamebible | orbit | bible: holydomain(3), sentineltotem(9) | firestaff: fireknife(2), blazerang(8) |
+| 7 | boomerang + lightning | thunderang | boomerang | boomerang: blazerang(8), sentineltotem*(9) | lightning: thunderholywater(1), blizzard(4) |
+| 8 | boomerang + firestaff | blazerang | boomerang | boomerang: thunderang(7), sentineltotem*(9) | firestaff: fireknife(2), flamebible(6) |
+| 9 | bible + boomerang | sentineltotem | orbit | bible: holydomain(3), flamebible(6) | boomerang: thunderang(7), blazerang(8) |
+
+**Note**: Boomerang appears in recipes 7, 8, and 9, but recipe 9 (sentineltotem) uses bible as base A and boomerang as base B. This means boomerang is the "base B" ingredient for sentineltotem, while also being the "base A" ingredient for thunderang and blazerang.
+
+### 14.5 Ingredient Coverage Analysis
+
+| Base Weapon | Evolution Recipes | Flexibility Rating |
+|---|---|---|
+| knife | fireknife, frostknife | Medium (2 paths, both projectile) |
+| lightning | thunderholywater, blizzard, thunderang | High (3 paths, 3 types) |
+| firestaff | fireknife, flamebible, blazerang | High (3 paths, 3 types) |
+| holywater | thunderholywater, holydomain | Low (2 paths, both orbit) |
+| frostaura | blizzard, frostknife | Low (2 paths) |
+| bible | holydomain, flamebible, sentineltotem | High (3 paths, all orbit but different mechanics) |
+| boomerang | thunderang, blazerang, sentineltotem | High (3 paths, 2 boomerang + 1 orbit) |
+
+**Observation**: holywater and frostaura have the fewest evolution paths (2 each). This is because they were designed as "support" weapons (orbit CC and aura slow) and their evolution combinations are narrower. In contrast, knife/firestaff/lightning are "core" weapons with broad evolution coverage.
+
+**Design implication**: In a 6-weapon build, the player can realistically pursue 1-2 evolutions per run. A typical build might carry knife + firestaff + frostaura + lightning, which enables 4 evolution paths (fireknife, frostknife, thunderholywater, blizzard) but the player can only take 1-2 due to the Lv3 requirement on both ingredients. This creates meaningful prioritization decisions.
+
+### 14.6 Comparison Summary
+
+| Aspect | Our Strength | Our Gap | Recommendation |
+|---|---|---|---|
+| Evolution trigger | Dual-weapon fusion is unique and creates strong mid-game moment | Requires 2 weapon slots, high opportunity cost | Keep as-is -- the slot economy reward (+1 free slot) compensates |
+| Branching paths | 3 weapons with 3+ paths each | knife is disproportionately valuable | Monitor -- if knife becomes "mandatory," consider adding more knife alternatives or buffing other base weapons' evolution options |
+| Visual feedback | Color change per evolution | VS/HoloCure have dramatic sprite swaps | P1: implement evolved weapon sprite differentiation |
+| Discovery | Upgrade pool reveals recipes when conditions met | No "chest surprise" moment | Keep as-is -- simpler is better for our game's shorter run time (5 min vs VS's 30 min) |
+| Evolution count | 9 evolutions | VS has 20+, HoloCure 30+ | 9 is sufficient for 7 base weapons; the 3 additional spec-only evolutions (frostvortex, holyshockwave, thunderbeam) would bring total to 12 |
+| Post-evolution | Fixed power (no further upgrades) | Same as VS and HoloCure | Keep as-is -- prevents power creep |
+
+---
+
+## 15. R14 Sprite Coverage Audit
+
+### 15.1 Current Sprite Inventory
+
+| Category | Sprites Present | Expected Coverage | Status |
+|---|---|---|---|
+| Characters | mage, warrior, ranger | 3 characters | COMPLETE |
+| Enemies | zombie, bat, skeleton, elite_skeleton, ghost, splitter, splitter_small, boss, fire_slime, elite_knight | 10 enemy types | COMPLETE (elite_knight is extra, not in H5 config) |
+| Base Weapons | holy_water, knife, bible, boomerang | 4 of 7 base weapons | **MISSING: lightning, firestaff, frostaura** |
+| Evolved Weapons | thunderholywater, fireknife, holydomain, blizzard, frostknife, flamebible, thunderang, blazerang | 8 of 9 registered | **MISSING: sentineltotem** |
+| Spec-Only Evolutions | (none) | frostvortex, holyshockwave, thunderbeam | **MISSING: all 3** (spec-only, not registered in code) |
+| Pickups | xp_gem_small, xp_gem_medium, xp_gem_large, food, crate_heal, crate_xp, crate_speed, chest | 8 pickup types | COMPLETE |
+| UI | wave_progress, wave_marker, boss_warning, wave_transition, wave_banner_w1-w5, wave_complete | 12 UI elements | COMPLETE |
+| Skills | elemental_burst, shield_charge, arrow_rain | 3 character skills | COMPLETE |
+| Effects | freeze_star, arrow, knife_ricochet, frost_shatter, boomerang_homing_trail, lightning_chain_kill, bible_expand, holywater_frost, firestaff_explode | 9 effect sprites | COMPLETE (Lv3 effect sprites pre-created) |
+| Passives | mage_vortex, warrior_shield, ranger_crosshair | 3 character passives | COMPLETE |
+| Enemy Weapons | enemy_bullet | 1 type | COMPLETE |
+
+### 15.2 Missing Sprites -- Priority List
+
+| Priority | Sprite | Category | Game Impact | Notes |
+|---|---|---|---|---|
+| **P0** | lightning.png | Base Weapon | Lightning has no visual sprite. Currently falls back to enemy_bullet.png fallback | Used by projectile.gd: `res://assets/sprites/weapons/lightning.png` |
+| **P0** | firestaff.png | Base Weapon | Fire Staff has no visual sprite. Falls back to enemy_bullet.png | Cone visual uses weapon_effects.gd inline drawing, but projectile/symbol still needed for HUD |
+| **P0** | frostaura.png | Base Weapon | Frost Aura has no visual sprite. Falls back to enemy_bullet.png | Aura is invisible (range-based), but HUD weapon slot needs icon |
+| **P1** | sentineltotem.png | Evolved Weapon | Sentinel Totem is registered in upgrade_pool.gd but has no sprite. Falls back to enemy_bullet.png | orbit type, needs orbit blade visual |
+| P2 | frostvortex.png | Spec-Only Evolution | Not registered in code. Only exists in evolution-expansion.md spec | Future implementation |
+| P2 | holyshockwave.png | Spec-Only Evolution | Not registered in code. Only exists in evolution-expansion.md spec | Future implementation |
+| P2 | thunderbeam.png | Spec-Only Evolution | Not registered in code. Only exists in evolution-expansion.md spec | Future implementation |
+
+### 15.3 Shared Passive Sprites
+
+The 7 shared passives (speedboots, armor, magnet, crit, maxhp, regen, luckycoin) currently use `icon_color` (ColorRect) in the upgrade pool, NOT sprite textures. The 3 character passive sprites (mage_vortex, warrior_shield, ranger_crosshair) exist but may represent character "ultimate" visuals rather than individual passive icons.
+
+**Recommendation**: Shared passive sprites are not blocking (ColorRect fallback works), but creating dedicated 16x16 icons for each passive would improve the upgrade selection UI. This is a P2 visual polish item.
+
+### 15.4 Sprite-to-Code Mapping Verification
+
+The code loads sprites dynamically using the pattern:
+- Weapons: `res://assets/sprites/weapons/{weapon_id}.png`
+- Enemies: `res://assets/sprites/enemies/{enemy_id}.png`
+
+The following weapon_id values are used in code but have NO matching sprite file:
+
+| weapon_id | Code Location | Fallback |
+|---|---|---|
+| `lightning` | upgrade_pool.gd line 47 | Falls through to enemy_bullet.png in projectile.gd |
+| `firestaff` | upgrade_pool.gd line 59 | Cone is drawn inline; HUD shows ColorRect |
+| `frostaura` | upgrade_pool.gd line 65 | Aura is invisible; HUD shows ColorRect |
+| `sentineltotem` | upgrade_pool.gd line 143 | Falls through to enemy_bullet.png in spin_blade |
+
+**Note**: lightning, firestaff, and frostaura are non-projectile weapon types (lightning is instant-target, firestaff is cone, frostaura is aura). They do not fire projectiles via projectile.gd, so the sprite is only needed for HUD weapon slot display, not for in-game projectile visuals. The HUD currently uses ColorRect with the weapon's `color` property. However, for the ColorRect->Sprite2D migration (R14 focus), these sprites become P0 blockers.
+
+### 15.5 Summary
+
+**Total sprites present**: 63
+**Total sprites needed for full coverage**: 70 (63 + 3 base weapons + 1 evolved weapon + 3 spec-only evolutions)
+**P0 blockers for ColorRect->Sprite2D migration**: 4 (lightning, firestaff, frostaura, sentineltotem)
+**P2 missing (spec-only, not yet in code)**: 3 (frostvortex, holyshockwave, thunderbeam)

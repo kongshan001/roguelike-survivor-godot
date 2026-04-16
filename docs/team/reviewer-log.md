@@ -4052,3 +4052,268 @@ SkillData (唯一数据源)
 **待改进**:
 - 无法在 Godot 环境中实际运行 999 测试验证通过率
 - chest.png 缺失和 _spawn_food_at() ColorRect 已各继承 9/10 轮, 作为 Reviewer 未能推动修复, 仅能记录
+
+---
+
+## R14 审核 (2026-04-17)
+
+### 任务 1: R13 遗留审计
+
+#### 1.1 enemy.gd BUG-101 修复验证 -- PASS
+
+`scripts/enemy.gd` 第 291-301 行 `_spawn_shatter_effect()` 已使用正确的字符串拼接替代三引号:
+
+```
+script.source_code = (
+    "extends Node2D\n"
+    + "var alpha: float = 0.6\n"
+    + "func _process(delta):\n"
+    ...
+)
+```
+
+验证结果: 符合 QA 修复方案, 无残留三引号。
+
+#### 1.2 weapon_boomerang_fire.gd 拆分验证 -- PASS (with notes)
+
+新文件 `scripts/weapons/weapon_boomerang_fire.gd` (99 行) 正确包含:
+- `fire_boomerang()` 完整逻辑
+- `_create_boomerang()` 工厂方法
+- Boomerang Lv3 追踪增强 (`track_angle *= 1.5`, 第 52 行)
+- `BOOMERANG_MAX_COUNT` 限制 (第 59 行)
+
+**发现 2 项残留**:
+- `weapon_fire.gd:26` 保留了未使用的 `BOOMERANG_MAX_COUNT` 常量 (委托后不再引用)
+- `weapon_fire.gd:31` 保留了未使用的 `BOOMERANG_LV3_TRACK_ANGLE_MUL` 常量 (实际值 1.5 在 boomerang_fire 中硬编码)
+
+#### 1.3 projectile.gd ricochet 逻辑验证 -- PASS
+
+`scripts/projectile.gd` 第 80-112 行 Knife Lv3 弹射逻辑:
+- 条件正确: `weapon_id == "knife" and weapon_level >= 3`
+- 弹射投射物正确传播 `weapon_level` (第 110 行)
+- 弹射投射物正确排除已命中敌人 (`_hit_enemies` 数组)
+- 使用 `is_instance_valid()` 作为全局函数, 非节点方法
+
+#### 1.4 weapon_fire.gd 拆分后完整性 -- PASS
+
+357 行, 6 种武器发射类型全部保留:
+- `fire_projectile()` (第 53 行)
+- `update_orbit()` (第 124 行)
+- `fire_lightning()` (第 209 行)
+- `fire_cone()` (第 249 行)
+- `update_aura()` (第 293 行)
+- `fire_boomerang()` 委托到 weapon_boomerang_fire.gd (第 352 行)
+
+---
+
+### 任务 2: 当前代码质量审查
+
+#### 2.1 文件行数审计
+
+| 文件 | 行数 | 上限 | 状态 |
+|------|------|------|------|
+| scripts/enemy.gd | 462 | 500 | 安全 (接近) |
+| scripts/weapons/weapon_fire.gd | 357 | 500 | 安全 |
+| scripts/projectile.gd | 113 | 500 | 安全 |
+| scripts/weapons/weapon_boomerang_fire.gd | 100 | 500 | 安全 |
+| scripts/player.gd | 408 | 500 | 安全 |
+| scripts/autoload/save_manager.gd | 395 | 500 | 安全 |
+| scripts/hud.gd | 375 | 500 | 安全 |
+| scripts/weapon_controller.gd | 133 | 500 | 安全 |
+
+所有文件均在 500 行上限以内。
+
+#### 2.2 Critical 发现
+
+**C1: weapon_effects.gd 第 28-49 行仍使用三引号 ("""...""")**
+
+文件: `/Users/ks_128/Documents/godot_demo/scripts/weapons/weapon_effects.gd`, 第 28 行
+
+```gdscript
+script.source_code = """extends Node2D
+var dir_angle: float = 0.0
+...
+draw_colored_polygon(points, Color(color.r, color.g, color.b, alpha))
+"""
+```
+
+这与 BUG-101 完全相同的模式。如果 GDScript 解析器在此处也拒绝三引号, 整个 `weapon_effects.gd` 将解析失败, 导致:
+- `create_cone_effect()` 不可用 -> firestaff 视觉特效缺失
+- `create_lightning_effect()` 不可用 -> lightning/thunderholyweapon/thunderang 视觉特效缺失
+- `create_evolution_flash()` 不可用 -> 进化闪光效果缺失
+
+**严重度: Critical** (与 BUG-101 同源, 影响范围覆盖 3 种视觉效果函数)
+
+**注意**: 当前 1044 测试中 0 失败, 说明此文件可能在实际 Godot 4.6 运行时仍可被加载 (GDScript 4.6 可能已支持三引号, 而 QA 报告的 BUG-101 仅在特定场景下触发解析错误)。但如果项目规范明确禁止三引号, 此处仍应修复以保持一致性。标记为 **Critical (pending verification)** -- 需确认 Godot 4.6 是否实际支持多行字符串三引号语法。
+
+**C2: boomerang.gd 第 138 行硬编码 weapon_id**
+
+文件: `/Users/ks_128/Documents/godot_demo/scripts/weapons/boomerang.gd`, 第 138 行
+
+```gdscript
+body.take_damage(damage, "boomerang", is_crit)
+```
+
+当 `thunderang` 或 `blazerang` 进化回旋镖命中敌人时, `weapon_id` 仍报告为 `"boomerang"` 而非实际的进化武器 ID。影响:
+- 击杀归属追踪错误 (evolution_history 不会记录 thunderang/blazerang)
+- `all_evolved` 成就可能无法正确解锁
+- 协同效应检查可能匹配错误的武器 ID
+
+**严重度: Critical** (影响成就解锁和协同效应判定)
+
+#### 2.3 Medium 发现
+
+**M1: weapon_fire.gd 中残留未使用的常量**
+
+文件: `/Users/ks_128/Documents/godot_demo/scripts/weapons/weapon_fire.gd`
+- 第 26 行: `BOOMERANG_MAX_COUNT` -- 委托后不再使用
+- 第 31 行: `BOOMERANG_LV3_TRACK_ANGLE_MUL` -- 实际值 1.5 在 weapon_boomerang_fire.gd 第 52 行硬编码
+
+**M2: weapon_fire.gd:188-189 holywater 的 weapon_level 赋值是死代码**
+
+```gdscript
+if weapon_id == "holywater":
+    instance.weapon_level = level
+```
+
+`spin_blade.gd` 从未读取 `weapon_level` 属性, 此赋值无任何效果。
+
+**M3: _spawn_shatter_effect() 动态脚本创建模式**
+
+`scripts/enemy.gd` 第 288-304 行和 `scripts/weapons/weapon_effects.gd` 第 26-58 行都使用 `GDScript.new()` + `source_code` + `reload()` 动态创建脚本。这种模式:
+- 无法被静态分析工具检查
+- 无法在测试中直接验证脚本内容
+- 每次创建新实例都会触发脚本编译
+
+建议: 将这些动态脚本替换为预定义的场景或脚本文件。
+
+#### 2.4 Low 发现
+
+**L1: enemy.gd 462 行接近 500 行上限**
+
+当前 462 行, 距离 500 行上限仅 38 行余量。如果后续需要添加更多敌人行为, 可能需要进一步拆分。
+
+---
+
+### 任务 3: 架构一致性检查
+
+#### 3.1 weapon_level 字段使用一致性
+
+| 使用位置 | 用途 | 状态 |
+|----------|------|------|
+| projectile.gd:20 | 声明 `weapon_level: int = 1` | 正确 |
+| projectile.gd:81 | Knife Lv3 弹射条件判断 | 正确 |
+| projectile.gd:110 | 弹射投射物传播 weapon_level | 正确 |
+| weapon_fire.gd:95 | 设置 knife 的 weapon_level | 正确 |
+| weapon_fire.gd:189 | 设置 holywater orbit 的 weapon_level | **死代码** (spin_blade 不使用) |
+
+**结论**: weapon_level 在 projectile 系统中使用正确, 但在 orbit 系统中有无效赋值。
+
+#### 3.2 Lv3 质变实现模式一致性
+
+| 武器 | Lv3 效果 | 实现位置 | 模式 | 状态 |
+|------|----------|----------|------|------|
+| Knife | 弹射 | projectile.gd `_spawn_ricochet()` | 新投射物 | 正确 |
+| Frost Aura | 碎裂 | enemy.gd `_handle_shatter()` | 条件触发 | 正确 |
+| Boomerang | 追踪增强 | weapon_boomerang_fire.gd:51-52 | 参数调整 | 正确 |
+
+三种模式各不相同, 但各自合理:
+- Knife 用新投射物 -- 因为弹射是独立的飞行体
+- Frost 用条件触发 -- 因为碎裂依赖敌人死亡时的冻结状态
+- Boomerang 用参数调整 -- 因为追踪增强是对现有行为的倍率调整
+
+#### 3.3 9 种进化武器配方与成就追踪完整性
+
+**配方文件** (`scripts/weapons/weapon_registry.gd`): 9/9 进化武器已注册
+
+| 进化武器 | 配方 | upgrade_pool 注册 | 成就追踪列表 |
+|----------|------|-------------------|-------------|
+| thunderholywater | holywater + lightning | 第 81 行 | save_manager.gd:264 |
+| fireknife | knife + firestaff | 第 88 行 | save_manager.gd:264 |
+| holydomain | bible + holywater | 第 96 行 | save_manager.gd:264 |
+| blizzard | frostaura + lightning | 第 103 行 | save_manager.gd:264 |
+| frostknife | knife + frostaura | 第 110 行 | save_manager.gd:264 |
+| flamebible | bible + firestaff | 第 118 行 | save_manager.gd:264 |
+| thunderang | boomerang + lightning | 第 126 行 | save_manager.gd:264 |
+| blazerang | boomerang + firestaff | 第 134 行 | save_manager.gd:264 |
+| sentineltotem | bible + boomerang | 第 143 行 | save_manager.gd:264 |
+
+**三维一致性: PASS** -- 9 种进化武器在 registry / upgrade_pool / save_manager 三处完全匹配。
+
+**但**: 由于 C2 (boomerang.gd 硬编码 weapon_id), thunderang 和 blazerang 的击杀归属可能无法正确记录到 evolution_history。
+
+---
+
+### 任务 4: TOP 5 技术债务
+
+| 优先级 | 描述 | 来源 | 影响 |
+|--------|------|------|------|
+| **P1** | boomerang.gd 硬编码 "boomerang" weapon_id, 影响 thunderang/blazerang 击杀归属和成就追踪 | R14 新发现 | 成就 `all_evolved` 可能无法解锁 |
+| **P1** | weapon_effects.gd 三引号 (与 BUG-101 同源) | R14 新发现 | 若 GDScript 不支持三引号则 firestaff/lightning/进化特效全部失效 |
+| **P2** | weapon_fire.gd 残留未使用常量 (BOOMERANG_MAX_COUNT + BOOMERANG_LV3_TRACK_ANGLE_MUL) | R13 拆分不彻底 | 代码混乱, 维护困难 |
+| **P2** | 动态脚本创建模式 (GDScript.new + source_code + reload) 在 enemy.gd 和 weapon_effects.gd | R8 起存在 | 不可测试, 不可静态分析, 每帧编译 |
+| **P3** | enemy.gd 462 行接近 500 行上限 | R12 起追踪 | 后续添加功能可能触发拆分 |
+
+---
+
+### 跨角色优化建议
+
+#### 程序 (Programmer)
+
+| 优先级 | 建议 | 文件 | 说明 |
+|--------|------|------|------|
+| Critical | 修复 boomerang.gd:138 硬编码 weapon_id | scripts/weapons/boomerang.gd | 改为 `body.take_damage(damage, weapon_id, is_crit)` |
+| Critical | weapon_effects.gd 三引号改为字符串拼接 | scripts/weapons/weapon_effects.gd:28-49 | 与 enemy.gd BUG-101 修复方案一致 |
+| Medium | 清理 weapon_fire.gd 未使用常量 | scripts/weapons/weapon_fire.gd:26,31 | 删除 BOOMERANG_MAX_COUNT 和 BOOMERANG_LV3_TRACK_ANGLE_MUL |
+| Medium | 删除 weapon_fire.gd:188-189 死代码 | scripts/weapons/weapon_fire.gd | holywater weapon_level 赋值无实际效果 |
+
+#### QA
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P1 | 添加 thunderang/blazerang 击杀归属测试 | 验证进化回旋镖的 kill source 是否正确传播 |
+| P2 | 添加 weapon_effects.gd 三引号解析测试 | 确认 create_cone_effect 是否能正常创建视觉节点 |
+
+#### 策划 (Designer)
+
+无新增建议。当前 3 种 Lv3 质变设计合理, 差异化足够。
+
+#### 美术 (Art)
+
+| 优先级 | 建议 | 说明 |
+|--------|------|------|
+| P2 | 提供 chest.png 宝箱精灵 | 已继承 10+ 轮, 2 个测试持续 Pending |
+
+---
+
+### 项目健康状态 (R14)
+
+```
+代码量:        ~4,500 行 GDScript (50+ 源文件)
+测试覆盖:      1044 测试 / 2581 断言 / 43 文件 / 0 失败 / 2 Pending
+功能完成度:    Phase 0-13 完成, 9/9 进化武器, 18/18 协同, 3/3 Lv3 质变
+技术债务:      2 个 P1 (新发现), 2 个 P2, 1 个 P3
+已知Bug:       2 个 Critical (C1 pending verification, C2 击杀归属)
+```
+
+---
+
+### 审核人自评: 90/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| R13 遗留审计准确性 | 23 | 25 | 逐行验证 BUG-101 修复、boomerang 拆分、ricochet 逻辑、weapon_fire 完整性 |
+| Critical 发现 | 15 | 15 | C1 (三引号同源问题) + C2 (boomerang weapon_id 硬编码), 均附文件路径和行号 |
+| 架构一致性检查 | 18 | 20 | 9/9 进化武器三维比对; Lv3 质变模式分析; weapon_level 使用链路追踪 |
+| 技术债务追踪 | 14 | 15 | 更新债务列表, 2 项 P1 为新发现 |
+| 时序遵守 | 10 | 10 | 先做 R13 遗留审计, 再进行 R14 全面审查 |
+| 文件行数审计 | 10 | 15 | 8 个关键文件全部在 500 行以内 |
+
+**加分项**:
+- 发现 C1 (weapon_effects.gd 三引号) 是 BUG-101 的同源问题, 说明 R13 修复不彻底
+- 发现 C2 (boomerang.gd 硬编码 weapon_id) 通过链路追踪 -- 从 weapon_boomerang_fire.gd 设置 weapon_id 到 boomerang.gd _on_body_entered 读取, 发现断裂
+- 识别 weapon_fire.gd 中 2 个未使用常量和 1 段死代码, 证明拆分后的清理未完成
+
+**待改进**:
+- C1 标记为 pending verification -- 需确认 Godot 4.6 是否实际支持三引号; 如果支持则降级为 Medium (风格问题)
+- enemy.gd 462 行已持续 2 轮, 作为 P3 风险应推动拆分而非持续观察

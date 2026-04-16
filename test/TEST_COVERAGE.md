@@ -1,19 +1,19 @@
 # Test Coverage Report
 
-Generated: 2026-04-16 R13
-QA Agent: Task 13D (Lv3 Weapon Transforms + Orphan Analysis)
+Generated: 2026-04-17 R14
+QA Agent: Task 14 (Orphan Fix + Lv3 Transform Validation + Regression)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total test files | 43 |
-| Total test functions | 1044 |
-| Assertions | 2581 |
-| Passing | 1042 |
+| Total test functions | 1070 |
+| Assertions | 2612 |
+| Passing | 1068 |
 | Pending | 2 (chest.png missing) |
 | Failing | 0 |
-| Orphans | 84 (BUG-101: enemy.gd triple-quote parse error) |
+| Orphans | 0 |
 
 ## Test File Inventory
 
@@ -49,6 +49,7 @@ QA Agent: Task 13D (Lv3 Weapon Transforms + Orphan Analysis)
 | test_weapon_registry.gd | 16 | Recipe count, structure, ingredient validation, unique results, evolution matching |
 | test_weapon_balance.gd | 16 | DPS balance regression: thunderang/fireknife/blazerang/frostknife/thunderholywater nerf/buff verification, global weapon damage/cooldown invariant checks |
 | test_weapon_lv3_transforms.gd | 17 | Lv3 quality transforms: Knife ricochet (constants, weapon_level, Lv2 no-ricochet, evolved no-ricochet, method existence, call_deferred), Frost Aura shatter (constants, method existence, freeze check, level check, Lv2 guard, die() call), Boomerang tracking (1.5x multiplier, formula, Lv3 actual, Lv2 no-bonus, evolved direct) |
+| test_lv3_transforms.gd | 54 | Knife ricochet (11), Frost Aura shatter (8), Boomerang homing (10+4 delegation), Holy Water Frost Blessing (7), Bible radius (6), Fire Staff burn (5), Lightning chain (8) |
 | test_sentinel_totem.gd | 16 | Sentinel Totem (bible+boomerang): registration, orbit type, orbit_fire_rate, evolution recipe, damage, orbit_count, radius/speed/projectile fields |
 | test_boomerang.gd | 18 | Boomerang flight, return, property preservation |
 | test_evolved_weapon_sprites.gd | 20 | Projectile evolved sprites (fireknife/frostknife), boomerang evolved sprites (thunderang/blazerang), fallback logic, resource existence |
@@ -69,7 +70,7 @@ QA Agent: Task 13D (Lv3 Weapon Transforms + Orphan Analysis)
 | test_hud.gd | 33 | HUD scene, HealthBar/XPBar/GoldLabel signals, combo display, boss warning, upgrade card selection, reroll logic |
 | test_hud_toast.gd | 27 | Toast container, creation, max visible limit, auto-remove, combo milestone, quest/achievement handlers |
 | test_hud_toast_module.gd | 22 | hud_toast.gd RefCounted module: constants, container creation, toast display/queue/remove |
-| test_achievement_screen.gd | 37 | Achievement scene, quest tab, achievement tab, hidden achievements, navigation, categories |
+| test_achievement_screen.gd | 37 | Achievement scene, quest tab, achievement tab, hidden achievements, navigation, categories (orphan fix: added after_each with await) |
 | test_difficulty_data.gd | 5 | DifficultyData resource |
 
 ### Integration & Specialized (8 files)
@@ -158,25 +159,40 @@ QA Agent: Task 13D (Lv3 Weapon Transforms + Orphan Analysis)
 
 ## Coverage Matrix: Lv3 Weapon Quality Transforms
 
-| Transform | test_weapon_lv3_transforms | test_weapon_fire | test_integration |
-|-----------|---------------------------|------------------|------------------|
-| Knife Lv3 ricochet constants | X | | |
-| Knife Lv3 weapon_level set | X | | |
-| Knife Lv2 no ricochet | X | | |
-| Knife evolved no ricochet | X | | |
-| Knife ricochet method/code | X | | |
-| Frost Aura Lv3 shatter constants | X | | |
-| Frost Aura Lv3 method exists | X | | |
-| Frost Aura Lv3 checks frozen | X | | |
-| Frost Aura Lv3 checks level | X | | |
-| Frost Aura Lv2 no shatter | X | | |
-| Frost Aura die() calls shatter | X | | |
-| Boomerang Lv3 1.5x tracking | X | | |
-| Boomerang Lv3 formula | X | | |
-| Boomerang Lv3 actual fire | X | | |
-| Boomerang Lv2 no bonus | X | | |
-| Boomerang evolved direct data | X | | |
-| Knife fire + weapon_level | | X | X |
+| Transform | test_weapon_lv3_transforms | test_lv3_transforms | test_weapon_fire | test_integration |
+|-----------|---------------------------|---------------------|------------------|------------------|
+| Knife Lv3 ricochet constants | X | X | | |
+| Knife Lv3 weapon_level set | X | X | | |
+| Knife Lv2 no ricochet | X | X | | |
+| Knife evolved no ricochet | X | X | | |
+| Knife ricochet method/code | X | X | | |
+| Frost Aura Lv3 shatter constants | X | X | | |
+| Frost Aura Lv3 method exists | X | X | | |
+| Frost Aura Lv3 checks frozen | X | X | | |
+| Frost Aura Lv3 checks level | X | X | | |
+| Frost Aura Lv2 no shatter | X | X | | |
+| Frost Aura die() calls shatter | X | X | | |
+| Boomerang Lv3 1.5x tracking | X | X | | |
+| Boomerang Lv3 formula | X | X | | |
+| Boomerang Lv3 actual fire | X | X | | |
+| Boomerang Lv2 no bonus | X | X | | |
+| Boomerang evolved direct data | X | X | | |
+| Knife fire + weapon_level | | | X | X |
+| Holy Water Lv3 slow constant | | X | | |
+| Holy Water Lv3 slow below/above | | X | | |
+| Holy Water Lv3 orbit weapon_level | | X | | |
+| Holy Water evolved no slow | | X | | |
+| Bible Lv3 radius multiplier | | X | | |
+| Bible Lv3 radius formula Lv1/2/3 | | X | | |
+| Bible Lv3 damage formula | | X | | |
+| Fire Staff Lv3 burn constants | | X | | |
+| Fire Staff Lv3 burn formula Lv1/2/3 | | X | | |
+| Fire Staff evolved not affected | | X | | |
+| Lightning Lv3 chain formula | | X | | |
+| Lightning Lv3 bolt count | | X | | |
+| Lightning Lv3 hit count formula | | X | | |
+| Lightning Lv3 chain bonus constant | | X | | |
+| Lightning evolved chain_count | | X | | |
 
 ## Source File Coverage
 

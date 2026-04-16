@@ -25,28 +25,29 @@ static func create_lightning_effect(from: Vector2, to: Vector2, color: Color, pa
 static func create_cone_effect(pos: Vector2, dir_angle: float, half_angle: float, range_val: float, color: Color, parent: Node) -> void:
 	var node := Node2D.new()
 	var script := GDScript.new()
-	script.source_code = """extends Node2D
-var dir_angle: float = 0.0
-var half_angle: float = 0.0
-var range_val: float = 0.0
-var color: Color = Color.WHITE
-var alpha: float = 0.4
-
-func _process(delta):
-	alpha -= delta * 3.0
-	if alpha <= 0.0:
-		queue_free()
-	queue_redraw()
-
-func _draw():
-	var points = [Vector2.ZERO]
-	var steps = 12
-	for i in range(steps + 1):
-		var a = dir_angle - half_angle + (2.0 * half_angle * i / steps)
-		points.append(Vector2(cos(a), sin(a)) * range_val)
-	points.append(Vector2.ZERO)
-	draw_colored_polygon(points, Color(color.r, color.g, color.b, alpha))
-"""
+	script.source_code = (
+		"extends Node2D\n"
+		+ "var dir_angle: float = 0.0\n"
+		+ "var half_angle: float = 0.0\n"
+		+ "var range_val: float = 0.0\n"
+		+ "var color: Color = Color.WHITE\n"
+		+ "var alpha: float = 0.4\n"
+		+ "\n"
+		+ "func _process(delta):\n"
+		+ "\talpha -= delta * 3.0\n"
+		+ "\tif alpha <= 0.0:\n"
+		+ "\t\tqueue_free()\n"
+		+ "\tqueue_redraw()\n"
+		+ "\n"
+		+ "func _draw():\n"
+		+ "\tvar points = [Vector2.ZERO]\n"
+		+ "\tvar steps = 12\n"
+		+ "\tfor i in range(steps + 1):\n"
+		+ "\t\tvar a = dir_angle - half_angle + (2.0 * half_angle * i / steps)\n"
+		+ "\t\tpoints.append(Vector2(cos(a), sin(a)) * range_val)\n"
+		+ "\tpoints.append(Vector2.ZERO)\n"
+		+ "\tdraw_colored_polygon(points, Color(color.r, color.g, color.b, alpha))\n"
+	)
 	script.reload()
 	node.set_script(script)
 	# set_script resets all vars via _init, so use set_deferred
