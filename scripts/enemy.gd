@@ -9,6 +9,9 @@ var _player: Node2D = null
 # Death effects module (loaded lazily)
 var _death_effects: RefCounted = null
 
+# Loot module (loaded lazily)
+var _loot: RefCounted = null
+
 # Status effects
 var _burn_dps: float = 0.0
 var _burn_timer: float = 0.0
@@ -62,9 +65,9 @@ func _setup_visual() -> void:
 		var tex_path := "res://assets/sprites/enemies/%s.png" % enemy_data.enemy_id
 		if ResourceLoader.exists(tex_path):
 			sprite.texture = load(tex_path)
-		var base_size: float = 32.0
-		var scale_factor: float = (enemy_data.size * 2.0) / base_size
-		sprite.scale = Vector2(scale_factor, scale_factor)
+	var base_size: float = 32.0
+	var scale_factor: float = (enemy_data.size * 2.0) / base_size
+	sprite.scale = Vector2(scale_factor, scale_factor)
 
 
 func _setup_collision() -> void:
@@ -209,6 +212,8 @@ func take_damage(amount: float, source: String = "", was_crit: bool = false):
 	var sprite_node: Sprite2D = $Sprite as Sprite2D
 	if sprite_node and is_instance_valid(sprite_node):
 		_get_death_effects().play_hit_feedback(self, sprite_node)
+	# Hit particles + damage number via feedback module
+	_spawn_hit_feedback(amount, source, was_crit)
 	if current_hp <= 0:
 		die()
 
@@ -239,48 +244,23 @@ func die() -> void:
 	if GameManager:
 		GameManager.unregister_enemy(self)
 
-	_handle_kill_rewards()
+	var loot: RefCounted = _get_loot()
+	var pm: Node = get_parent().get_node_or_null("PickupManager") if get_parent() else null
+
+	loot.handle_kill_rewards(enemy_data, _last_hit_by, _was_crit)
 	_handle_shatter()
-	_spawn_xp_gems()
-	_spawn_food_drop()
-	_spawn_crate_drop()
-	_handle_boss_death()
-	_handle_splitter_death()
+	loot.spawn_xp_gems(enemy_data, global_position, _last_hit_by, _was_crit, _burn_timer, pm)
+	loot.spawn_food_drop(enemy_data, global_position, get_parent())
+	loot.spawn_crate_drop(enemy_data, global_position, pm)
+	_handle_boss_death(loot, pm)
+	_handle_splitter_death(loot)
 
 	# Play death animation then free
 	_play_death_animation_and_free()
 
 
-func _handle_kill_rewards() -> void:
-	GameManager.register_kill()
-	GameManager.score += enemy_data.xp_value
-	GameManager.enemy_count -= 1
+# --- Frost Aura Lv3 Shatter ---
 
-	var gold_amount: int = _calculate_gold_drop()
-	GameManager.add_gold(gold_amount)
-
-	# holywater_luckycoin synergy: 圣水击杀+1金币
-	if SynergyManager and SynergyManager.has_synergy("holywater_luckycoin"):
-		if _last_hit_by == "holywater":
-			GameManager.add_gold(1)
-
-	# Weapon mastery kill attribution
-	if SaveManager and _last_hit_by != "":
-		var evolved_parents: Dictionary = {
-			"thunderholywater": ["holywater", "lightning"], "fireknife": ["knife", "firestaff"],
-			"holydomain": ["bible", "holywater"], "blizzard": ["frostaura", "lightning"],
-			"frostknife": ["knife", "frostaura"], "flamebible": ["bible", "firestaff"],
-			"thunderang": ["boomerang", "lightning"],
-			"blazerang": ["boomerang", "firestaff"], "sentineltotem": ["bible", "boomerang"]
-		}
-		if evolved_parents.has(_last_hit_by):
-			for parent_id: String in evolved_parents[_last_hit_by]:
-				SaveManager.add_weapon_kill(parent_id)
-		else:
-			SaveManager.add_weapon_kill(_last_hit_by)
-
-
-# Frost Aura Lv3: Shatter -- frozen enemy explodes on death
 const FROSTAURA_LV3_SHATTER_RADIUS: float = 50.0
 const FROSTAURA_LV3_SHATTER_DAMAGE: float = 2.0
 
@@ -314,157 +294,31 @@ func _spawn_shatter_effect() -> void:
 	get_parent().call_deferred("add_child", circle)
 
 
-func _calculate_gold_drop() -> int:
-	var gold_amount: int = 3
-	if SaveManager:
-		gold_amount = int(float(gold_amount) * (1.0 + SaveManager.get_gold_bonus()))
-
-	# Lucky coin passive: +15% gold per stack
-	var player_ref: Node2D = _find_player()
-	if player_ref and player_ref.has_passive("luckycoin"):
-		var lucky_stacks: int = player_ref.owned_passives.get("luckycoin", 0)
-		gold_amount = int(float(gold_amount) * (1.0 + 0.15 * lucky_stacks))
-
-	# crit_luckycoin synergy: 暴击时双倍金币
-	if SynergyManager and SynergyManager.has_synergy("crit_luckycoin"):
-		gold_amount *= 2
-
-	# Combo gold bonus: 连击≥5时+1金币/击杀
-	if GameManager.combo_count >= 5:
-		gold_amount += 1
-
-	return gold_amount
-
-
-func _spawn_xp_gems() -> void:
-	_spawn_xp_gem()
-
-	# magnet_crit synergy: 暴击额外掉落价值+2宝石
-	if SynergyManager and SynergyManager.has_synergy("magnet_crit") and _was_crit:
-		_spawn_bonus_gem(2)
-
-	# firestaff_luckycoin synergy: 燃烧击杀+1宝石
-	if SynergyManager and SynergyManager.has_synergy("firestaff_luckycoin"):
-		if _last_hit_by == "firestaff" and _burn_timer > 0:
-			_spawn_bonus_gem(1)
-
-
-func _spawn_food_drop() -> void:
-	if randf() < 0.1 * GameManager.get_difficulty_mul("food_drop_mul", 1.0):
-		_spawn_food()
-
-
-func _spawn_crate_drop() -> void:
-	if randf() < enemy_data.drop_chance:
-		_spawn_item_crate()
-
-
-func _handle_boss_death() -> void:
+func _handle_boss_death(loot: RefCounted, pm: Node) -> void:
 	if not enemy_data.is_boss:
 		return
-
-	GameManager.boss_killed = true
-	GameManager.boss_kill_count += 1
-
-	# Boss bonus gems (all modes)
-	for i in range(5):
-		_spawn_xp_gem()
-
-	# Endless mode boss kill rewards
-	if GameManager.selected_difficulty == "endless":
-		_apply_endless_boss_reward()
+	loot.handle_boss_death(enemy_data, global_position, get_parent(), pm)
 
 
-func _apply_endless_boss_reward() -> void:
-	GameManager.add_gold(50)
-	GameManager.add_xp(30.0)
-	for i in range(5):
-		_spawn_food_at(global_position + Vector2(randf_range(-30, 30), randf_range(-30, 30)))
-	GameManager.boss_kill_reward.emit(50, 30)
-
-
-func _handle_splitter_death() -> void:
+func _handle_splitter_death(loot: RefCounted) -> void:
 	if enemy_data.is_splitter and not _has_split:
 		_has_split = true
-		_spawn_split_children()
+		loot.spawn_split_children(enemy_data, global_position, get_parent())
 
 
-# --- Spawning helpers ---
+# --- Hit feedback (particles + damage numbers) ---
 
-func _spawn_xp_gem():
-	var gem_scene: PackedScene = preload("res://scenes/xp_gem.tscn")
-	var gem: Area2D = gem_scene.instantiate()
-	gem.global_position = global_position + Vector2(randf_range(-10, 10), randf_range(-10, 10))
-	gem.xp_value = enemy_data.xp_value
-	var pm: Node = get_parent().get_node_or_null("PickupManager")
-	if pm:
-		pm.call_deferred("add_child", gem)
+var _hit_feedback: RefCounted = null
 
 
-func _spawn_item_crate():
-	var crate_scene: PackedScene = preload("res://scenes/item_crate.tscn")
-	var crate: Area2D = crate_scene.instantiate()
-	crate.global_position = global_position
-	var pm: Node = get_parent().get_node_or_null("PickupManager")
-	if pm:
-		pm.call_deferred("add_child", crate)
-
-
-func _spawn_food():
-	_spawn_food_at(global_position + Vector2(randf_range(-15, 15), randf_range(-15, 15)))
-
-
-func _spawn_food_at(pos: Vector2) -> void:
-	var food: Area2D = Area2D.new()
-	food.collision_mask = 1; food.set_script(preload("res://scripts/food_pickup.gd"))  # Player layer
-	var shape: CollisionShape2D = CollisionShape2D.new()
-	var circle: CircleShape2D = CircleShape2D.new()
-	circle.radius = 6.0; shape.shape = circle
-	food.add_child(shape)
-	var sprite: Sprite2D = Sprite2D.new()
-	var tex_path: String = "res://assets/sprites/pickups/food.png"
-	if ResourceLoader.exists(tex_path):
-		sprite.texture = load(tex_path)
-	sprite.scale = Vector2(0.25, 0.25); sprite.modulate = Color(0.4, 0.9, 0.3)
-	food.add_child(sprite)
-	food.global_position = pos
-	get_parent().call_deferred("add_child", food)
-
-
-func _spawn_split_children():
-	var enemy_scene: PackedScene = preload("res://scenes/enemy.tscn")
-	for i in range(enemy_data.split_count):
-		var child_data: EnemyData = EnemyData.new()
-		child_data.enemy_id = "splitter_small"
-		child_data.enemy_name = "小分裂者"
-		child_data.max_hp = 1.0
-		child_data.speed = 70.0
-		child_data.damage = 1.0
-		child_data.xp_value = 1
-		child_data.color = Color(0.3, 0.71, 0.67)
-		child_data.size = 8.0
-		child_data.is_child = true
-		# Apply difficulty multipliers to children
-		child_data.max_hp *= GameManager.get_difficulty_mul("enemy_hp_mul")
-		child_data.speed *= GameManager.get_difficulty_mul("enemy_speed_mul")
-		child_data.damage *= GameManager.get_difficulty_mul("enemy_dmg_mul")
-
-		var child: CharacterBody2D = enemy_scene.instantiate()
-		child.enemy_data = child_data
-		var offset: Vector2 = Vector2(randf_range(-20, 20), randf_range(-20, 20))
-		child.global_position = global_position + offset
-		get_parent().call_deferred("add_child", child)
-		GameManager.enemy_count += 1
-
-
-func _spawn_bonus_gem(value: int) -> void:
-	var gem_scene: PackedScene = preload("res://scenes/xp_gem.tscn")
-	var gem: Area2D = gem_scene.instantiate()
-	gem.global_position = global_position + Vector2(randf_range(-15, 15), randf_range(-15, 15))
-	gem.xp_value = value
-	var pm: Node = get_parent().get_node_or_null("PickupManager")
-	if pm:
-		pm.call_deferred("add_child", gem)
+func _spawn_hit_feedback(amount: float, source: String, was_crit: bool) -> void:
+	## Delegate hit particle and damage number spawning to feedback module.
+	if _hit_feedback == null:
+		var script: GDScript = load("res://scripts/effects/hit_feedback.gd") as GDScript
+		if script:
+			_hit_feedback = script.new()
+	if _hit_feedback:
+		_hit_feedback.spawn(self, amount, source, was_crit)
 
 
 func _find_player() -> Node2D:
@@ -477,6 +331,12 @@ func _get_death_effects() -> RefCounted:
 	if _death_effects == null:
 		_death_effects = load("res://scripts/enemies/enemy_death_effects.gd").new()
 	return _death_effects
+
+
+func _get_loot() -> RefCounted:
+	if _loot == null:
+		_loot = load("res://scripts/enemies/enemy_loot.gd").new()
+	return _loot
 
 
 func _play_death_animation_and_free() -> void:

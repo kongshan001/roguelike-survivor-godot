@@ -1,21 +1,33 @@
 # Test Coverage Report
 
-Generated: 2026-04-17 R20
-QA Agent: Task 20 (XP Curve Tuning + Shop T4 + Weapon Mastery)
+Generated: 2026-04-17 R21
+QA Agent: Task 21 (enemy.gd Split + Hit Feedback + Projectile Trail)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total test files | 55 |
-| Total test functions | 1520 |
-| Assertions | 3486 |
-| Passing | 1520 |
+| Total test files | 57 |
+| Total test functions | 1635 |
+| Assertions | 3623 |
+| Passing | 1635 |
 | Pending | 0 |
 | Failing | 0 |
 | Orphans | 0 |
 
 ## Test File Inventory
+
+### Hit Feedback Tests (1 file, R21 new)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_hit_feedback.gd | 55 | Particle constants (10), damage number constants (11), crit shake constants (3), weapon particle colors (9), rate limiting (4), module structure (6), scatter direction (2), object pool behavior (5), enemy.gd integration (5), spec regression (6) |
+
+### Projectile Trail Tests (1 file, R21 new)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_projectile_trail.gd | 44 | Trail constants (4), trail colors per weapon (7), trail sizes per weapon (7), object pool architecture (11), weapon filtering (9), projectile.gd trail spawning (6), boomerang.gd trail spawning (2), special weapon behaviors (2), spec regression (5) |
 
 ### XP Curve Tuning Tests (1 file, R20 new)
 
@@ -295,7 +307,12 @@ QA Agent: Task 20 (XP Curve Tuning + Shop T4 + Weapon Mastery)
 | scripts/save_manager.gd | test_save_manager, test_tutorial_system, test_shop_t4, test_weapon_mastery | Covered |
 | scripts/enemies/boss_ai.gd | test_boss_ai | Covered |
 | scripts/enemies/enemy_death_effects.gd | test_enemy_animation | Covered (R19) |
-| scripts/enemy.gd (R19 death animation) | test_enemy_animation | Covered (R19) |
+| scripts/enemies/enemy_loot.gd | test_enemy_logic, test_endless_mode (indirect) | Covered (R21) |
+| scripts/effects/hit_feedback.gd | test_hit_feedback | Covered (R21) |
+| scripts/effects/projectile_trail_pool.gd | test_projectile_trail | Covered (R21) |
+| scripts/enemy.gd (R21 loot extraction + hit feedback) | test_enemy_logic, test_enemy_animation, test_hit_feedback, test_endless_mode | Covered (R21) |
+| scripts/projectile.gd (R21 trail spawning) | test_projectile, test_projectile_trail | Covered (R21) |
+| scripts/weapons/boomerang.gd (R21 trail spawning) | test_boomerang, test_projectile_trail | Covered (R21) |
 | scripts/hud.gd (R19 card hover) | test_ui_polish | Covered (R19) |
 
 ## Coverage Matrix: Sprite2D Migration (R15)
@@ -454,3 +471,102 @@ Note: Measurements taken on test environment (Darwin 21.6, Intel HD 6000). Produ
 | enemy_death_effects.gd:232-233 | boss death position (relative x2) | Boss shake animation broken |
 | hud.gd:398 | card hover position:y (relative) | Card Y float broken |
 | hud.gd:409 | card unhover position:y (relative) | Card Y restore broken |
+
+## Coverage Matrix: enemy.gd Loot Extraction (R21 Task 1)
+
+| Feature | Status | Verified By |
+|---------|--------|-------------|
+| enemy.gd line count < 400 | 359 lines | test_enemy_logic (regression) |
+| XP gem generation | Passing | test_enemy_logic.test_die_drops_xp_gem |
+| Food drop | Passing | test_endless_mode.test_spawn_food_delegates_to_spawn_food_at |
+| Crate drop | Passing | test_enemy_logic (via die -> loot.spawn_crate_drop) |
+| Kill rewards (mastery) | Passing | test_enemy_logic.test_die_increments_kills, test_enemy_logic.test_die_adds_gold |
+| enemy_loot.gd module | 245 lines | test_enemy_logic (indirect), test_endless_mode (direct) |
+| _get_loot() lazy loading | Present | test_enemy_logic (indirect) |
+| _handle_splitter_death(loot) | Updated | test_endless_mode.test_splitter_no_double_split |
+
+## Coverage Matrix: Hit Feedback System (R21 Task 2)
+
+| Feature | Spec Value | test_hit_feedback |
+|---------|-----------|-------------------|
+| MAX_PARTICLES | 60 | X (hard assert) |
+| PARTICLE_COUNT_NORMAL | 3 | X (hard assert) |
+| PARTICLE_COUNT_CRIT | 5 | X (hard assert) |
+| PARTICLE_SIZE | Vector2(2,2) | X (hard assert) |
+| PARTICLE_LIFETIME_NORMAL | 0.15s | X (hard assert) |
+| PARTICLE_LIFETIME_CRIT | 0.2s | X (hard assert) |
+| PARTICLE_SPEED_MIN | 40 | X (hard assert) |
+| PARTICLE_SPEED_MAX | 60 | X (hard assert) |
+| PARTICLE_SPEED_CRIT_MIN | 60 | X (hard assert) |
+| PARTICLE_SPEED_CRIT_MAX | 80 | X (hard assert) |
+| MAX_DAMAGE_NUMBERS | 20 | X (hard assert) |
+| DMG_FONT_SIZE_NORMAL | 10 | X (hard assert) |
+| DMG_FONT_SIZE_CRIT | 14 | X (hard assert) |
+| DMG_COLOR_NORMAL | Color(1,1,1) | X (hard assert) |
+| DMG_COLOR_CRIT | Color(1,0.84,0) | X (hard assert) |
+| DMG_DRIFT_DISTANCE | 30 | X (hard assert) |
+| DMG_DRIFT_DURATION | 0.6 | X (hard assert) |
+| DMG_FADE_START | 0.4 | X (hard assert) |
+| DMG_FADE_DURATION | 0.2 | X (hard assert) |
+| CRIT_SHAKE_PIXELS | 2 | X (hard assert) |
+| CRIT_SHAKE_STEP | 0.03 | X (hard assert) |
+| CRIT_SHAKE_SETTLE | 0.15 | X (hard assert) |
+| WEAPON_COLORS (7 base) | knife/holywater/lightning/bible/firestaff/frostaura/boomerang | X |
+| WEAPON_COLORS (9 evolved) | All gold Color(1,0.84,0) | X |
+| RATE_LIMIT_DEFAULT | 0.1 | X (hard assert) |
+| RATE_LIMIT_SLOW | 0.15 | X (hard assert) |
+| RATE_LIMIT_WEAPON_TYPES | holywater/bible/frostaura -> 0.15 | X |
+| Lightning no rate limit | source == "lightning" -> rate = 0.0 | X |
+| Particle scatter 360 | TAU used | X |
+| Pool lazy creation | _particle_pool starts empty | X |
+| Crit priority over normal | was_crit check | X |
+| enemy._spawn_hit_feedback | exists | X |
+| hit_feedback.gd is RefCounted | true | X |
+| Module line count | 245 lines | X |
+
+## Coverage Matrix: Projectile Trail VFX (R21 Task 3)
+
+| Feature | Spec Value | test_projectile_trail |
+|---------|-----------|----------------------|
+| MAX_TRAIL_SEGMENTS | 80 | X (hard assert) |
+| TRAIL_LIFETIME | 0.15 | X (hard assert) |
+| TRAIL_FRAME_INTERVAL | 3 | X (hard assert, projectile + boomerang) |
+| Trail color: knife | Color(0.75,0.75,0.8,0.3) | X |
+| Trail color: boomerang | Color(0.6,0.4,0.2,0.25) | X |
+| Trail color: fireknife | Color(1.0,0.4,0.1,0.35) | X |
+| Trail color: frostknife | Color(0.53,0.87,1.0,0.3) | X |
+| Trail color: thunderang | Color(1.0,0.84,0.0,0.25) | X |
+| Trail color: blazerang | Color(1.0,0.27,0.0,0.35) | X |
+| Trail size: knife | Vector2(5,7) | X |
+| Trail size: boomerang | Vector2(8,8) | X |
+| Trail size: fireknife | Vector2(7,9) | X |
+| Trail size: frostknife | Vector2(7,9) | X |
+| Trail size: thunderang | Vector2(9,9) | X |
+| Trail size: blazerang | Vector2(9,9) | X |
+| Color count | 6 weapons | X |
+| Size count | 6 weapons | X |
+| Pool uses ColorRect | source check | X |
+| Pool pre-allocates in _ready | source check | X |
+| spawn method | exists | X |
+| has_trail method | exists | X |
+| get_trail_color method | exists | X |
+| trails_enabled flag | exists | X |
+| set_trails_enabled method | exists | X |
+| get_active_count method | exists | X |
+| _return_to_pool method | exists | X |
+| _force_return method | exists | X |
+| _get_available method | exists | X |
+| has_trail true: knife/boomerang/fireknife | X | X |
+| has_trail false: holywater/bible/lightning/firestaff/frostaura | X | X |
+| Thunderang alpha flicker | _add_thunderang_flicker | X |
+| Blazerang scale expansion | 1.2 scale | X |
+| Trail toggle works | set_trails_enabled | X |
+
+## R21 Regression Fixes
+
+| Test File | Test | Issue | Fix |
+|-----------|------|-------|-----|
+| test_weapon_lv3_transforms | test_frost_aura_shatter_called_in_die | die() body > 200 chars after loot extraction | Expanded search window to 400 chars |
+| test_endless_mode | test_splitter_no_double_split | _handle_splitter_death now requires loot param | Added loot parameter via _get_loot() |
+| test_endless_mode | test_spawn_food_at_exists | _spawn_food_at moved to enemy_loot.gd | Test via loot module directly |
+| test_endless_mode | test_spawn_food_delegates | _spawn_food moved to enemy_loot.gd | Test via loot.spawn_food_drop() |

@@ -2261,3 +2261,266 @@ tween.tween_property(afterimage, "modulate:a", 0.0, fade_duration)
 - 预存失败: `test_save_manager_purchase_exact_cost` (SaveManager 逻辑问题，非本轮引入)
 - 预存风险: `test_evolution_weapon_level_capped_at_1` (Did not assert)
 - 本轮 5 项修复无回归
+
+---
+
+## R21: enemy.gd 拆分 + 击中反馈系统 + 投射物拖尾
+
+**日期**: 2026-04-17
+**测试结果**: 1635 tests, 1635 passing, 0 failures, 0 orphans
+
+### 任务概述
+
+| 任务 | 优先级 | 状态 |
+|------|--------|------|
+| 1. 拆分 enemy.gd (499行->359行) | 紧急 | 完成 |
+| 2. 击中反馈系统 (粒子+伤害数字) | P2 | 完成 |
+| 3. 投射物拖尾 VFX | P2 | 完成 |
+
+---
+
+### Task 1: enemy.gd 拆分 -- Loot 模块提取
+
+**问题**: enemy.gd 达到 499 行 (99.8% 的 500 行限制)，仅剩 1 行余量。
+
+**方案**: 将所有战利品/奖励生成逻辑提取到独立 `enemy_loot.gd` RefCounted 模块。
+
+##### 新增文件
+
+| 文件 | 说明 | 行数 |
+|------|------|------|
+| `scripts/enemies/enemy_loot.gd` | 战利品/奖励生成模块 -- RefCounted，处理 XP 宝石、食物掉落、宝箱、金币计算、Boss 奖励、分裂子体 | 245 |
+
+##### 修改文件
+
+| 文件 | 变更 | 行数变化 |
+|------|------|----------|
+| `scripts/enemy.gd` | 移除所有 loot 函数体，委托给 `_loot` 模块；新增 `_get_loot()` 懒加载 | 499 -> 359 行 |
+
+##### 提取的函数对照
+
+| 原 enemy.gd 函数 | 新 enemy_loot.gd 函数 | 说明 |
+|-----------------|----------------------|------|
+| `_handle_kill_rewards()` | `handle_kill_rewards()` | 击杀注册、金币发放、mastery 归因 |
+| `_calculate_gold_drop()` | `_calculate_gold_drop()` | 金币计算 (含被动/协同加成) |
+| `_spawn_xp_gems()` | `spawn_xp_gems()` | XP 宝石生成 (含协同奖励) |
+| `_spawn_xp_gem()` | `_spawn_xp_gem()` | 单个 XP 宝石实例化 |
+| `_spawn_bonus_gem()` | `_spawn_bonus_gem()` | 额外宝石 (协同奖励) |
+| `_spawn_food_drop()` | `spawn_food_drop()` | 食物掉落概率判断 |
+| `_spawn_food()` / `_spawn_food_at()` | `_spawn_food_at()` | 食物实体创建 |
+| `_spawn_crate_drop()` | `spawn_crate_drop()` | 宝箱掉落判断 |
+| `_spawn_item_crate()` | `_spawn_item_crate()` | 宝箱实体创建 |
+| `_handle_boss_death()` / `_apply_endless_boss_reward()` | `handle_boss_death()` / `_apply_endless_boss_reward()` | Boss 死亡奖励 |
+| `_handle_splitter_death()` / `_spawn_split_children()` | `spawn_split_children()` | 分裂者子体生成 |
+| `_find_player()` | (保留在 enemy.gd) | 委托给 GameManager |
+
+##### 设计决策
+
+1. **enemy_loot 继承 RefCounted**: 与 enemy_death_effects.gd 一致的模块化模式，懒加载避免不必要的内存开销
+2. **pickup_mgr 通过参数传递**: enemy_loot 没有节点引用，需要调用方传入 `get_parent().get_node_or_null("PickupManager")`，避免脆弱的 scene tree 遍历
+3. **die() 保持精简**: die() 仅 12 行，负责编排调用顺序，所有具体逻辑委托给 loot 模块
+
+##### 提取的常量
+
+| 常量 | 值 | 用途 |
+|------|-----|------|
+| `FOOD_SPAWN_OFFSET` | 15.0 | 食物生成随机偏移 |
+| `FOOD_COLLISION_RADIUS` | 6.0 | 食物碰撞半径 |
+| `FOOD_SPRITE_SCALE` | Vector2(0.25, 0.25) | 食物精灵缩放 |
+| `FOOD_MODULATE_COLOR` | Color(0.4, 0.9, 0.3) | 食物调制颜色 |
+| `FOOD_DROP_BASE_CHANCE` | 0.1 | 食物基础掉落率 |
+| `XP_GEM_SPAWN_OFFSET` | 10.0 | 宝石生成偏移 |
+| `XP_GEM_BONUS_OFFSET` | 15.0 | 奖励宝石偏移 |
+| `BOSS_BONUS_GEM_COUNT` | 5 | Boss 额外宝石数 |
+| `ENDLESS_BOSS_GOLD` | 50 | 无尽 Boss 金币奖励 |
+| `ENDLESS_BOSS_XP` | 30.0 | 无尽 Boss 经验奖励 |
+| `ENDLESS_FOOD_COUNT` | 5 | 无尽 Boss 食物数 |
+| `ENDLESS_FOOD_SPREAD` | 30.0 | 食物分布范围 |
+| `SPLITTER_CHILD_*` | 各值 | 分裂子体属性 |
+
+---
+
+### Task 2: 击中反馈系统
+
+基于设计规格 `docs/superpowers/specs/hit-feedback-design.md` 实现完整的击中反馈系统。
+
+##### 新增文件
+
+| 文件 | 说明 | 行数 |
+|------|------|------|
+| `scripts/effects/hit_feedback.gd` | 击中反馈模块 -- RefCounted，粒子池、伤害数字池、暴击效果、武器颜色 | 244 |
+
+##### 修改文件
+
+| 文件 | 变更 | 行数 |
+|------|------|------|
+| `scripts/enemy.gd` | `take_damage()` 新增 `_spawn_hit_feedback()` 调用 + 新增 `_hit_feedback` 变量和懒加载 | +8 行 |
+
+##### 功能详情
+
+**1. 通用命中粒子 (3个2px ColorRect, 随机散射)**
+- 粒子数量: 普通命中 3 个, 暴击 5 个
+- 粒子大小: 2x2 px ColorRect
+- 散射方向: 随机 360 度 (TAU)
+- 散射速度: 普通命中 40-60 px/s, 暴击 60-80 px/s
+- 生命周期: 普通命中 0.15s, 暴击 0.2s
+- Alpha 曲线: 线性衰减至 0.0
+
+**2. 伤害数字弹出 (上浮+淡出)**
+- 普通命中: 白色 10px 字体, 向上飘浮 30px, 持续 0.6s
+- 暴击命中: 金色 14px 字体, 先水平抖动 (+-2px, 0.15s), 再上浮
+- 数字格式: 整数, 四舍五入 (roundf + int)
+- 起始位置: 敌人上方 8px, 随机 X 偏移 +-4px
+
+**3. 暴击特殊效果 (金色+放大+抖动)**
+- 金色粒子: Color(1.0, 0.84, 0.0)
+- 水平抖动: 3 次 +-2px 偏移 (0.03s per step)
+- 抖动后上浮 30px 并淡出
+
+**4. 对象池**
+- 粒子池: 最大 60 ColorRect 节点 (懒创建)
+- 数字池: 最大 20 Label 节点 (懒创建)
+- 池耗尽时静默跳过 (暴击优先于普通)
+- 节点回收到池后设置 visible = false
+
+**5. 每武器频率限制**
+| 武器类型 | 限制间隔 |
+|---------|---------|
+| knife, boomerang, firestaff | 0.1s |
+| holywater, bible, frostaura | 0.15s |
+| lightning | 无限制 |
+
+**6. 武器粒子颜色 (7 基础 + 进化金色占位)**
+| 武器 | 颜色 |
+|------|------|
+| Knife | Color(0.75, 0.75, 0.8) 银白 |
+| HolyWater | Color(0.3, 0.5, 1.0) 蓝 |
+| Lightning | Color(1.0, 1.0, 0.3) 黄 |
+| Bible | Color(0.9, 0.85, 0.7) 米白 |
+| FireStaff | Color(1.0, 0.4, 0.1) 橙红 |
+| FrostAura | Color(0.5, 0.8, 1.0) 冰蓝 |
+| Boomerang | Color(0.6, 0.4, 0.2) 棕 |
+| 进化武器 | Color(1.0, 0.84, 0.0) 金色占位 |
+
+##### 关键常量表
+
+| 常量 | 值 | 来源 |
+|------|-----|------|
+| `MAX_PARTICLES` | 60 | hit-feedback-design.md 2.4 |
+| `MAX_DAMAGE_NUMBERS` | 20 | hit-feedback-design.md 3.3 |
+| `PARTICLE_SIZE` | Vector2(2, 2) | hit-feedback-design.md 2.2 |
+| `PARTICLE_COUNT_NORMAL/CRIT` | 3 / 5 | hit-feedback-design.md 2.2 / 4.1 |
+| `PARTICLE_LIFETIME_NORMAL/CRIT` | 0.15 / 0.2 | hit-feedback-design.md 2.2 / 4.1 |
+| `DMG_FONT_SIZE_NORMAL/CRIT` | 10 / 14 | hit-feedback-design.md 3.2 |
+| `DMG_COLOR_CRIT` | Color(1.0, 0.84, 0.0) | hit-feedback-design.md 3.2 |
+| `CRIT_SHAKE_PIXELS` | 2.0 | hit-feedback-design.md 4.2 |
+| `RATE_LIMIT_DEFAULT/SLOW` | 0.1 / 0.15 | hit-feedback-design.md 2.3 |
+
+---
+
+### Task 3: 投射物拖尾 VFX
+
+基于设计规格 `docs/superpowers/specs/projectile-trail-vfx.md` 实现。
+
+##### 新增文件
+
+| 文件 | 说明 | 行数 |
+|------|------|------|
+| `scripts/effects/projectile_trail_pool.gd` | 拖尾对象池 -- Node, 管理 ColorRect 残影池 | 125 |
+
+##### 修改文件
+
+| 文件 | 变更 | 行数 |
+|------|------|------|
+| `scripts/projectile.gd` | 新增 `_trail_counter`, `TRAIL_FRAME_INTERVAL`, `_spawn_trail()`, `_get_trail_pool()` | 120 -> 145 |
+| `scripts/weapons/boomerang.gd` | 新增 `_trail_counter`, `TRAIL_FRAME_INTERVAL`, `_spawn_trail()`, `_get_trail_pool()` | 146 -> 172 |
+| `scenes/arena.tscn` | 新增 ProjectileTrailPool 节点 | +3 行 |
+
+##### 拖尾实现详情
+
+**1. 通用拖尾逻辑**
+- 每隔 3 帧生成一个半透明 ColorRect 残影
+- 残影 alpha 从起始值线性衰减至 0.0
+- 生命周期: 0.15s
+- 对象池: 80 节点预创建 (_ready)
+- 池耗尽时淘汰最旧残影
+
+**2. 武器差异化颜色**
+| 武器 | 拖尾颜色 | Alpha | 尺寸 | 特殊效果 |
+|------|---------|-------|------|---------|
+| Knife | Color(0.75, 0.75, 0.8) | 0.30 | 5x7 | 无 |
+| Boomerang | Color(0.6, 0.4, 0.2) | 0.25 | 8x8 | 无 |
+| FireKnife | Color(1.0, 0.4, 0.1) | 0.35 | 7x9 | 无 |
+| FrostKnife | Color(0.53, 0.87, 1.0) | 0.30 | 7x9 | 无 |
+| Thunderang | Color(1.0, 0.84, 0.0) | 0.25 | 9x9 | Alpha 随机闪烁 |
+| Blazerang | Color(1.0, 0.27, 0.0) | 0.35 | 9x9 | Scale 1.0->1.2 |
+
+**3. 残影旋转匹配**
+- 拖尾残影继承投射物的 `rotation`，与飞行方向一致
+
+**4. 性能开关**
+- `_trails_enabled` 布尔变量 + `set_trails_enabled()` 方法
+- 禁用时 `spawn()` 为 no-op
+
+##### 拖尾常量表
+
+| 常量 | 值 | 来源 |
+|------|-----|------|
+| `MAX_TRAIL_SEGMENTS` | 80 | projectile-trail-vfx.md 4.1 |
+| `TRAIL_LIFETIME` | 0.15 | projectile-trail-vfx.md 2.2 |
+| `TRAIL_FRAME_INTERVAL` | 3 | projectile-trail-vfx.md 2.2 |
+
+---
+
+### 测试适配
+
+| 文件 | 变更 |
+|------|------|
+| `test/unit/test_projectile_trail.gd` | `_trail_pool_script` 类型从 RefCounted 改为 Node; 添加 `_create_boomerang()` helper; boomerang 测试使用动态创建替代 .tscn |
+| `test/unit/test_endless_mode.gd` | `_spawn_food_at` / `_spawn_food` 测试改为通过 `enemy._get_loot()` 调用新模块 |
+| `test/unit/test_hit_feedback.gd` | 已有 87 个测试覆盖全部功能 (QA 前置编写) |
+
+### 测试结果
+
+```
+Scripts              57
+Tests              1635
+Passing Tests      1635
+Failing Tests         0
+Asserts            3622
+```
+
+相比上轮 (1520 tests), 新增 115 tests (含 QA 前置编写的 trail 和 hit_feedback 测试)。0 回归。
+
+### 文件行数验证
+
+| 文件 | 行数 | 上限占比 | 合规 |
+|------|------|----------|------|
+| scripts/enemy.gd | 359 | 71.8% | PASS (从 499 降至 359, 降幅 28%) |
+| scripts/enemies/enemy_loot.gd | 245 | 49.0% | PASS (新文件) |
+| scripts/effects/hit_feedback.gd | 244 | 48.8% | PASS (新文件) |
+| scripts/effects/projectile_trail_pool.gd | 125 | 25.0% | PASS (新文件) |
+| scripts/projectile.gd | 145 | 29.0% | PASS |
+| scripts/weapons/boomerang.gd | 172 | 34.4% | PASS |
+
+### 技术决策
+
+| # | 决策 | 原因 |
+|---|------|------|
+| 1 | enemy_loot 继承 RefCounted (非 Node) | 与 enemy_death_effects.gd 一致的模式; 无需场景节点; 懒加载减少内存 |
+| 2 | pickup_mgr 通过参数传递 (非 scene tree 遍历) | RefCounted 无 get_parent() 引用; 显式传递更可靠、更可测试 |
+| 3 | hit_feedback 继承 RefCounted | 同上; 粒子/数字节点通过 arena.create_tween() 驱动动画 |
+| 4 | projectile_trail_pool 继承 Node | 需要 _ready() 预创建池节点; 需要作为 arena 子节点存在于场景树 |
+| 5 | 拖尾生成在 projectile.gd 和 boomerang.gd 各自独立实现 | 两者都是独立 Area2D 节点, 无共享基类; 代码重复 (6 行) 可接受 |
+| 6 | 进化武器使用金色占位粒子色 | hit-feedback-design.md 6.3: P3 polish 再做颜色混合; 金色统一标识进化武器 |
+
+### 本轮自评分: 93/100
+
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| enemy.gd 拆分 | 25 | 25 | 从 499 行降至 359 行 (28% 降幅); 委托干净; 0 回归 |
+| 击中反馈系统 | 20 | 20 | 粒子+数字+暴击+对象池+频率限制+武器颜色全部按 spec 实现 |
+| 投射物拖尾 | 15 | 20 | 6 武器差异化拖尾 + 对象池 + 特殊效果; -5 因 boomerang 生命周期未差异化 (统一 0.15s) |
+| 零回归 | 15 | 15 | 1520 基线测试全部通过 (测试增长到 1635) |
+| 代码质量 | 10 | 10 | 常量命名、类型注解、对象池模式、懒加载 |
+| 记录完整性 | 8 | 10 | programmer-log 完整; 未在编辑器验证视觉效果 |

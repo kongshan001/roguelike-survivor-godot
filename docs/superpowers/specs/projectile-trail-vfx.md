@@ -1,10 +1,10 @@
 # Projectile Trail VFX Design
 
-**Author**: Art Agent
+**Author**: Designer Agent
 **Date**: 2026-04-17
-**Round**: R20
+**Round**: R21 (refined from R20)
 **Status**: Design Spec
-**Context**: R19 competitive analysis (Vampire Survivors projectile trail) identified trailing effects as a P2 visual enhancement for v1.0.2. This spec defines weapon-differentiated projectile trail effects using ColorRect (no new PNG assets required).
+**Context**: R20 defined the projectile trail system with per-weapon colors and behaviors. R21 provides exact trail generation intervals (in milliseconds), alpha decay curves (per-frame values), size decay curves, evolved-vs-base weapon parameter differences, and precise object pool sizes for direct implementation.
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### 1.1 Concept
 
-Projectile trails are semi-transparent ColorRect afterimages left behind by moving projectiles (knives, boomerangs, evolved weapon projectiles). Each frame, a fading copy of the projectile is placed at its previous position, creating a motion trail effect.
+Projectile trails are semi-transparent ColorRect afterimages left behind by moving projectiles (knives, boomerangs, evolved weapon projectiles). Each trail segment is placed at the projectile's previous position at fixed intervals, fading out over its lifetime.
 
 ### 1.2 Design Goals
 
@@ -23,255 +23,505 @@ Projectile trails are semi-transparent ColorRect afterimages left behind by movi
 
 ### 1.3 Applicable Weapons
 
-Not all weapons benefit from trails. The following analysis determines which weapons should have trails:
-
-| Weapon | Type | Has Projectile | Trail | Reason |
-|--------|------|---------------|-------|--------|
-| Knife | Projectile | Yes | **Yes** | Classic trail effect for throwing knives |
-| Holy Water | Orbit | No (orbit) | No | Orbit blades rotate in place, no linear motion |
-| Lightning | Instant | No (Line2D) | No | Lightning is instant, no traveling projectile |
-| Bible | Orbit | No (orbit) | No | Same as Holy Water |
-| Fire Staff | Cone | No (instant) | No | Cone is an instant area effect |
-| Frost Aura | Aura | No (continuous) | No | Aura is a continuous radius effect |
-| Boomerang | Boomerang | Yes | **Yes** | Trail enhances the curved flight path |
-| FireKnife (evolved) | Projectile | Yes | **Yes** | Fire trail is the signature visual |
-| FrostKnife (evolved) | Projectile | Yes | **Yes** | Ice trail for visual identity |
-| Thunderang (evolved) | Boomerang | Yes | **Yes** | Electric trail |
-| Blazerang (evolved) | Boomerang | Yes | **Yes** | Fire trail |
+| Weapon | Type | Has Projectile | Trail | Speed (px/s) | Reason |
+|--------|------|---------------|-------|--------------|--------|
+| Knife | Projectile | Yes | **Yes** | 350 | Classic trail for throwing knives |
+| Holy Water | Orbit | No (orbit) | No | -- | Orbits rotate in place |
+| Lightning | Instant | No (Line2D) | No | -- | Instant strike, no traveling |
+| Bible | Orbit | No (orbit) | No | -- | Same as Holy Water |
+| Fire Staff | Cone | No (instant) | No | -- | Instant area effect |
+| Frost Aura | Aura | No (continuous) | No | -- | Continuous radius effect |
+| Boomerang | Boomerang | Yes | **Yes** | 280 | Trail enhances curved flight path |
+| FireKnife (evolved) | Projectile | Yes | **Yes** | 400 | Fire trail is signature visual |
+| FrostKnife (evolved) | Projectile | Yes | **Yes** | 380 | Ice trail for visual identity |
+| Thunderang (evolved) | Boomerang | Yes | **Yes** | 280 | Electric trail |
+| Blazerang (evolved) | Boomerang | Yes | **Yes** | 280 | Fire trail |
 
 **Total trail-enabled weapons**: 6 (2 base + 4 evolved)
 
+**Speed source**: All speeds from `upgrade_pool.gd` weapon registrations and `weapon_boomerang_fire.gd` BOOMERANG_SPEED constant.
+
 ---
 
-## 2. Trail Implementation
+## 2. Trail Generation Interval
 
-### 2.1 Method: ColorRect Fade-Out
+### 2.1 Interval Definition
 
-The trail uses ColorRect nodes placed at the projectile's previous positions. Each trail segment is a small ColorRect that fades out over its lifetime.
+Trail segments are spawned at fixed time intervals, not frame intervals, to ensure consistent behavior regardless of framerate.
 
-**Why ColorRect over pre-generated sprites**:
-- ColorRect allows dynamic color per weapon without separate PNG files
-- Alpha decay is trivially implemented via `modulate.a`
-- Object pool reuse is simpler with uniform ColorRect nodes
-- Performance is predictable (no texture sampling)
+| Weapon | Speed (px/s) | Generation Interval | Gap Between Segments | Rationale |
+|--------|-------------|---------------------|---------------------|-----------|
+| Knife | 350 | 50 ms (0.050s) | 17.5 px | Fast projectile, frequent segments |
+| Boomerang | 280 | 60 ms (0.060s) | 16.8 px | Medium speed, medium interval |
+| FireKnife | 400 | 40 ms (0.040s) | 16.0 px | Fastest projectile, dense trail for fire effect |
+| FrostKnife | 380 | 45 ms (0.045s) | 17.1 px | Fast, slightly denser than knife |
+| Thunderang | 280 | 60 ms (0.060s) | 16.8 px | Same speed as base boomerang |
+| Blazerang | 280 | 50 ms (0.050s) | 14.0 px | Slightly denser than Thunderang (fire lingers) |
 
-### 2.2 Trail Parameters (Universal)
+**Gap calculation**: interval_seconds x speed_px_per_sec = gap_px. Target gap is ~15-18 px for visual continuity.
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Trail segments | 2 | Lightweight. More segments = more overhead for minimal gain at 16-20px |
-| Segment spacing | Every 3 physics frames | ~0.05s at 60fps, creates ~8px gap at typical projectile speed |
-| Segment size | Same as projectile display size | Knife: 6x8, Boomerang: 10x10, Evolved: 8x10 |
-| Alpha start | 0.3 | Semi-transparent |
-| Alpha end | 0.0 | Fully transparent |
-| Lifetime | 0.15s | Quick fade |
-| Color | Weapon primary color (semi-transparent) | See per-weapon colors below |
+### 2.2 Interval to Frames Conversion (60 FPS)
 
-### 2.3 Trail Placement Logic
+| Weapon | Interval (ms) | Frames Between Spawns | Implementation Counter |
+|--------|--------------|----------------------|----------------------|
+| Knife | 50 ms | 3 frames | `_trail_timer += 1; if _trail_timer >= 3` |
+| Boomerang | 60 ms | 4 frames | `_trail_timer += 1; if _trail_timer >= 4` |
+| FireKnife | 40 ms | 2 frames | `_trail_timer += 1; if _trail_timer >= 2` |
+| FrostKnife | 45 ms | 3 frames | `_trail_timer += 1; if _trail_timer >= 3` |
+| Thunderang | 60 ms | 4 frames | `_trail_timer += 1; if _trail_timer >= 4` |
+| Blazerang | 50 ms | 3 frames | `_trail_timer += 1; if _trail_timer >= 3` |
+
+**Why timer-based (delta accumulation) is preferred over frame counting**: Delta accumulation handles variable framerates correctly. However, at 60 FPS the frame counts above are the practical implementation. The code should use `delta` accumulation for robustness:
 
 ```gdscript
-# In projectile.gd or boomerang.gd _physics_process()
-
-var _trail_timer: int = 0
-const TRAIL_INTERVAL: int = 3  # frames between trail segments
-const MAX_TRAIL_SEGMENTS: int = 2
+var _trail_timer: float = 0.0
 
 func _physics_process(delta: float) -> void:
-    _trail_timer += 1
-    if _trail_timer >= TRAIL_INTERVAL:
-        _trail_timer = 0
+    _trail_timer += delta
+    var interval: float = _get_trail_interval()
+    if _trail_timer >= interval:
+        _trail_timer -= interval
         _spawn_trail_segment()
-
-func _spawn_trail_segment() -> void:
-    var trail_color: Color = _get_trail_color()
-    ProjectileTrailPool.spawn(
-        global_position,
-        trail_color,
-        _get_trail_size(),
-        0.15  # lifetime
-    )
 ```
 
 ---
 
-## 3. Weapon-Specific Trail Design
+## 3. Alpha Decay Curves
 
-### 3.1 Knife Trail
+### 3.1 Universal Alpha Decay Formula
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Trail color | Color(0.75, 0.75, 0.8, 0.3) | Silver-white, matches knife.png |
-| Trail size | 5x7 px | Slightly smaller than display knife |
-| Trail shape | Rotated to match knife direction | trail_rect.rotation = projectile.rotation |
-| Fade curve | Linear alpha 0.3 -> 0.0 | Clean fade |
-| Lifetime | 0.12s | Quick, knife is fast |
+Each trail segment's alpha follows a linear decay from `alpha_start` to 0.0 over its lifetime.
 
-**Visual description**: Two semi-transparent silver-white knife silhouettes trail behind the flying knife, matching its rotation. Creates a "throwing knife streak" effect.
+```
+current_alpha = alpha_start * (1.0 - (elapsed / lifetime))
+```
 
-### 3.2 Boomerang Trail
+### 3.2 Per-Weapon Alpha Parameters
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Trail color | Color(0.6, 0.4, 0.2, 0.25) | Brown, matches boomerang.png |
-| Trail size | 8x8 px | Slightly smaller than display boomerang |
-| Trail shape | Rotated to match boomerang direction | Follows curved path |
-| Fade curve | Linear alpha 0.25 -> 0.0 | Subtle, boomerang is already visually complex |
-| Lifetime | 0.18s | Slightly longer, curved path needs more visibility |
+| Weapon | Alpha Start | Lifetime | Alpha at 33% life | Alpha at 66% life | Alpha at 100% life |
+|--------|------------|----------|-------------------|-------------------|-------------------|
+| Knife | 0.30 | 0.12s | 0.20 | 0.10 | 0.00 |
+| Boomerang | 0.25 | 0.18s | 0.17 | 0.08 | 0.00 |
+| FireKnife | 0.40 | 0.20s | 0.27 | 0.13 | 0.00 |
+| FrostKnife | 0.35 | 0.18s | 0.23 | 0.12 | 0.00 |
+| Thunderang | 0.30 | 0.15s | 0.20 | 0.10 | 0.00 |
+| Blazerang | 0.40 | 0.22s | 0.27 | 0.13 | 0.00 |
 
-**Visual description**: Two semi-transparent brown boomerang silhouettes follow the curved flight path, showing the boomerang's trajectory even after it turns. Helps the player track the return path.
+**Per-frame alpha values (at 60 FPS)**:
 
-### 3.3 FireKnife Trail (Evolved)
+**Knife (lifetime 0.12s = ~7 frames)**:
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Trail color | Color(1.0, 0.4, 0.1, 0.35) | Orange-red fire |
-| Trail size | 7x9 px | Evolved weapon is larger |
-| Trail shape | Rotated, with slight upward scale | Flame-like elongation |
-| Fade curve | alpha 0.35 -> 0.0 + scale 1.0 -> 0.7 | Shrink + fade |
-| Lifetime | 0.20s | Longer, fire lingers |
-| Extra particles | 1 random 2x2 orange spark per trail segment | Fire sparkles |
+| Frame | Elapsed (s) | Alpha |
+|-------|------------|-------|
+| 0 | 0.000 | 0.300 |
+| 1 | 0.017 | 0.258 |
+| 2 | 0.033 | 0.217 |
+| 3 | 0.050 | 0.175 |
+| 4 | 0.067 | 0.133 |
+| 5 | 0.083 | 0.092 |
+| 6 | 0.100 | 0.050 |
+| 7 | 0.117 | 0.008 |
 
-**Visual description**: Orange-red fading silhouettes trail behind the fire knife, with occasional orange sparks. Creates a "flaming projectile" feel distinct from the base knife's silver trail.
+**Boomerang (lifetime 0.18s = ~11 frames)**:
 
-### 3.4 FrostKnife Trail (Evolved)
+| Frame | Elapsed (s) | Alpha |
+|-------|------------|-------|
+| 0 | 0.000 | 0.250 |
+| 1 | 0.017 | 0.227 |
+| 2 | 0.033 | 0.204 |
+| 3 | 0.050 | 0.181 |
+| 4 | 0.067 | 0.158 |
+| 5 | 0.083 | 0.135 |
+| 6 | 0.100 | 0.112 |
+| 7 | 0.117 | 0.088 |
+| 8 | 0.133 | 0.065 |
+| 9 | 0.150 | 0.042 |
+| 10 | 0.167 | 0.019 |
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Trail color | Color(0.53, 0.87, 1.0, 0.3) | Ice blue |
-| Trail size | 7x9 px | Same size as FireKnife |
-| Trail shape | Rotated, 45-degree diamond offset | Icy crystalline feel |
-| Fade curve | alpha 0.3 -> 0.0 + scale 1.0 -> 0.5 | Shrinks more aggressively |
-| Lifetime | 0.18s | Medium |
+**FireKnife (lifetime 0.20s = ~12 frames)**:
 
-**Visual description**: Ice-blue fading silhouettes trail behind the frost knife, shrinking more aggressively than fire. Creates a "freezing wake" effect. Visual cold/warm contrast with FireKnife.
+| Frame | Elapsed (s) | Alpha |
+|-------|------------|-------|
+| 0 | 0.000 | 0.400 |
+| 1 | 0.017 | 0.365 |
+| 2 | 0.033 | 0.330 |
+| 3 | 0.050 | 0.295 |
+| 4 | 0.067 | 0.260 |
+| 5 | 0.083 | 0.225 |
+| 6 | 0.100 | 0.190 |
+| 7 | 0.117 | 0.155 |
+| 8 | 0.133 | 0.120 |
+| 9 | 0.150 | 0.085 |
+| 10 | 0.167 | 0.050 |
+| 11 | 0.183 | 0.015 |
 
-### 3.5 Thunderang Trail (Evolved)
+**FrostKnife (lifetime 0.18s = ~11 frames)**:
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Trail color | Color(1.0, 0.84, 0.0, 0.25) | Lightning gold |
-| Trail size | 9x9 px | Evolved boomerang size |
-| Trail shape | Rotated to match flight direction | Follows curved path |
-| Fade curve | alpha 0.25 -> 0.0 with random alpha flicker | Electric stuttering |
-| Lifetime | 0.15s | Standard |
-| Alpha flicker | Random +-0.1 per frame | Electric instability |
+| Frame | Elapsed (s) | Alpha |
+|-------|------------|-------|
+| 0 | 0.000 | 0.350 |
+| 1 | 0.017 | 0.319 |
+| 2 | 0.033 | 0.287 |
+| 3 | 0.050 | 0.256 |
+| 4 | 0.067 | 0.225 |
+| 5 | 0.083 | 0.193 |
+| 6 | 0.100 | 0.162 |
+| 7 | 0.117 | 0.131 |
+| 8 | 0.133 | 0.099 |
+| 9 | 0.150 | 0.068 |
+| 10 | 0.167 | 0.037 |
 
-**Visual description**: Gold semi-transparent silhouettes trail behind the thunderang, with random alpha flicker simulating electric instability. The flickering distinguishes it from a smooth fire trail.
+**Thunderang (lifetime 0.15s = ~9 frames, with alpha flicker)**:
 
-### 3.6 Blazerang Trail (Evolved)
+| Frame | Elapsed (s) | Base Alpha | Flicker (+-0.08) | Effective Range |
+|-------|------------|------------|-------------------|-----------------|
+| 0 | 0.000 | 0.300 | +-0.08 | 0.22 - 0.38 |
+| 1 | 0.017 | 0.267 | +-0.08 | 0.19 - 0.35 |
+| 2 | 0.033 | 0.233 | +-0.08 | 0.15 - 0.31 |
+| 3 | 0.050 | 0.200 | +-0.08 | 0.12 - 0.28 |
+| 4 | 0.067 | 0.167 | +-0.08 | 0.09 - 0.25 |
+| 5 | 0.083 | 0.133 | +-0.08 | 0.05 - 0.21 |
+| 6 | 0.100 | 0.100 | +-0.08 | 0.02 - 0.18 |
+| 7 | 0.117 | 0.067 | +-0.08 | 0.00 - 0.15 |
+| 8 | 0.133 | 0.033 | +-0.08 | 0.00 - 0.11 |
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Trail color | Color(1.0, 0.27, 0.0, 0.35) | Blaze red-orange |
-| Trail size | 9x9 px | Same as Thunderang |
-| Trail shape | Rotated, with slight expansion (scale 1.0 -> 1.2) | Growing flame |
-| Fade curve | alpha 0.35 -> 0.0, scale 1.0 -> 1.2 | Expands as it fades |
-| Lifetime | 0.22s | Longest, fire persists |
-| Extra particles | 1 random 2x2 red spark per trail segment | Ember sparks |
+**Flicker implementation**: Each frame, add `randf_range(-0.08, 0.08)` to the base alpha, clamped to [0.0, 1.0]. This creates the electric "stuttering" visual.
 
-**Visual description**: Red-orange expanding silhouettes trail behind the blazerang, growing slightly as they fade. Occasional red sparks. Creates a "burning trajectory" effect.
+**Blazerang (lifetime 0.22s = ~13 frames)**:
+
+| Frame | Elapsed (s) | Alpha |
+|-------|------------|-------|
+| 0 | 0.000 | 0.400 |
+| 1 | 0.017 | 0.370 |
+| 2 | 0.033 | 0.340 |
+| 3 | 0.050 | 0.310 |
+| 4 | 0.067 | 0.280 |
+| 5 | 0.083 | 0.250 |
+| 6 | 0.100 | 0.220 |
+| 7 | 0.117 | 0.190 |
+| 8 | 0.133 | 0.155 |
+| 9 | 0.150 | 0.125 |
+| 10 | 0.167 | 0.095 |
+| 11 | 0.183 | 0.065 |
+| 12 | 0.200 | 0.035 |
 
 ---
 
-## 4. Performance Optimization
+## 4. Size Decay Curves
 
-### 4.1 Object Pool
+### 4.1 Size Decay Formula
+
+Most weapons use no size decay (constant size). Two weapons have special size curves:
+
+- **FireKnife**: Shrinks from 1.0x to 0.7x over lifetime (flame dwindling)
+- **FrostKnife**: Shrinks from 1.0x to 0.5x over lifetime (ice dissolving)
+- **Blazerang**: Grows from 1.0x to 1.2x over lifetime (fire spreading)
+
+```
+current_scale = scale_start + (scale_end - scale_start) * (elapsed / lifetime)
+```
+
+### 4.2 Per-Weapon Size Parameters
+
+| Weapon | Trail Size (px) | Scale Start | Scale End | Size at 50% life | Constant Size? |
+|--------|----------------|-------------|-----------|-----------------|----------------|
+| Knife | 5x7 | 1.0 | 1.0 | 5x7 | Yes (constant) |
+| Boomerang | 8x8 | 1.0 | 1.0 | 8x8 | Yes (constant) |
+| FireKnife | 7x9 | 1.0 | 0.7 | 5x6 | Shrink (flame dwindles) |
+| FrostKnife | 7x9 | 1.0 | 0.5 | 4x5 | Aggressive shrink (ice dissolves) |
+| Thunderang | 9x9 | 1.0 | 1.0 | 9x9 | Yes (constant, flicker handles differentiation) |
+| Blazerang | 9x9 | 1.0 | 1.2 | 10x10 | Expand (fire spreads) |
+
+### 4.3 Per-Frame Scale Values (Weapons with Size Decay)
+
+**FireKnife (lifetime 0.20s = ~12 frames)**:
+
+| Frame | Elapsed (s) | Scale | Effective Size |
+|-------|------------|-------|---------------|
+| 0 | 0.000 | 1.00 | 7x9 |
+| 1 | 0.017 | 0.975 | 7x9 |
+| 2 | 0.033 | 0.950 | 7x9 |
+| 3 | 0.050 | 0.925 | 6x8 |
+| 4 | 0.067 | 0.900 | 6x8 |
+| 5 | 0.083 | 0.875 | 6x8 |
+| 6 | 0.100 | 0.850 | 6x8 |
+| 7 | 0.117 | 0.825 | 6x7 |
+| 8 | 0.133 | 0.800 | 6x7 |
+| 9 | 0.150 | 0.775 | 5x7 |
+| 10 | 0.167 | 0.750 | 5x7 |
+| 11 | 0.183 | 0.725 | 5x7 |
+
+**FrostKnife (lifetime 0.18s = ~11 frames)**:
+
+| Frame | Elapsed (s) | Scale | Effective Size |
+|-------|------------|-------|---------------|
+| 0 | 0.000 | 1.00 | 7x9 |
+| 1 | 0.017 | 0.972 | 7x9 |
+| 2 | 0.033 | 0.944 | 7x8 |
+| 3 | 0.050 | 0.917 | 6x8 |
+| 4 | 0.067 | 0.889 | 6x8 |
+| 5 | 0.083 | 0.861 | 6x8 |
+| 6 | 0.100 | 0.833 | 6x8 |
+| 7 | 0.117 | 0.806 | 6x7 |
+| 8 | 0.133 | 0.778 | 5x7 |
+| 9 | 0.150 | 0.750 | 5x7 |
+| 10 | 0.167 | 0.722 | 5x6 |
+
+**Blazerang (lifetime 0.22s = ~13 frames)**:
+
+| Frame | Elapsed (s) | Scale | Effective Size |
+|-------|------------|-------|---------------|
+| 0 | 0.000 | 1.00 | 9x9 |
+| 1 | 0.017 | 1.015 | 9x9 |
+| 2 | 0.033 | 1.030 | 9x9 |
+| 3 | 0.050 | 1.045 | 9x9 |
+| 4 | 0.067 | 1.061 | 10x10 |
+| 5 | 0.083 | 1.076 | 10x10 |
+| 6 | 0.100 | 1.091 | 10x10 |
+| 7 | 0.117 | 1.106 | 10x10 |
+| 8 | 0.133 | 1.121 | 10x10 |
+| 9 | 0.150 | 1.136 | 10x10 |
+| 10 | 0.167 | 1.152 | 10x11 |
+| 11 | 0.183 | 1.167 | 10x11 |
+| 12 | 0.200 | 1.182 | 11x11 |
+
+---
+
+## 5. Evolved vs Base Weapon Differences
+
+### 5.1 Parameter Comparison Table
+
+| Parameter | Knife (base) | FireKnife (evolved) | FrostKnife (evolved) | Difference Type |
+|-----------|-------------|--------------------|--------------------|----------------|
+| Trail color | Color(0.75, 0.75, 0.8) silver | Color(1.0, 0.4, 0.1) orange-red | Color(0.4, 0.8, 1.0) ice blue | Color |
+| Trail size | 5x7 | 7x9 | 7x9 | Larger (evolved) |
+| Alpha start | 0.30 | 0.40 | 0.35 | Higher (more visible) |
+| Lifetime | 0.12s | 0.20s | 0.18s | Longer (fire/ice lingers) |
+| Gen interval | 50 ms | 40 ms | 45 ms | Denser (faster projectile) |
+| Scale decay | None (constant) | Shrink to 0.7x | Shrink to 0.5x | Evolved has decay |
+| Spark particles | No | 1 per segment (2x2 orange) | No | FireKnife extra |
+
+| Parameter | Boomerang (base) | Thunderang (evolved) | Blazerang (evolved) | Difference Type |
+|-----------|-----------------|---------------------|--------------------|----------------|
+| Trail color | Color(0.6, 0.4, 0.2) brown | Color(1.0, 0.84, 0.0) gold | Color(1.0, 0.27, 0.0) blaze red | Color |
+| Trail size | 8x8 | 9x9 | 9x9 | Larger (evolved) |
+| Alpha start | 0.25 | 0.30 | 0.40 | Higher (evolved) |
+| Lifetime | 0.18s | 0.15s | 0.22s | Varied by element |
+| Gen interval | 60 ms | 60 ms | 50 ms | Blazerang denser |
+| Alpha flicker | No | Yes (+-0.08) | No | Thunderang unique |
+| Scale decay | None (constant) | None (constant) | Expand to 1.2x | Blazerang unique |
+| Spark particles | No | No | 1 per segment (2x2 red) | Blazerang extra |
+
+### 5.2 Design Philosophy for Evolved Differences
+
+1. **Evolved trails are always more visible**: Higher alpha start (0.35-0.40 vs 0.25-0.30) and larger size (7x9 or 9x9 vs 5x7 or 8x8).
+2. **Evolved trails last longer**: 0.15-0.22s vs 0.12-0.18s. The player earns these weapons and their visual impact should match the power boost.
+3. **Each evolved weapon has a unique behavior**: FireKnife shrinks + sparks, FrostKnife aggressively shrinks, Thunderang flickers, Blazerang expands + sparks.
+4. **Base weapons are subtle**: Knife and Boomerang trails use their base colors and constant size. They communicate motion without demanding attention.
+
+---
+
+## 6. Object Pool Specification
+
+### 6.1 Pool Size Calculation
+
+**Maximum active trail segments per weapon**:
+
+| Weapon | Segments per Projectile | Max Active Projectiles | Max Segments | Calculation |
+|--------|------------------------|----------------------|-------------|-------------|
+| Knife | ceil(0.12 / 0.05) = 3 | 3 (Lv3) | 9 | 3 seg x 3 proj |
+| Boomerang | ceil(0.18 / 0.06) = 3 | 3 (Lv3) | 9 | 3 seg x 3 bmrg |
+| FireKnife | ceil(0.20 / 0.04) = 5 | 3 (fixed count) | 15 | 5 seg x 3 proj |
+| FrostKnife | ceil(0.18 / 0.045) = 4 | 4 (fixed count) | 16 | 4 seg x 4 proj |
+| Thunderang | ceil(0.15 / 0.06) = 3 | 4 (fixed count) | 12 | 3 seg x 4 bmrg |
+| Blazerang | ceil(0.22 / 0.05) = 5 | 3 (fixed count) | 15 | 5 seg x 3 bmrg |
+
+**Segments per projectile formula**: `ceil(lifetime / interval)` -- each segment lives for the full lifetime, and new ones spawn at each interval.
+
+**Total theoretical maximum**: 9 + 9 + 15 + 16 + 12 + 15 = **76 segments**
+
+However, this assumes all 6 weapons are active simultaneously with all projectiles in flight. In practice:
+- The player can have at most 6 weapons
+- 2 of those are typically orbit/instant/aura types (no trails)
+- Realistic max is 3-4 trail-enabled weapons active simultaneously
+
+**Realistic peak**: 3 weapons x ~12 segments avg = ~36 segments
+
+### 6.2 Pool Size
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| Pool size | **80 ColorRect nodes** | Theoretical max 76 + 4 headroom = 80 |
+| Pool warm-up | Lazy (created on first request) | Avoids startup cost |
+| Max active | Tracked counter, hard cap at 80 | Prevents runaway allocation |
+| Overflow behavior | Cull oldest active segment | Maintains visual consistency |
+
+### 6.3 Pool Node Structure
+
+Each pool node is a ColorRect with these properties set per spawn:
 
 ```gdscript
-# ProjectileTrailPool singleton or Arena child node
-const MAX_TRAIL_SEGMENTS: int = 80  # 6 weapons x ~3 active projectiles x 2 segments = ~36; 80 headroom
-
-var _pool: Array[ColorRect] = []
-var _active: Array[Dictionary] = []
-
-func _ready() -> void:
-    for i in MAX_TRAIL_SEGMENTS:
-        var rect := ColorRect.new()
-        rect.visible = false
-        add_child(rect)
-        _pool.append(rect)
+var rect := ColorRect.new()
+rect.visible = false
+rect.z_index = -1  # Behind projectiles and enemies
 ```
 
-### 4.2 Performance Budget
+**Why z_index = -1**: Trails should appear behind the projectile and all game entities, not in front.
 
-| Metric | Value | Calculation |
-|--------|-------|-------------|
-| Max active projectiles (typical) | ~10 | 3 knives + 2 boomerangs + 3 evolved projectiles + 2 reserve |
-| Trail segments per projectile | 2 | Per spec |
-| Total active trail segments | ~20 | 10 x 2 |
-| Pool capacity | 80 | 4x typical for burst scenarios |
-| Per-frame cost | ~20 ColorRect updates | Position + alpha only |
+### 6.4 Pool Recycling
 
-### 4.3 Culling Strategy
+When a trail segment's lifetime expires:
+1. Set `rect.visible = false`
+2. Return to pool (push to `_pool` array)
 
-| Scenario | Action |
-|----------|--------|
-| Pool exhausted (80 active) | Cull oldest trail segment |
-| Trail segment lifetime expired | Return to pool |
-| Projectile destroyed/freed | All its trail segments accelerated to fade (lifetime -> 0.03s) |
-
-### 4.4 Frame Budget
-
-Trail update cost per frame: ~20 x (position update + alpha update) = negligible.
-At 60fps, this is well within the frame budget. Even at 80 segments (max pool), the cost is ~80 simple arithmetic operations per frame.
+When pool is exhausted (all 80 active):
+1. Find the segment with the oldest spawn time
+2. Force-recycle it (instant fade)
+3. Use the recycled node for the new segment
 
 ---
 
-## 5. ColorRect Fallback (No PNG Required)
+## 7. Trail Color Reference
 
-All trail segments are ColorRect nodes. No PNG sprites needed.
+| Weapon | Trail Color (RGB) | Alpha Start | Hex | Source |
+|--------|-------------------|-------------|-----|--------|
+| Knife | Color(0.75, 0.75, 0.8) | 0.30 | #C0C0CC | Knife weapon color from upgrade_pool.gd |
+| Boomerang | Color(0.6, 0.4, 0.2) | 0.25 | #996633 | Boomerang weapon color from upgrade_pool.gd |
+| FireKnife | Color(1.0, 0.4, 0.1) | 0.40 | #FF6619 | Fire + knife blend |
+| FrostKnife | Color(0.4, 0.8, 1.0) | 0.35 | #66CCFF | Frost + knife blend |
+| Thunderang | Color(1.0, 0.84, 0.0) | 0.30 | #FFD700 | Lightning gold |
+| Blazerang | Color(1.0, 0.27, 0.0) | 0.40 | #FF4500 | Blaze red-orange |
 
-### 5.1 Trail Color Reference Table
+### 7.1 Trail Shape Reference
 
-| Weapon | Trail Color | Alpha | Hex | Source |
-|--------|------------|-------|-----|--------|
-| Knife | Color(0.75, 0.75, 0.8) | 0.30 | #C0C0CC | knife.png silver |
-| Boomerang | Color(0.6, 0.4, 0.2) | 0.25 | #996633 | boomerang.png brown |
-| FireKnife | Color(1.0, 0.4, 0.1) | 0.35 | #FF6619 | Fire orange |
-| FrostKnife | Color(0.53, 0.87, 1.0) | 0.30 | #88DDFF | Ice blue |
-| Thunderang | Color(1.0, 0.84, 0.0) | 0.25 | #FFD700 | Lightning gold |
-| Blazerang | Color(1.0, 0.27, 0.0) | 0.35 | #FF4500 | Blaze red |
+| Weapon | Trail Size (px) | Rotation | Scale Decay | Special |
+|--------|----------------|----------|-------------|---------|
+| Knife | 5x7 | Matches projectile direction | None | -- |
+| Boomerang | 8x8 | Matches flight direction | None | -- |
+| FireKnife | 7x9 | Matches projectile direction | 1.0 -> 0.7 (shrink) | +1 spark per segment |
+| FrostKnife | 7x9 | Matches + 45 deg offset | 1.0 -> 0.5 (aggressive shrink) | -- |
+| Thunderang | 9x9 | Matches flight direction | None | Alpha flicker +-0.08 |
+| Blazerang | 9x9 | Matches flight direction | 1.0 -> 1.2 (expand) | +1 spark per segment |
 
-### 5.2 Trail Shape Reference Table
+### 7.2 Spark Particle Specification (FireKnife, Blazerang)
 
-| Weapon | Trail Size (px) | Rotation Match | Special |
-|--------|----------------|----------------|---------|
-| Knife | 5x7 | Yes (projectile direction) | None |
-| Boomerang | 8x8 | Yes (flight direction) | None |
-| FireKnife | 7x9 | Yes | + 1 spark particle per segment |
-| FrostKnife | 7x9 | Yes + 45 degree offset | Aggressive shrink |
-| Thunderang | 9x9 | Yes | Alpha flicker (random +-0.1) |
-| Blazerang | 9x9 | Yes | Scale expansion 1.0 -> 1.2, + 1 spark |
+FireKnife and Blazerang spawn one additional 2x2 spark particle per trail segment.
+
+| Parameter | FireKnife Spark | Blazerang Spark |
+|-----------|----------------|-----------------|
+| Size | 2x2 px | 2x2 px |
+| Color | Color(1.0, 0.6, 0.2) orange | Color(1.0, 0.3, 0.1) red |
+| Alpha start | 0.5 | 0.5 |
+| Lifetime | 0.10s | 0.10s |
+| Position | Trail segment position + random(-3, 3, -3, 3) | Trail segment position + random(-4, 4, -4, 4) |
+| Velocity | Random 360 deg, 10-20 px/s | Random 360 deg, 10-20 px/s |
+
+**Sparks are pooled separately**: 20 spark particles max (2 weapons x ~5 segments x 1 spark each + headroom). Sparks use the same pool system.
 
 ---
 
-## 6. Implementation Scope
+## 8. Implementation Scope
 
-### 6.1 File Changes
+### 8.1 File Changes
 
 | File | Change | Lines |
 |------|--------|-------|
-| New: `scripts/effects/projectile_trail_pool.gd` | Object pool + spawn + fade logic | ~70 |
-| `scripts/projectile.gd` | Add trail spawning in _physics_process | ~15 |
-| `scripts/boomerang.gd` | Add trail spawning in _physics_process | ~15 |
+| New: `scripts/effects/projectile_trail_pool.gd` | Object pool + spawn + fade logic | ~90 |
+| `scripts/projectile.gd` | Add trail spawning in _physics_process | ~20 |
+| `scripts/weapons/boomerang.gd` | Add trail spawning in _physics_process | ~20 |
 | `scripts/arena.tscn` | Add ProjectileTrailPool node | ~3 |
-| `test/unit/test_projectile_trail.gd` | Pool capacity, spawn, cull tests | ~35 |
-| **Total** | | **~138** |
+| `test/unit/test_projectile_trail.gd` | Pool capacity, spawn, cull tests | ~40 |
+| **Total** | | **~173** |
 
-### 6.2 Integration Points
+### 8.2 Integration Points
 
-| Weapon | Script | Trail Color Getter | Notes |
-|--------|--------|-------------------|-------|
-| Knife | `projectile.gd` | Based on `weapon_id` == "knife" | Silver trail |
-| Boomerang | `boomerang.gd` | Based on `weapon_id` == "boomerang" | Brown trail |
-| FireKnife | `projectile.gd` | Based on `weapon_id` == "fireknife" | Orange-red fire trail |
-| FrostKnife | `projectile.gd` | Based on `weapon_id` == "frostknife" | Ice blue trail |
-| Thunderang | `boomerang.gd` | Based on `weapon_id` == "thunderang" | Gold flickering trail |
-| Blazerang | `boomerang.gd` | Based on `weapon_id` == "blazerang" | Red expanding trail |
+| Weapon | Script | Trail Config ID | Notes |
+|--------|--------|----------------|-------|
+| Knife | `projectile.gd` | "knife" | Silver trail, 50ms interval |
+| Boomerang | `boomerang.gd` | "boomerang" | Brown trail, 60ms interval |
+| FireKnife | `projectile.gd` | "fireknife" | Orange-red fire trail, 40ms, shrink + sparks |
+| FrostKnife | `projectile.gd` | "frostknife" | Ice blue trail, 45ms, aggressive shrink |
+| Thunderang | `boomerang.gd` | "thunderang" | Gold trail, 60ms, alpha flicker |
+| Blazerang | `boomerang.gd` | "blazerang" | Red trail, 50ms, expand + sparks |
 
-### 6.3 Trail Disable Toggle
+### 8.3 Trail Config Data Structure
 
-For performance debugging, add a simple toggle:
+```gdscript
+# In projectile_trail_pool.gd or a separate trail_config.gd
+
+const TRAIL_CONFIGS: Dictionary = {
+    "knife": {
+        "color": Color(0.75, 0.75, 0.8),
+        "size": Vector2(5, 7),
+        "alpha_start": 0.30,
+        "lifetime": 0.12,
+        "interval": 0.050,
+        "scale_start": 1.0,
+        "scale_end": 1.0,
+        "flicker": 0.0,
+        "spark": false,
+    },
+    "boomerang": {
+        "color": Color(0.6, 0.4, 0.2),
+        "size": Vector2(8, 8),
+        "alpha_start": 0.25,
+        "lifetime": 0.18,
+        "interval": 0.060,
+        "scale_start": 1.0,
+        "scale_end": 1.0,
+        "flicker": 0.0,
+        "spark": false,
+    },
+    "fireknife": {
+        "color": Color(1.0, 0.4, 0.1),
+        "size": Vector2(7, 9),
+        "alpha_start": 0.40,
+        "lifetime": 0.20,
+        "interval": 0.040,
+        "scale_start": 1.0,
+        "scale_end": 0.7,
+        "flicker": 0.0,
+        "spark": true,
+        "spark_color": Color(1.0, 0.6, 0.2),
+    },
+    "frostknife": {
+        "color": Color(0.4, 0.8, 1.0),
+        "size": Vector2(7, 9),
+        "alpha_start": 0.35,
+        "lifetime": 0.18,
+        "interval": 0.045,
+        "scale_start": 1.0,
+        "scale_end": 0.5,
+        "flicker": 0.0,
+        "spark": false,
+    },
+    "thunderang": {
+        "color": Color(1.0, 0.84, 0.0),
+        "size": Vector2(9, 9),
+        "alpha_start": 0.30,
+        "lifetime": 0.15,
+        "interval": 0.060,
+        "scale_start": 1.0,
+        "scale_end": 1.0,
+        "flicker": 0.08,
+        "spark": false,
+    },
+    "blazerang": {
+        "color": Color(1.0, 0.27, 0.0),
+        "size": Vector2(9, 9),
+        "alpha_start": 0.40,
+        "lifetime": 0.22,
+        "interval": 0.050,
+        "scale_start": 1.0,
+        "scale_end": 1.2,
+        "flicker": 0.0,
+        "spark": true,
+        "spark_color": Color(1.0, 0.3, 0.1),
+    },
+}
+```
+
+### 8.4 Trail Disable Toggle
 
 ```gdscript
 # In game_manager.gd or arena.gd
@@ -282,15 +532,63 @@ When `trails_enabled == false`, `ProjectileTrailPool.spawn()` is a no-op.
 
 ---
 
-## 7. Decision Record
+## 9. Performance Budget
+
+### 9.1 Resource Usage
+
+| Metric | Typical | Peak | Max Pool |
+|--------|---------|------|----------|
+| Active trail segments | ~20 | ~40 | 80 |
+| Active spark particles | ~6 | ~12 | 20 |
+| Per-frame updates | ~20 (alpha + position) | ~40 | 80 |
+| Memory per segment | ~200 bytes (ColorRect) | -- | 80 x 200 = 16 KB |
+| Memory per spark | ~200 bytes | -- | 20 x 200 = 4 KB |
+| Total memory | ~4 KB | ~8 KB | 20 KB |
+
+### 9.2 Culling Strategy
+
+| Scenario | Action |
+|----------|--------|
+| Pool exhausted (80 active segments) | Cull oldest active segment |
+| Trail segment lifetime expired | Return to pool |
+| Projectile destroyed/freed | Accelerate all its segments (lifetime -> 0.03s) |
+| `trails_enabled == false` | `spawn()` returns immediately, no allocation |
+
+### 9.3 Frame Budget
+
+At 60 FPS:
+- Trail segment update: ~40 x (alpha calc + modulate set) = negligible
+- Spark update: ~12 x (alpha calc + modulate set) = negligible
+- Total trail cost: < 0.3ms per frame, well within 16ms frame budget
+
+---
+
+## 10. Decision Record
 
 | Decision | Why | Alternative Considered |
 |----------|-----|----------------------|
-| ColorRect trail instead of pre-generated sprite | Dynamic color per weapon without separate PNGs. Alpha decay is trivial. Object pool reuse is simpler. | Pre-rendered trail sprite sheet (needs multiple PNGs, overkill for semi-transparent rectangles) |
-| 2 trail segments | At 16-20px projectile size, 2 segments (8px spacing) is sufficient to convey motion. 3+ segments would overlap at typical speeds. | 1 segment (barely visible), 3 segments (performance cost with minimal visual gain) |
-| 3-frame spacing | At 60fps, 3 frames = 0.05s. At knife speed (~200px/s), this creates ~10px gaps between segments. Visible but not cluttered. | Every frame (too many segments, pool exhaustion), 5+ frames (gaps too large, trail invisible) |
-| Weapon-specific trail colors | Reinforces weapon identity. Silver/brown/fire/ice/gold/red each evoke the weapon's theme. | Uniform white trail (loses weapon differentiation) |
-| Alpha flicker for Thunderang | Random alpha variation simulates electric instability, distinguishing electric trail from fire trail. Both are warm colors (gold vs red) so behavior difference is critical. | Uniform fade (indistinguishable from Blazerang at a glance) |
-| Scale expansion for Blazerang | Fire "grows" as it spreads, even in a tiny 9x9 pixel trail. The expansion makes the Blazerang trail feel "hotter" than the Thunderang's stable-size flickering. | Same size as Thunderang (harder to distinguish) |
-| Object pool of 80 | 6 weapons x ~3 active x 2 segments = 36 typical. 80 provides 2.2x headroom for burst scenarios. | 50 (tight, risk of culling during heavy combat), 150 (wasteful) |
-| No trail for orbit/aura/instant weapons | Trails require linear motion. Orbit weapons (Holy Water, Bible) move in circles (trail would be a ring = confusing). Aura/instant weapons have no projectile to trail. | Universal trail (wasteful for non-linear weapons) |
+| Timer-based intervals (not frame-based) | Frame-based breaks at variable framerates. Timer using delta accumulation is robust. | Frame counter (simpler but wrong at 30fps or 144fps) |
+| Per-weapon intervals (not universal 50ms) | Different projectile speeds need different intervals to maintain ~15-18px gaps. Knife at 350px/s needs 50ms; FireKnife at 400px/s needs 40ms to maintain similar gap density. | Universal 50ms (gaps would be inconsistent: knife 17.5px vs fireknife 20px) |
+| Linear alpha decay (not ease-out) | Linear is simpler, predictable, and pixel art benefits from straightforward visual transitions. Ease-out would make trails linger too long at low alpha. | Ease-out quadratic (trails would ghost at low alpha) |
+| FireKnife shrink + Blazerang expand (opposite curves) | Fire "dies down" (shrinks), while spreading fire "grows" (expands). These opposite behaviors distinguish two fire-themed weapons at a glance. | Same curve for both (harder to distinguish) |
+| Thunderang alpha flicker +-0.08 | +-0.08 creates visible stuttering without causing the trail to fully disappear at peak flicker (alpha never drops below 0.0 due to clamping). | +-0.15 (too much variation, trail disappears), +-0.04 (too subtle) |
+| Pool size 80 (not 50 or 120) | 50 is too tight for theoretical max 76. 120 wastes 40 nodes. 80 covers max + 5% headroom. | 50 (pool exhaustion during heavy combat), 120 (wasteful) |
+| Separate spark pool of 20 | Sparks are independent from trail segments (different size, shorter lifetime). Separate pool prevents trail segments from being consumed by sparks. | Shared pool (sparks could starve trail segments) |
+| ColorRect z_index = -1 | Trails behind projectiles and enemies. If trails were in front, they would obscure the projectile visual. | z_index = 0 (overlaps with entities, confusing) |
+
+---
+
+## 11. Success Criteria
+
+1. All 6 trail-enabled weapons display distinct trail effects during flight
+2. Knife trail is subtle silver, boomerang trail is subtle brown
+3. Evolved weapon trails are visibly more prominent than base weapon trails
+4. FireKnife trail shrinks and produces orange sparks
+5. FrostKnife trail aggressively shrinks to 0.5x
+6. Thunderang trail has visible alpha flicker (electric instability)
+7. Blazerang trail expands and produces red sparks
+8. No more than 80 active trail segments at any time
+9. Trail effects do not cause frame drops (< 0.5ms per frame)
+10. `trails_enabled = false` completely disables all trail effects
+11. All existing 1520+ tests pass
+12. Pool exhaustion is handled gracefully (cull oldest, no errors)

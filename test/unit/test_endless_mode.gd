@@ -368,7 +368,9 @@ func test_splitter_no_double_split():
 	var splitter := _create_test_enemy_with_arena(10.0, false, true)
 	GameManager.enemy_count = 1
 	splitter.take_damage(10.0)
-	splitter._handle_splitter_death()
+	# R21: _handle_splitter_death now requires loot parameter
+	var loot: RefCounted = splitter._get_loot()
+	splitter._handle_splitter_death(loot)
 	assert_eq(GameManager.enemy_count, 2, "No double split on second call")
 
 
@@ -377,17 +379,21 @@ func test_splitter_no_double_split():
 # =====================================================================
 
 func test_spawn_food_at_exists():
+	# R21: _spawn_food_at moved to enemy_loot.gd module
+	var loot: RefCounted = load("res://scripts/enemies/enemy_loot.gd").new()
 	var enemy := _create_test_enemy_with_arena(10.0)
-	enemy._spawn_food_at(Vector2(100, 200))
+	loot._spawn_food_at(Vector2(100, 200), enemy.get_parent())
 	await get_tree().process_frame
 	assert_true(true, "_spawn_food_at does not crash")
 
 
 func test_spawn_food_delegates_to_spawn_food_at():
+	# R21: _spawn_food moved to enemy_loot.gd module as spawn_food_drop
+	var loot: RefCounted = load("res://scripts/enemies/enemy_loot.gd").new()
 	var enemy := _create_test_enemy_with_arena(10.0)
-	enemy._spawn_food()
+	loot.spawn_food_drop(enemy.enemy_data, enemy.global_position, enemy.get_parent())
 	await get_tree().process_frame
-	assert_true(true, "_spawn_food delegates to _spawn_food_at without crash")
+	assert_true(true, "spawn_food_drop delegates to _spawn_food_at without crash")
 
 
 # =====================================================================

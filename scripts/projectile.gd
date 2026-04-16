@@ -29,6 +29,10 @@ const KNIFE_LV3_RICOCHET_SPEED: float = 300.0
 const KNIFE_LV3_RICOCHET_SIZE: float = 4.0
 const KNIFE_LV3_RICOCHET_LIFETIME: float = 0.5
 
+# Trail constants (from projectile-trail-vfx.md)
+const TRAIL_FRAME_INTERVAL: int = 3
+var _trail_counter: int = 0
+
 
 func setup(pos: Vector2, target_pos: Vector2, spd: float, dmg: float, prc: int, col: Color, sz: float):
 	global_position = pos
@@ -68,6 +72,27 @@ func _physics_process(delta):
 	if lifetime <= 0:
 		queue_free()
 	rotation = direction.angle()
+	_spawn_trail()
+
+
+func _spawn_trail() -> void:
+	## Spawn trail afterimage every TRAIL_FRAME_INTERVAL frames if weapon has trail.
+	_trail_counter += 1
+	if _trail_counter % TRAIL_FRAME_INTERVAL != 0:
+		return
+	var pool: Node = _get_trail_pool()
+	if not pool:
+		return
+	if pool.has_trail(weapon_id):
+		pool.spawn(global_position, weapon_id, rotation)
+
+
+func _get_trail_pool() -> Node:
+	## Find ProjectileTrailPool node in the scene tree.
+	var parent: Node = get_parent()
+	if parent:
+		return parent.get_node_or_null("ProjectileTrailPool")
+	return null
 
 
 func _on_body_entered(body: Node2D):

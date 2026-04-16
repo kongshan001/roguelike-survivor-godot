@@ -20,6 +20,10 @@ var _returning: bool = false
 var _player_pos: Vector2 = Vector2.ZERO
 var _dist_traveled: float = 0.0
 
+# Trail constants (from projectile-trail-vfx.md)
+const TRAIL_FRAME_INTERVAL: int = 3
+var _trail_counter: int = 0
+
 
 func setup(pos: Vector2, dir: Vector2, start_pos: Vector2):
 	global_position = pos
@@ -113,6 +117,9 @@ func _physics_process(delta):
 		queue_free()
 	rotation = direction.angle()
 
+	# Spawn trail afterimage
+	_spawn_trail()
+
 	# boomerang_magnet synergy: attract nearby xp_gems
 	if SynergyManager and SynergyManager.has_synergy("boomerang_magnet"):
 		for area in get_overlapping_areas():
@@ -143,3 +150,23 @@ func _on_body_entered(body: Node2D):
 		pierce -= 1
 		if pierce < 0:
 			queue_free()
+
+
+func _spawn_trail() -> void:
+	## Spawn trail afterimage every TRAIL_FRAME_INTERVAL frames if weapon has trail.
+	_trail_counter += 1
+	if _trail_counter % TRAIL_FRAME_INTERVAL != 0:
+		return
+	var pool: Node = _get_trail_pool()
+	if not pool:
+		return
+	if pool.has_trail(weapon_id):
+		pool.spawn(global_position, weapon_id, rotation)
+
+
+func _get_trail_pool() -> Node:
+	## Find ProjectileTrailPool node in the scene tree.
+	var parent: Node = get_parent()
+	if parent:
+		return parent.get_node_or_null("ProjectileTrailPool")
+	return null
