@@ -22,13 +22,7 @@ const AURA_DAMAGE_PER_LEVEL: float = 0.5
 const CRIT_KNIFE_SPEED: float = 250.0
 const CRIT_KNIFE_LIFETIME: float = 1.0
 
-# Boomerang
-const BOOMERANG_MAX_COUNT: int = 8
-
 # --- Weapon Lv3 Quality-Change Constants ---
-
-# Boomerang Lv3: Homing Tweak
-const BOOMERANG_LV3_TRACK_ANGLE_MUL: float = 1.5
 
 # Bible Lv3: Expanding Radius
 const BIBLE_LV3_RADIUS_MUL: float = 1.5
@@ -185,8 +179,6 @@ func update_orbit(weapon_id: String, data: WeaponData, level: int, player: Chara
 		rot_speed *= SynergyManager.get_synergy_value("bible_boots", "value", 1.5)
 	instance.rotation_speed = rot_speed
 	instance.weapon_id = weapon_id
-	if weapon_id == "holywater":
-		instance.weapon_level = level
 	var pm: Node = _get_pm(player)
 	if pm:
 		pm.call_deferred("add_child", instance)

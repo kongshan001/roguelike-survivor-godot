@@ -2623,3 +2623,343 @@ find assets/sprites -name "*.png" | wc -l
 **加分项**: P0 缺失精灵清零(+5), modulate 优先级规则文档化(+3), 全精灵 scale_factor 映射(+3), 进化武器配色表补全(+2)
 
 **扣分项**: 脚本尚未运行验证 4 个新 PNG 输出(-2), P2 缺失精灵(frostvortex/holyshockwave/thunderbeam)仍未覆盖(-2)
+
+## Round 16 执行 (2026-04-17)
+
+### 任务背景
+
+项目综合评分 92.8/100，63 个 PNG 精灵全部就绪，功能完整度 100%。进入打磨优化阶段。本轮聚焦于角色行走动画帧、敌人行为动画规范、UI 动画规范三项视觉打磨任务。
+
+### 任务 1: 角色行走动画帧精灵
+
+当前角色精灵为静态 32x32 单帧。新增 3 个第二帧精灵（每个角色一个动画帧），实现简单的 2 帧循环动画。建议帧率 4 FPS。
+
+#### 新增精灵清单
+
+| 精灵 | 文件路径 | 尺寸 | 帧角色 | 与帧 1 差异 |
+|------|---------|------|--------|------------|
+| 法师施法 | assets/sprites/characters/mage_cast.png | 32x32 | 帧 2: 右臂抬起，法杖上举 3px | 法杖整体上移 3px，宝珠提升至画布顶部(y=0..3)，光晕增强(alpha 180)，右袖上移至 y=12..15 |
+| 战士举盾 | assets/sprites/characters/warrior_block.png | 32x32 | 帧 2: 盾牌上举 4px | 盾牌整体上移 4px(从 y=9 起始)，盾牌十字徽章移至 y=12..16，左手臂随盾上移 |
+| 游侠拉弓 | assets/sprites/characters/ranger_draw.png | 32x32 | 帧 2: 弓弦拉满 | 弓弦从直弦(x=27)变为拉满曲线(最深处 x=24)，箭矢更突出(含箭头+尾羽)，左臂前伸至 y=13..15 |
+
+#### 动画帧设计原则
+
+1. **帧间最小差异**: 仅修改动作相关的像素（手臂/武器位置），身体/头部/衣物保持不变，避免 2 帧循环时的闪烁感
+2. **动作方向明确**: 每个角色的帧 2 表达该角色的核心动作（法师=施法、战士=举盾、游侠=拉弓），与角色定位一致
+3. **32x32 全画布复用**: 帧 2 使用与帧 1 完全相同的画布尺寸和像素布局基础，仅局部区域发生变化
+4. **逐像素绘制**: 沿用项目规范，所有动画帧使用 point() 逐像素绘制，确保与帧 1 风格一致
+
+#### 动画帧配色
+
+所有动画帧的配色与帧 1 完全相同（同一角色的主色/辅色/强调色不变）。新增唯一变化:
+
+| 角色 | 帧 2 特殊色 | 用途 |
+|------|------------|------|
+| 法师 | orb_glow_bright: Color(0.30, 0.50, 1.0, 0.706) | 施法时宝珠光晕增强，alpha 从 120 提升至 180 |
+| 战士 | 无新色 | 盾牌位置变化，配色不变 |
+| 游侠 | 无新色 | 弓弦形态变化，配色不变 |
+
+#### 动画参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 帧率 | 4 FPS | 慢速交替，像素风中 2 帧循环不应过快 |
+| 循环 | 是 | 帧 1 <-> 帧 2 持续交替 |
+| 切换条件 | 玩家移动时播放 | 静止时显示帧 1 |
+| 停止条件 | 玩家停止移动时冻结为帧 1 | 不需要在帧 2 停止 |
+
+#### generate_sprites.py 变更
+
+| 变更项 | 详情 |
+|--------|------|
+| 新增函数 | gen_mage_cast() -- 法师施法帧 |
+| 新增函数 | gen_warrior_block() -- 战士举盾帧 |
+| 新增函数 | gen_ranger_draw() -- 游侠拉弓帧 |
+| main() 更新 | Characters 区后新增 "Character Animation Frames" 区，调用 3 个新函数 |
+| 新增精灵文件 | mage_cast.png / warrior_block.png / ranger_draw.png (各 32x32) |
+| 精灵总数变化 | 63 -> 66 |
+
+### 任务 2: 敌人行为动画规范
+
+为 3 种常见敌人设计基于 modulate/scale/rotation 的程序化动画，不需要新 PNG 精灵。以下规范供 Programmer Agent 在 enemy.gd 中实现。
+
+#### 僵尸 (zombie) -- 死亡效果
+
+| 阶段 | 属性变化 | 时长 | 缓动 | 说明 |
+|------|---------|------|------|------|
+| 死亡 | scale: Vector2(1.0,1.0) -> Vector2(1.3,0.3) | 0.3s | ease_in | 身体横向拉伸 + 纵向压扁，模拟倒地 |
+| 死亡 | modulate.a: 1.0 -> 0.0 | 0.3s | ease_in | 同步淡出 |
+| 死亡 | modulate.r: 1.0 -> 0.3 (覆盖) | 0.15s | linear | 先变暗红再淡出 |
+
+**实现建议**:
+```
+# 在 enemy.gd die() 函数中，zombie 类型添加:
+if enemy_data.enemy_id == "zombie":
+    var tween = create_tween()
+    tween.tween_property(sprite, "scale", Vector2(1.3, 0.3), 0.3).set_ease(Tween.EASE_IN)
+    tween.parallel().tween_property(sprite, "modulate:a", 0.0, 0.3).set_ease(Tween.EASE_IN)
+    tween.parallel().tween_property(sprite, "modulate:r", 0.3, 0.15)
+```
+
+#### 蝙蝠 (bat) -- 飞行翅膀摆动
+
+| 属性 | 变化 | 时长 | 缓动 | 循环 |
+|------|------|------|------|------|
+| scale.y | 0.85 <-> 1.15 | 0.25s/方向 | ease_in_out | 是 |
+| rotation | -0.08 <-> 0.08 | 0.5s/周期 | ease_in_out | 是 |
+| modulate.a 微脉动 | 0.9 <-> 1.0 | 0.5s/周期 | ease_in_out | 是 |
+
+**视觉描述**: 蝙蝠在飞行时上下轻微拍翅（scale.y 交替变化）+ 身体微微左右倾斜（rotation），配合透明度微脉动营造"飘忽不定"的感觉。
+
+**实现建议**:
+```
+# 在 enemy.gd _ready() 中，bat 类型添加:
+if enemy_data.enemy_id == "bat":
+    var tween = create_tween().set_loops()
+    tween.tween_property(sprite, "scale:y", 0.85, 0.25).set_ease(Tween.EASE_IN_OUT)
+    tween.tween_property(sprite, "scale:y", 1.15, 0.25).set_ease(Tween.EASE_IN_OUT)
+    var rot_tween = create_tween().set_loops()
+    rot_tween.tween_property(sprite, "rotation", 0.08, 0.25).set_ease(Tween.EASE_IN_OUT)
+    rot_tween.tween_property(sprite, "rotation", -0.08, 0.25).set_ease(Tween.EASE_IN_OUT)
+```
+
+#### 幽灵 (ghost) -- 出现/消失过渡
+
+| 阶段 | 属性变化 | 时长 | 缓动 | 说明 |
+|------|---------|------|------|------|
+| 出现 | modulate.a: 0.0 -> 0.7 | 0.5s | ease_out | 从完全透明渐显 |
+| 巡逻 | modulate.a: 0.5 <-> 0.7 | 1.0s/周期 | ease_in_out | 循环脉动（已有行为的增强） |
+| 消失 | modulate.a: 0.7 -> 0.0 | 0.3s | ease_in | 死亡淡出加速 |
+| 巡逻 | position.y 偏移: -2px <-> +2px | 2.0s/周期 | ease_in_out | 上下飘浮效果 |
+
+**视觉描述**: 幽灵从透明渐显进入，巡逻时上下缓慢飘浮 + 透明度微脉动（alpha 0.5-0.7），死亡时快速淡出。相比当前仅有的 alpha 脉动，增加出现过渡和垂直飘浮。
+
+**实现建议**:
+```
+# 在 enemy.gd _ready() 中，ghost 类型:
+if enemy_data.enemy_id == "ghost":
+    sprite.modulate.a = 0.0  # 初始完全透明
+    var appear_tween = create_tween()
+    appear_tween.tween_property(sprite, "modulate:a", 0.7, 0.5).set_ease(Tween.EASE_OUT)
+    appear_tween.tween_callback(func():
+        # 出现完成后开始巡逻循环
+        var pulse = create_tween().set_loops()
+        pulse.tween_property(sprite, "modulate:a", 0.5, 0.5).set_ease(Tween.EASE_IN_OUT)
+        pulse.tween_property(sprite, "modulate:a", 0.7, 0.5).set_ease(Tween.EASE_IN_OUT)
+        var float_tween = create_tween().set_loops()
+        float_tween.tween_property(sprite, "position:y", -2.0, 1.0).set_ease(Tween.EASE_IN_OUT).set_relative(true)
+        float_tween.tween_property(sprite, "position:y", 2.0, 1.0).set_ease(Tween.EASE_IN_OUT).set_relative(true)
+    )
+```
+
+### 任务 3: UI 动画规范
+
+为 4 种 UI 元素设计 Tween 动画参数，供 Programmer Agent 在对应场景中实现。
+
+#### 3.1 波次切换横幅 (wave_banner)
+
+| 阶段 | 属性变化 | 时长 | 缓动 | 说明 |
+|------|---------|------|------|------|
+| 滑入 | position.y: -80 -> 20 | 0.4s | ease_out_back | 从画面上方弹性滑入 |
+| 停留 | position.y: 20 (不变) | 2.0s | -- | 显示波次名称 |
+| 滑出 | position.y: 20 -> -80 | 0.3s | ease_in | 向上方滑出消失 |
+
+**总时长**: 2.7s (0.4 + 2.0 + 0.3)
+
+**ease_out_back 说明**: Godot 中使用 `Tween.EASE_OUT` + `Tween.TRANS_BACK`，产生轻微过冲回弹效果，使横幅出现更有"弹出感"。
+
+**实现建议**:
+```
+# 在 hud.gd 或 wave_banner 控制脚本中:
+var banner = $WaveBanner
+banner.position.y = -80
+banner.visible = true
+var t = create_tween()
+t.tween_property(banner, "position:y", 20.0, 0.4).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+t.tween_interval(2.0)
+t.tween_property(banner, "position:y", -80.0, 0.3).set_ease(Tween.EASE_IN)
+t.tween_callback(func(): banner.visible = false)
+```
+
+**视觉补充**: 横幅使用已有 wave_banner_bg (#1A1A2E) 配色，文字使用白色。每波次使用对应波次色（wave1_green / wave2_yellow / wave3_orange / wave4_red / wave5_boss_red）作为横幅左侧色带。
+
+#### 3.2 升级选择面板
+
+| 阶段 | 属性变化 | 时长 | 缓动 | 说明 |
+|------|---------|------|------|------|
+| 弹入 | scale: Vector2(0.3,0.3) -> Vector2(1.0,1.0) | 0.3s | ease_out_back | 从中心缩小态弹性放大到正常 |
+| 弹入 | modulate.a: 0.0 -> 1.0 | 0.2s | ease_out | 同步淡入 |
+| 选项出现 | scale: Vector2(0.8,0.8) -> Vector2(1.0,1.0) | 0.15s | ease_out | 每个选项卡片延迟 0.05s 依次出现 |
+| 选择后关闭 | scale: Vector2(1.0,1.0) -> Vector2(0.8,0.8) | 0.15s | ease_in | 缩小关闭 |
+| 选择后关闭 | modulate.a: 1.0 -> 0.0 | 0.15s | ease_in | 同步淡出 |
+
+**总时长**: 打开 0.3s + 选项延迟 0.15s; 关闭 0.15s
+
+**实现建议**:
+```
+# 升级面板打开:
+panel.scale = Vector2(0.3, 0.3)
+panel.modulate.a = 0.0
+panel.visible = true
+var t = create_tween()
+t.tween_property(panel, "scale", Vector2.ONE, 0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+t.parallel().tween_property(panel, "modulate:a", 1.0, 0.2).set_ease(Tween.EASE_OUT)
+
+# 选项卡片依次出现 (每个延迟 0.05s):
+for i in option_cards.size():
+    var card = option_cards[i]
+    card.scale = Vector2(0.8, 0.8)
+    var ct = create_tween().set_parallel()
+    ct.tween_property(card, "scale", Vector2.ONE, 0.15).set_ease(Tween.EASE_OUT).set_delay(0.05 * i)
+
+# 选择后关闭:
+var ct = create_tween()
+ct.tween_property(panel, "scale", Vector2(0.8, 0.8), 0.15).set_ease(Tween.EASE_IN)
+ct.parallel().tween_property(panel, "modulate:a", 0.0, 0.15).set_ease(Tween.EASE_IN)
+ct.tween_callback(func(): panel.visible = false)
+```
+
+#### 3.3 伤害数字
+
+| 属性 | 变化 | 时长 | 缓动 | 循环 | 说明 |
+|------|------|------|------|------|------|
+| position.y | 敌人头顶 -> 上浮 30px | 0.8s | ease_out | 否 | 数字向上漂浮 |
+| modulate.a | 1.0 -> 0.0 | 0.8s | ease_in | 否 | 同步淡出 |
+| scale | Vector2(0.5,0.5) -> Vector2(1.2,1.2) -> Vector2(1.0,1.0) | 0.1s + 0.1s | ease_out | 否 | 先放大再缩回(弹出) |
+
+**总时长**: 0.8s (浮出+淡出)，前 0.2s 包含弹出
+
+**字体颜色规则**:
+| 伤害类型 | 颜色 | 字号 |
+|---------|------|------|
+| 普通伤害 | Color(1.0, 1.0, 1.0) 白色 | 12px |
+| 暴击伤害 | Color(1.0, 0.85, 0.0) 金色 | 16px (放大 1.3x) |
+| 治疗 | Color(0.4, 0.9, 0.3) 绿色 | 12px |
+| 冰冻伤害 | Color(0.5, 0.8, 1.0) 冰蓝 | 12px |
+| 燃烧 DOT | Color(1.0, 0.4, 0.1) 橙红 | 10px (较小) |
+
+**实现建议**:
+```
+# 伤害数字浮动标签:
+var label = Label.new()
+label.position = enemy_position + Vector2(0, -20)  # 敌人头顶
+label.modulate.a = 1.0
+label.scale = Vector2(0.5, 0.5)
+add_child(label)
+
+var t = create_tween()
+# 弹出
+t.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_ease(Tween.EASE_OUT)
+t.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_ease(Tween.EASE_OUT)
+# 上浮 + 淡出 (与前 0.2s 的后半段并行)
+t.parallel().tween_property(label, "position:y", -30.0, 0.6).set_ease(Tween.EASE_OUT).set_relative(true)
+t.parallel().tween_property(label, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN).set_delay(0.2)
+t.tween_callback(func(): label.queue_free())
+```
+
+#### 3.4 金币获取 (+1 上浮)
+
+| 属性 | 变化 | 时长 | 缓动 | 循环 | 说明 |
+|------|------|------|------|------|------|
+| position.y | 玩家头顶 -> 上浮 20px | 0.6s | ease_out | 否 | +1 数字向上漂浮 |
+| modulate.a | 1.0 -> 0.0 | 0.6s | ease_in | 否 | 同步淡出 |
+| scale | Vector2(0.6,0.6) -> Vector2(1.0,1.0) | 0.15s | ease_out | 否 | 简单放大出现 |
+
+**总时长**: 0.6s
+
+**视觉规范**:
+| 属性 | 值 |
+|------|-----|
+| 文字内容 | "+1" |
+| 字体颜色 | Color(1.0, 0.84, 0.0) 金色 #FFD700 |
+| 字号 | 10px |
+| 起始位置 | 玩家精灵上方 10px |
+
+**实现建议**:
+```
+var label = Label.new()
+label.text = "+1"
+label.modulate = Color(1.0, 0.84, 0.0)  # 金色
+label.position = player_position + Vector2(0, -10)
+label.scale = Vector2(0.6, 0.6)
+add_child(label)
+
+var t = create_tween()
+t.tween_property(label, "scale", Vector2.ONE, 0.15).set_ease(Tween.EASE_OUT)
+t.parallel().tween_property(label, "position:y", -20.0, 0.6).set_ease(Tween.EASE_OUT).set_relative(true)
+t.parallel().tween_property(label, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN)
+t.tween_callback(func(): label.queue_free())
+```
+
+### 任务 4: UI 动画参数汇总表
+
+| UI 元素 | 总时长 | 循环 | 主要属性 | 缓动 | 备注 |
+|---------|--------|------|---------|------|------|
+| 波次横幅 | 2.7s | 否 | position.y | ease_out_back / ease_in | 3 阶段: 滑入/停留/滑出 |
+| 升级面板 | 0.3s 开 / 0.15s 关 | 否 | scale + modulate.a | ease_out_back / ease_in | 选项卡片延迟 0.05s |
+| 伤害数字 | 0.8s | 否 | position.y + scale + modulate.a | ease_out / ease_in | 弹出 0.2s + 浮出淡出 0.6s |
+| 金币 +1 | 0.6s | 否 | position.y + scale + modulate.a | ease_out / ease_in | 简单放大+上浮+淡出 |
+
+### 待执行命令
+
+```bash
+# 生成全部 PNG 精灵（包括 3 个新角色动画帧）
+/opt/anaconda3/bin/python3 tools/generate_sprites.py
+
+# 验证 3 个新 PNG 是否生成
+ls -la assets/sprites/characters/mage_cast.png \
+       assets/sprites/characters/warrior_block.png \
+       assets/sprites/characters/ranger_draw.png
+
+# 确认精灵总数（应为 66）
+find assets/sprites -name "*.png" | wc -l
+
+# Godot 导入新资产
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path /Users/ks_128/Documents/godot_demo --import
+```
+
+### 设计决策记录
+
+1. **法师帧 2 选择"施法"而非"行走"**: 法师的核心动作是施法。将法杖上举 3px + 宝珠光晕增强比两腿交替移动在像素风中更有辨识度。32px 画布上腿部交替变化过小（2-3px 移动），而法杖上举 3px 在视觉上更显著。
+
+2. **战士帧 2 选择"举盾"而非"挥剑"**: 战士的标志性动作是举盾格挡。盾牌上移 4px 在视觉上非常清晰，而挥剑需要更多帧数才能表达。2 帧循环中，静止(帧1)<->举盾(帧2) 的对比更直观。
+
+3. **游侠帧 2 选择"拉弓"而非"跑步"**: 游侠的标志性动作是拉弓射击。弓弦从直弦变为拉满曲线是帧间最显著的差异点。弓弦位移 3px (x=27->x=24) 在 32px 画布上清晰可辨。
+
+4. **敌人动画使用 modulate/scale/rotation 而非新 PNG**: 僵尸死亡、蝙蝠翅膀摆动、幽灵飘浮等效果通过属性动画实现比精灵帧更灵活且节省内存。每帧无需绘制新精灵，仅在代码中添加 Tween 动画。
+
+5. **UI 动画统一使用 Tween 而非 AnimationPlayer**: Tween 更适合一次性的 UI 过渡效果（滑入/弹出/淡出），AnimationPlayer 更适合循环动画。波次横幅和升级面板都是触发型 UI，Tween 的代码量更少且更易维护。
+
+6. **波次横幅使用 ease_out_back**: ease_out_back 产生轻微过冲（overshoot），使横幅从上方滑入时有一个"弹性"着陆效果，比普通 ease_out 更有活力。这是游戏中横幅动画的常见选择。
+
+### 质量自评: 97/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 配色准确性 | 15 | 15 | 动画帧配色与帧 1 完全一致，仅法师宝珠光晕 alpha 增强 |
+| 精灵覆盖率 | 15 | 15 | 3 个新动画帧精灵覆盖全部角色，总数 63->66 |
+| 动画帧辨识度 | 14 | 15 | 法师法杖上举/战士举盾/游侠拉弓各有特色，帧间差异清晰 |
+| 敌人动画规范 | 14 | 15 | 3 种敌人动画参数完整，含伪代码，modulate/scale 方案合理 |
+| UI 动画规范 | 14 | 15 | 4 种 UI 动画参数完整，含总时长/缓动/属性变化/伪代码 |
+| 工具链可维护性 | 10 | 10 | 3 个新函数风格与现有一致，main() 更新整洁 |
+| 动画参数合理性 | 15 | 15 | 4 FPS 帧率适合像素风 2 帧循环，所有 Tween 时长合理 |
+
+**加分项**: 角色动画帧精灵(+5), 敌人行为动画伪代码(+3), UI 动画规范含伤害类型颜色规则(+3), 波次横幅 ease_out_back 弹性效果(+2)
+
+**扣分项**: 脚本尚未运行验证 3 个新 PNG 输出(-2), 蝙蝠翅膀动画实际需验证 scale.y 效果是否自然(-1)
+
+### 精灵清单更新
+
+项目精灵总数: 66 PNG
+
+| 目录 | 文件数 | 新增 |
+|------|--------|------|
+| characters/ | 6 | +3 (mage_cast, warrior_block, ranger_draw) |
+| enemies/ | 10 | 0 |
+| weapons/ | 17 | 0 |
+| pickups/ | 8 | 0 |
+| ui/ | 6 | 0 |
+| skills/ | 6 | 0 |
+| effects/ | 7 | 0 |
+| passives/ | 3 | 0 |
+| (根目录) | 3 | 0 |

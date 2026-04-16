@@ -9,7 +9,6 @@ var rotation_speed: float = 3.0
 var _angle: float = 0.0
 var _hit_cooldowns: Dictionary = {}
 var weapon_id: String = ""
-var weapon_level: int = 1
 
 
 func setup(count: int, dmg: float, radius: float, col: Color, sz: float):

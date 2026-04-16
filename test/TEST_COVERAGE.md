@@ -1,21 +1,28 @@
 # Test Coverage Report
 
-Generated: 2026-04-17 R15
-QA Agent: Task 15 (Sprite Migration Validation + Regression)
+Generated: 2026-04-17 R16
+QA Agent: Task 16 (Boundary Stress Tests + Tech Debt Verification + Regression)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total test files | 44 |
-| Total test functions | 1112 |
-| Assertions | 2697 |
-| Passing | 1110 |
-| Pending | 2 (chest.png missing) |
+| Total test files | 46 |
+| Total test functions | 1191 |
+| Assertions | 2935 |
+| Passing | 1191 |
+| Pending | 0 |
 | Failing | 0 |
 | Orphans | 0 |
 
 ## Test File Inventory
+
+### Boundary & Stress Tests (2 files)
+
+| File | Tests | Module Coverage |
+|------|-------|----------------|
+| test_boundary_stress.gd | 56 | Enemy boundaries (0 HP, double die, splitter children difficulty, boss near-death), weapon boundaries (empty scene no crash, 9 evolution paths, Lv3 guard, weapon_level range), wave boundaries (wave 0/-1, endless cycle 100/500 overflow, WARMUP no spawn, VICTORY no spawn), economy boundaries (gold=0 purchase, soul fragments insufficient, negative gold, maxed upgrades) |
+| test_wave_boundary.gd | 23 | Wave edge cases (exact duration, below duration, required fields, total duration), endless numerical safety (cycle 1/5/6/50/500, wave wrapping), VICTORY invariants (flags, immune to updates, reset clears state), state machine edge cases |
 
 ### Core Systems (8 files)
 
@@ -249,12 +256,38 @@ QA Agent: Task 15 (Sprite Migration Validation + Regression)
 | EnemyBullet | X | X | X | X (0.5) | X | X |
 | Boomerang | X | X | X | X (1.0) | - | X |
 
+## Coverage Matrix: Boundary Conditions (R16)
+
+| Boundary | test_boundary_stress | test_wave_boundary |
+|----------|---------------------|-------------------|
+| 0 HP enemy behavior | X | |
+| Double die protection | X | |
+| Splitter children difficulty mul | X | |
+| Boss at 0.1% HP | X | |
+| Empty scene weapon fire | X | |
+| All 9 evolution recipe completeness | X | |
+| Lv3 guard (all weapon types) | X | |
+| weapon_level out of range | X | |
+| Wave 0 / wave -1 | X | |
+| Endless cycle 100+ no overflow | X | X |
+| WARMUP no enemy spawn | X | |
+| VICTORY no enemy spawn | X | X |
+| Gold = 0 purchase failure | X | |
+| Soul fragments insufficient | X | |
+| Negative gold protection | X | |
+| Maxed upgrade purchase block | X | |
+| Wave exact duration boundary | | X |
+| Wave required fields | | X |
+| Endless spawn rate floor | | X |
+| VICTORY state invariants | | X |
+| Wave state machine edge cases | | X |
+
 ## Identified Gaps
 
 1. `scripts/shop.gd` - No dedicated test file (low priority: pure UI)
-2. `scripts/character_select.gd` - No test (low priority: UI navigation)
+2. `scripts/character_select.gd` - No test (low priority: UI navigation, now uses TextureRect)
 3. `scripts/difficulty_select.gd` - No test (low priority: UI navigation)
-4. `scripts/weapon_select.gd` - No test (low priority: UI navigation)
+4. `scripts/weapon_select.gd` - No test (low priority: UI navigation, now uses TextureRect)
 5. `scripts/game_over_screen.gd` - Tested indirectly via test_endless_mode (4 tests)
 6. `scripts/title_screen.gd` - No test (low priority: minimal logic)
 

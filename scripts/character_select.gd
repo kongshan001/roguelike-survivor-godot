@@ -4,7 +4,7 @@ var _characters: Array[Dictionary] = [
 	{
 		"id": "mage",
 		"name": "魔法师",
-		"icon": "M",
+		"sprite": "res://assets/sprites/characters/mage.png",
 		"hp": 8,
 		"speed": 160,
 		"desc": "均衡型，自选初始武器",
@@ -14,7 +14,7 @@ var _characters: Array[Dictionary] = [
 	{
 		"id": "warrior",
 		"name": "战士",
-		"icon": "W",
+		"sprite": "res://assets/sprites/characters/warrior.png",
 		"hp": 12,
 		"speed": 140,
 		"desc": "高血量坦克，初始飞刀",
@@ -24,7 +24,7 @@ var _characters: Array[Dictionary] = [
 	{
 		"id": "ranger",
 		"name": "游侠",
-		"icon": "R",
+		"sprite": "res://assets/sprites/characters/ranger.png",
 		"hp": 6,
 		"speed": 190,
 		"desc": "高速低血，初始圣水",
@@ -67,9 +67,13 @@ func _create_card(data: Dictionary) -> Panel:
 	panel.add_child(vbox)
 
 	# Icon
-	var icon = ColorRect.new()
+	var icon = TextureRect.new()
 	icon.custom_minimum_size = Vector2(60, 60)
-	icon.color = data.color
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var tex_path: String = data.get("sprite", "")
+	if tex_path != "" and ResourceLoader.exists(tex_path):
+		icon.texture = load(tex_path)
+	icon.modulate = data.color
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	vbox.add_child(icon)
 

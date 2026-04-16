@@ -929,6 +929,625 @@ def gen_ranger():
     save(img, "characters", "ranger.png")
 
 
+# ── Character Animation Frame 2 (32x32) ──────────────────────────────────
+
+def gen_mage_cast():
+    """Mage cast frame (32x32) -- right arm raised upward, staff orb brightened.
+    Based on gen_mage() with arm lifted and orb glow intensified.
+    """
+    img, d = draw_img(32, 32)
+    outline = rgba("dark_outline")
+    hat_dark = rgba("mage_dark")
+    robe_c = rgba("mage_robe")
+    skin_c = rgba("skin")
+    white = rgba("white")
+    black = rgba("black")
+    staff_c = rgba("bible")
+    orb_c = rgba("holy_water")
+    orb_glow = (*PALETTE["holy_water"][:3], 120)
+    orb_glow_bright = (*PALETTE["holy_water"][:3], 180)  # brighter for cast
+
+    # ── Outline (identical to frame 1) ──
+    hat_outline = [
+        (15, 0), (16, 0),
+        (15, 1), (16, 1),
+        (14, 2), (17, 2),
+        (13, 3), (18, 3),
+        (12, 4), (19, 4),
+        (11, 5), (20, 5),
+        (10, 6), (21, 6),
+        (9, 7), (22, 7),
+        (8, 8), (23, 8),
+        (7, 9), (24, 9),
+        (6, 10), (7, 10), (24, 10), (25, 10),
+        (5, 11), (6, 11), (25, 11), (26, 11),
+        (5, 12), (26, 12),
+        (5, 13), (26, 13),
+    ]
+    for pt in hat_outline:
+        d.point(pt, fill=outline)
+
+    body_outline = [
+        (8, 14), (9, 14), (22, 14), (23, 14),
+        (7, 15), (24, 15),
+        (6, 16), (7, 16), (24, 16), (25, 16),
+        (6, 17), (25, 17),
+        (6, 18), (25, 18),
+        (6, 19), (25, 19),
+        (7, 20), (24, 20),
+        (7, 21), (24, 21),
+        (8, 22), (9, 22), (22, 22), (23, 22),
+        (9, 23), (10, 23), (21, 23), (22, 23),
+        (10, 24), (11, 24), (20, 24), (21, 24),
+        (10, 25), (21, 25),
+        (10, 26), (21, 26),
+        (11, 27), (20, 27),
+        (11, 28), (20, 28),
+        (12, 29), (19, 29),
+        (13, 30), (18, 30),
+    ]
+    for pt in body_outline:
+        d.point(pt, fill=outline)
+
+    # ── Hat fill (identical to frame 1) ──
+    hat_rows = [
+        (1, 15, 17), (2, 14, 18), (3, 13, 19), (4, 12, 20),
+        (5, 11, 21), (6, 10, 22), (7, 9, 23), (8, 8, 24), (9, 7, 25),
+    ]
+    for y, xs, xe in hat_rows:
+        for x in range(xs, xe + 1):
+            d.point((x, y), fill=hat_dark)
+    for y in range(10, 14):
+        for x in range(6, 27):
+            d.point((x, y), fill=hat_dark)
+    hat_highlight = [
+        (14, 2), (15, 3), (14, 4), (15, 5), (14, 6), (15, 7),
+    ]
+    for pt in hat_highlight:
+        d.point(pt, fill=(*PALETTE["mage_robe"][:3], 200))
+    d.point((15, 1), fill=white)
+    d.point((16, 1), fill=white)
+    d.point((15, 0), fill=orb_c)
+    d.point((16, 0), fill=orb_c)
+
+    # ── Face ──
+    for y in range(14, 19):
+        for x in range(10, 22):
+            d.point((x, y), fill=skin_c)
+    d.point((13, 15), fill=white)
+    d.point((14, 15), fill=black)
+    d.point((13, 16), fill=black)
+    d.point((18, 15), fill=white)
+    d.point((17, 15), fill=black)
+    d.point((18, 16), fill=black)
+
+    # ── Robe body (identical to frame 1) ──
+    robe_rows = [
+        (14, 9, 22), (15, 8, 23), (16, 7, 24), (17, 7, 24),
+        (18, 7, 24), (19, 7, 24), (20, 8, 23), (21, 8, 23),
+        (22, 9, 22), (23, 10, 21), (24, 11, 20), (25, 11, 20),
+        (26, 11, 20), (27, 12, 19), (28, 12, 19), (29, 13, 18),
+        (30, 14, 17),
+    ]
+    for y, xs, xe in robe_rows:
+        for x in range(xs, xe + 1):
+            d.point((x, y), fill=robe_c)
+    robe_folds = [
+        (13, 20), (13, 21), (13, 22), (13, 23),
+        (17, 20), (17, 21), (17, 22), (17, 23),
+        (21, 16), (21, 17), (21, 18), (21, 19),
+    ]
+    for pt in robe_folds:
+        d.point(pt, fill=hat_dark)
+    for x in range(12, 20):
+        d.point((x, 29), fill=hat_dark)
+    for x in range(13, 18):
+        d.point((x, 30), fill=hat_dark)
+
+    # ── Staff -- LIFTED UP 3 pixels (cast animation) ──
+    # Staff shaft shifted up by 3 pixels: subtract 3 from all y values
+    staff_shaft_cast = [
+        (26, 3), (27, 3),
+        (26, 4), (27, 4),
+        (26, 5), (27, 5),
+        (27, 6), (28, 6),
+        (27, 7), (28, 7),
+        (28, 8), (29, 8),
+        (28, 9), (29, 9),
+        (28, 10), (29, 10),
+        (28, 11), (29, 11),
+        (28, 12), (29, 12),
+        (28, 13), (29, 13),
+        (28, 14), (29, 14),
+        (28, 15), (29, 15),
+        (28, 16), (29, 16),
+        (28, 17), (29, 17),
+        (28, 18), (29, 18),
+        (28, 19), (29, 19),
+        (27, 20), (28, 20),
+        (27, 21), (28, 21),
+        (27, 22), (28, 22),
+        (27, 23), (28, 23),
+        (27, 24), (28, 24),
+    ]
+    for pt in staff_shaft_cast:
+        d.point(pt, fill=staff_c)
+
+    staff_outline_cast = [
+        (25, 2), (26, 2), (28, 2), (29, 2),
+        (25, 3), (28, 3),
+        (25, 4), (28, 4),
+        (25, 5), (28, 5),
+        (28, 6), (30, 6),
+        (29, 7), (30, 7),
+        (29, 8), (30, 8),
+        (29, 9), (30, 9),
+        (29, 10), (30, 10),
+        (29, 11), (30, 11),
+        (29, 12), (30, 12),
+        (29, 13), (30, 13),
+        (29, 14), (30, 14),
+        (29, 15), (30, 15),
+        (29, 16), (30, 16),
+        (29, 17), (30, 17),
+        (29, 18), (30, 18),
+        (29, 19), (30, 19),
+        (26, 20), (29, 20),
+        (26, 21), (29, 21),
+        (26, 22), (29, 22),
+        (26, 23), (29, 23),
+        (26, 24), (29, 24),
+        (26, 25), (29, 25),
+    ]
+    for pt in staff_outline_cast:
+        d.point(pt, fill=outline)
+
+    # Staff orb -- LIFTED UP 3 pixels, with brighter glow
+    orb_pts_cast = [
+        (26, 0), (27, 0),
+        (25, 1), (26, 1), (27, 1), (28, 1),
+        (25, 2), (26, 2), (27, 2), (28, 2),
+        (26, 3), (27, 3),
+    ]
+    for pt in orb_pts_cast:
+        d.point(pt, fill=orb_c)
+
+    # Brighter glow halo for cast frame
+    d.point((24, 1), fill=orb_glow_bright)
+    d.point((29, 1), fill=orb_glow_bright)
+    # Extra side glow for cast intensity
+    d.point((24, 2), fill=orb_glow_bright)
+    d.point((29, 2), fill=orb_glow_bright)
+    d.point((25, 0), fill=orb_glow_bright)
+    d.point((28, 0), fill=orb_glow_bright)
+
+    # Orb highlight
+    d.point((26, 1), fill=white)
+
+    # ── Right sleeve -- LIFTED toward staff (cast pose) ──
+    # Arm reaches up higher to hold raised staff
+    sleeve_r_cast = [
+        (24, 12), (25, 12), (26, 12),
+        (24, 13), (25, 13), (26, 13),
+        (25, 14), (26, 14), (27, 14),
+        (26, 15), (27, 15),
+    ]
+    for pt in sleeve_r_cast:
+        d.point(pt, fill=robe_c)
+
+    # Left sleeve (same as frame 1)
+    sleeve_l = [
+        (7, 15), (8, 15), (9, 15),
+        (7, 16), (8, 16),
+        (7, 17), (8, 17),
+    ]
+    for pt in sleeve_l:
+        d.point(pt, fill=robe_c)
+
+    save(img, "characters", "mage_cast.png")
+
+
+def gen_warrior_block():
+    """Warrior block frame (32x32) -- shield raised up (lifted 4px higher).
+    Based on gen_warrior() with shield position shifted upward.
+    """
+    img, d = draw_img(32, 32)
+    outline = rgba("dark_outline")
+    dark_red = rgba("warrior_dark")
+    red_c = rgba("warrior_red")
+    gold_c = rgba("gold")
+    white = rgba("white")
+    black = rgba("black")
+    steel_c = rgba("knife")
+
+    # ── Helmet (identical to frame 1) ──
+    helmet_outline = [
+        (10, 4), (11, 4), (20, 4), (21, 4),
+        (9, 5), (22, 5),
+        (8, 6), (9, 6), (22, 6), (23, 6),
+        (8, 7), (23, 7),
+        (8, 8), (23, 8),
+        (8, 9), (23, 9),
+        (8, 10), (23, 10),
+        (8, 11), (23, 11),
+        (8, 12), (23, 12),
+        (9, 13), (22, 13),
+        (9, 14), (22, 14),
+    ]
+    for pt in helmet_outline:
+        d.point(pt, fill=outline)
+    for y in range(5, 14):
+        for x in range(9, 23):
+            d.point((x, y), fill=dark_red)
+    for x in range(10, 22):
+        d.point((x, 4), fill=dark_red)
+    crest_pts = [
+        (15, 3), (16, 3), (15, 4), (16, 4), (15, 5), (16, 5),
+    ]
+    for pt in crest_pts:
+        d.point(pt, fill=gold_c)
+    d.point((15, 2), fill=gold_c)
+    d.point((16, 2), fill=gold_c)
+    for x in range(11, 21):
+        d.point((x, 9), fill=black)
+        d.point((x, 10), fill=black)
+    d.point((13, 9), fill=white)
+    d.point((14, 9), fill=white)
+    d.point((18, 9), fill=white)
+    d.point((17, 9), fill=white)
+    d.point((10, 7), fill=gold_c)
+    d.point((21, 7), fill=gold_c)
+    d.point((10, 11), fill=gold_c)
+    d.point((21, 11), fill=gold_c)
+
+    # Neck guard
+    for x in range(10, 22):
+        d.point((x, 14), fill=dark_red)
+
+    # ── Armor body (identical to frame 1) ──
+    armor_outline = [
+        (6, 15), (7, 15), (24, 15), (25, 15),
+        (5, 16), (6, 16), (25, 16), (26, 16),
+        (5, 17), (26, 17),
+        (5, 18), (26, 18),
+        (5, 19), (26, 19),
+        (5, 20), (26, 20),
+        (5, 21), (26, 21),
+        (5, 22), (26, 22),
+        (6, 23), (7, 23), (24, 23), (25, 23),
+        (7, 24), (24, 24),
+        (8, 25), (23, 25),
+        (8, 26), (9, 26), (22, 26), (23, 26),
+        (9, 27), (22, 27),
+        (10, 28), (11, 28), (20, 28), (21, 28),
+        (11, 29), (20, 29),
+        (12, 30), (19, 30),
+    ]
+    for pt in armor_outline:
+        d.point(pt, fill=outline)
+    for y in range(15, 24):
+        for x in range(6, 26):
+            d.point((x, y), fill=red_c)
+    for y in range(24, 28):
+        for x in range(7, 24):
+            d.point((x, y), fill=red_c)
+    for y in range(28, 30):
+        for x in range(10, 21):
+            d.point((x, y), fill=red_c)
+    for x in range(11, 20):
+        d.point((x, 30), fill=red_c)
+
+    # Armor plate detail
+    for y in range(16, 23):
+        d.point((15, y), fill=dark_red)
+        d.point((16, y), fill=dark_red)
+    for x in range(8, 24):
+        d.point((x, 22), fill=dark_red)
+        d.point((x, 23), fill=dark_red)
+    d.point((15, 22), fill=gold_c)
+    d.point((16, 22), fill=gold_c)
+    d.point((15, 23), fill=gold_c)
+    d.point((16, 23), fill=gold_c)
+    for x in range(6, 10):
+        d.point((x, 15), fill=dark_red)
+    for x in range(22, 26):
+        d.point((x, 15), fill=dark_red)
+
+    # ── Shield -- LIFTED UP 4 pixels (block pose) ──
+    # Shifted shield: subtract 4 from all y values
+    shield_outline_block = [
+        (2, 9), (3, 9),
+        (1, 10), (2, 10),
+        (0, 11), (1, 11),
+        (0, 12), (1, 12),
+        (0, 13), (1, 13),
+        (0, 14), (1, 14),
+        (0, 15), (1, 15),
+        (0, 16), (1, 16),
+        (1, 17), (2, 17),
+        (1, 18), (2, 18),
+        (2, 19), (3, 19),
+        (3, 20), (4, 20),
+        (4, 21), (5, 21),
+        (5, 20), (6, 19),
+    ]
+    shield_outer_r_block = [
+        (6, 9),
+        (7, 10),
+        (7, 11), (7, 12), (7, 13), (7, 14), (7, 15), (7, 16),
+        (7, 17),
+    ]
+    for pt in shield_outline_block + shield_outer_r_block:
+        d.point(pt, fill=outline)
+
+    shield_fill_block = [
+        (10, 2, 6), (11, 1, 7), (12, 1, 7), (13, 1, 7),
+        (14, 1, 7), (15, 1, 7), (16, 1, 7), (17, 2, 7),
+        (18, 2, 6), (19, 3, 5), (20, 4, 5),
+    ]
+    for y, xs, xe in shield_fill_block:
+        for x in range(xs, xe + 1):
+            d.point((x, y), fill=dark_red)
+
+    shield_rim_block = [
+        (11, 2, 6), (12, 2, 6), (13, 2, 6), (14, 2, 6),
+        (15, 2, 6), (16, 2, 6), (17, 3, 6), (18, 3, 5),
+    ]
+    for y, xs, xe in shield_rim_block:
+        for x in range(xs, xe + 1):
+            d.point((x, y), fill=steel_c)
+
+    shield_inner_block = [
+        (12, 3, 5), (13, 3, 5), (14, 3, 5), (15, 3, 5),
+        (16, 3, 5), (17, 4, 5),
+    ]
+    for y, xs, xe in shield_inner_block:
+        for x in range(xs, xe + 1):
+            d.point((x, y), fill=red_c)
+
+    # Shield cross emblem (golden)
+    shield_cross_v_block = [(4, 12), (4, 13), (4, 14), (4, 15), (4, 16)]
+    shield_cross_h_block = [(3, 14), (4, 14), (5, 14)]
+    for pt in shield_cross_v_block + shield_cross_h_block:
+        d.point(pt, fill=gold_c)
+    d.point((3, 12), fill=white)
+
+    # ── Legs ──
+    for y in range(27, 31):
+        for x in range(11, 15):
+            d.point((x, y), fill=dark_red)
+    for y in range(27, 31):
+        for x in range(17, 21):
+            d.point((x, y), fill=dark_red)
+    d.point((12, 29), fill=red_c)
+    d.point((18, 29), fill=red_c)
+
+    save(img, "characters", "warrior_block.png")
+
+
+def gen_ranger_draw():
+    """Ranger draw frame (32x32) -- bowstring pulled back, arrow nocked.
+    Based on gen_ranger() with bowstring bent inward and left arm reaching forward.
+    """
+    img, d = draw_img(32, 32)
+    outline = rgba("dark_outline")
+    dark_green = rgba("ranger_dark")
+    green_c = rgba("ranger_green")
+    skin_c = rgba("skin")
+    white = rgba("white")
+    black = rgba("black")
+    bow_c = rgba("boomerang")
+    string_c = rgba("knife")
+    quiver_c = (0x6B, 0x44, 0x23, 255)
+    arrow_fletch = (0xFF, 0xE0, 0x80, 255)
+
+    # ── Cloak (identical to frame 1) ──
+    cloak_outline = [
+        (7, 10), (8, 10), (23, 10), (24, 10),
+        (6, 11), (7, 11), (24, 11), (25, 11),
+        (5, 12), (6, 12), (25, 12), (26, 12),
+        (5, 13), (26, 13),
+        (4, 14), (5, 14), (26, 14), (27, 14),
+        (4, 15), (27, 15),
+        (4, 16), (27, 16),
+        (4, 17), (27, 17),
+        (4, 18), (27, 18),
+        (5, 19), (26, 19),
+        (5, 20), (26, 20),
+        (6, 21), (25, 21),
+        (6, 22), (25, 22),
+        (7, 23), (24, 23),
+        (7, 24), (24, 24),
+        (8, 25), (23, 25),
+        (9, 26), (22, 26),
+        (10, 27), (21, 27),
+        (11, 28), (20, 28),
+    ]
+    for pt in cloak_outline:
+        d.point(pt, fill=outline)
+    for y in range(11, 28):
+        for x in range(5, 27):
+            d.point((x, y), fill=dark_green)
+
+    # ── Hood (identical to frame 1) ──
+    hood_outline = [
+        (15, 4), (16, 4), (14, 5), (17, 5), (13, 6), (18, 6),
+        (12, 7), (19, 7), (11, 8), (20, 8), (10, 9), (21, 9),
+        (9, 10), (22, 10), (9, 11), (22, 11), (8, 12), (23, 12),
+        (8, 13), (23, 13),
+    ]
+    for pt in hood_outline:
+        d.point(pt, fill=outline)
+    hood_rows = [
+        (5, 14, 18), (6, 13, 19), (7, 12, 20), (8, 11, 21),
+        (9, 10, 22), (10, 9, 23), (11, 9, 23), (12, 8, 24), (13, 8, 24),
+    ]
+    for y, xs, xe in hood_rows:
+        for x in range(xs, xe + 1):
+            d.point((x, y), fill=dark_green)
+    for x in range(9, 23):
+        d.point((x, 13), fill=(0x15, 0x4A, 0x19, 255))
+
+    # ── Face ──
+    for y in range(13, 18):
+        for x in range(11, 21):
+            d.point((x, y), fill=skin_c)
+    d.point((13, 14), fill=white)
+    d.point((14, 14), fill=black)
+    d.point((13, 15), fill=black)
+    d.point((18, 14), fill=white)
+    d.point((17, 14), fill=black)
+    d.point((18, 15), fill=black)
+
+    # ── Body / tunic (identical to frame 1) ──
+    tunic_outline = [
+        (9, 15), (10, 15), (21, 15), (22, 15),
+        (8, 16), (9, 16), (22, 16), (23, 16),
+        (8, 17), (23, 17), (8, 18), (23, 18),
+        (8, 19), (23, 19), (8, 20), (23, 20),
+        (9, 21), (22, 21), (9, 22), (22, 22),
+        (10, 23), (21, 23), (10, 24), (21, 24),
+        (11, 25), (20, 25), (12, 26), (19, 26),
+        (13, 27), (18, 27),
+    ]
+    for pt in tunic_outline:
+        d.point(pt, fill=outline)
+    for y in range(15, 22):
+        for x in range(9, 23):
+            d.point((x, y), fill=green_c)
+    for x in range(10, 22):
+        d.point((x, 22), fill=green_c)
+    for x in range(10, 21):
+        d.point((x, 23), fill=green_c)
+    for x in range(11, 20):
+        d.point((x, 24), fill=green_c)
+    for x in range(12, 19):
+        d.point((x, 25), fill=green_c)
+    for x in range(13, 18):
+        d.point((x, 26), fill=green_c)
+    for x in range(10, 22):
+        d.point((x, 19), fill=quiver_c)
+        d.point((x, 20), fill=quiver_c)
+    d.point((15, 19), fill=rgba("gold"))
+    d.point((16, 19), fill=rgba("gold"))
+
+    # Cloak drape
+    drape_l = [
+        (5, 15), (5, 16), (5, 17), (5, 18),
+        (6, 16), (6, 17), (6, 18), (6, 19),
+    ]
+    for pt in drape_l:
+        d.point(pt, fill=dark_green)
+    drape_r = [
+        (26, 15), (26, 16), (26, 17), (26, 18),
+        (25, 16), (25, 17), (25, 18), (25, 19),
+    ]
+    for pt in drape_r:
+        d.point(pt, fill=dark_green)
+
+    # ── Quiver (identical to frame 1) ──
+    quiver_outline = [
+        (3, 10), (4, 10), (3, 11), (4, 11), (2, 12), (3, 12),
+        (2, 13), (3, 13), (2, 14), (3, 14), (2, 15), (3, 15),
+        (2, 16), (3, 16), (2, 17), (3, 17), (2, 18), (3, 18),
+        (2, 19), (3, 19), (3, 20), (4, 20),
+    ]
+    for pt in quiver_outline:
+        d.point(pt, fill=outline)
+    quiver_fill = [
+        (3, 10), (3, 11), (3, 12), (3, 13), (3, 14),
+        (3, 15), (3, 16), (3, 17), (3, 18), (3, 19),
+        (4, 20),
+    ]
+    for pt in quiver_fill:
+        d.point(pt, fill=quiver_c)
+    d.point((3, 9), fill=string_c)
+    d.point((4, 9), fill=string_c)
+    d.point((3, 8), fill=arrow_fletch)
+    d.point((4, 8), fill=arrow_fletch)
+
+    # ── Bow (identical to frame 1) ──
+    bow_outline_pts = [
+        (27, 6), (28, 6), (28, 7), (29, 7), (29, 8), (30, 8),
+        (30, 9), (31, 9), (31, 10), (31, 11), (31, 12), (31, 13),
+        (31, 14), (31, 15), (31, 16), (30, 16), (30, 17), (29, 17),
+        (29, 18), (28, 18), (28, 19), (27, 19),
+    ]
+    for pt in bow_outline_pts:
+        d.point(pt, fill=outline)
+    bow_body = [
+        (27, 7), (28, 7), (28, 8), (29, 8), (29, 9), (30, 9),
+        (30, 10), (30, 11), (30, 12), (30, 13), (30, 14), (30, 15),
+        (29, 16), (29, 15), (28, 17), (27, 18),
+    ]
+    for pt in bow_body:
+        d.point(pt, fill=bow_c)
+    d.point((28, 8), fill=(0xBB, 0x88, 0x44, 255))
+    d.point((29, 10), fill=(0xBB, 0x88, 0x44, 255))
+    d.point((29, 13), fill=(0xBB, 0x88, 0x44, 255))
+
+    # ── Bowstring -- PULLED BACK (draw animation) ──
+    # In frame 1, bowstring is straight at x=27
+    # In frame 2, bowstring is pulled back to x=24 at center (y=12-13)
+    bowstring_draw = [
+        (27, 7), (27, 8), (27, 9), (27, 10),
+        (26, 11),
+        (25, 12),
+        (24, 13),  # pulled back center
+        (25, 14),
+        (26, 15),
+        (27, 16), (27, 17), (27, 18),
+    ]
+    for pt in bowstring_draw:
+        d.point(pt, fill=string_c)
+
+    # ── Arrow fully nocked (pointing right, on the pulled string) ──
+    arrow_draw = [
+        (24, 13), (25, 13), (26, 13), (27, 13), (28, 13),
+        (29, 13),
+    ]
+    for pt in arrow_draw:
+        d.point(pt, fill=string_c)
+    # Arrowhead (pointing right, more prominent)
+    d.point((30, 12), fill=white)
+    d.point((30, 13), fill=white)
+    d.point((30, 14), fill=white)
+    d.point((31, 13), fill=white)
+    # Fletching at back of arrow
+    d.point((23, 12), fill=arrow_fletch)
+    d.point((23, 14), fill=arrow_fletch)
+
+    # ── Right arm holding bow (same as frame 1) ──
+    arm_r = [
+        (23, 13), (24, 13), (25, 13), (26, 13),
+        (23, 14), (24, 14), (25, 14), (26, 14),
+        (24, 15), (25, 15), (26, 15),
+    ]
+    for pt in arm_r:
+        d.point(pt, fill=green_c)
+
+    # Left arm -- reaching forward (draw pose)
+    arm_l_draw = [
+        (6, 13), (7, 13), (8, 13),
+        (6, 14), (7, 14), (8, 14), (9, 14),
+        (7, 15), (8, 15),
+    ]
+    for pt in arm_l_draw:
+        d.point(pt, fill=green_c)
+
+    # ── Legs ──
+    for y in range(24, 28):
+        for x in range(12, 16):
+            d.point((x, y), fill=dark_green)
+    for y in range(24, 28):
+        for x in range(17, 21):
+            d.point((x, y), fill=dark_green)
+    d.point((13, 27), fill=green_c)
+    d.point((18, 27), fill=green_c)
+
+    save(img, "characters", "ranger_draw.png")
+
+
 # ── Enemies (32x32 canvas, centered) ──────────────────────────────────────
 
 def gen_zombie():
@@ -4207,6 +4826,12 @@ def main():
     gen_mage()
     gen_warrior()
     gen_ranger()
+
+    # Character Animation Frame 2
+    print("\nCharacter Animation Frames:")
+    gen_mage_cast()
+    gen_warrior_block()
+    gen_ranger_draw()
 
     # Enemies
     print("\nEnemies:")

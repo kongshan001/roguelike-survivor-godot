@@ -1,10 +1,10 @@
 extends Control
 
 var _weapons: Array[Dictionary] = [
-	{"id": "holywater", "name": "圣水", "desc": "环绕旋转", "color": Color(0.3, 0.5, 1.0)},
-	{"id": "knife", "name": "飞刀", "desc": "自动投掷", "color": Color(0.75, 0.75, 0.8)},
-	{"id": "lightning", "name": "闪电", "desc": "随机电击", "color": Color(1.0, 1.0, 0.3)},
-	{"id": "boomerang", "name": "回旋镖", "desc": "追踪回旋", "color": Color(0.6, 0.4, 0.2)},
+	{"id": "holywater", "name": "圣水", "desc": "环绕旋转", "color": Color(0.3, 0.5, 1.0), "sprite": "res://assets/sprites/weapons/holy_water.png"},
+	{"id": "knife", "name": "飞刀", "desc": "自动投掷", "color": Color(0.75, 0.75, 0.8), "sprite": "res://assets/sprites/weapons/knife.png"},
+	{"id": "lightning", "name": "闪电", "desc": "随机电击", "color": Color(1.0, 1.0, 0.3), "sprite": "res://assets/sprites/weapons/lightning.png"},
+	{"id": "boomerang", "name": "回旋镖", "desc": "追踪回旋", "color": Color(0.6, 0.4, 0.2), "sprite": "res://assets/sprites/weapons/boomerang.png"},
 ]
 
 
@@ -36,9 +36,13 @@ func _create_card(data: Dictionary) -> Panel:
 	vbox.add_theme_constant_override("separation", 8)
 	panel.add_child(vbox)
 
-	var icon = ColorRect.new()
+	var icon = TextureRect.new()
 	icon.custom_minimum_size = Vector2(40, 40)
-	icon.color = data.color
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var tex_path: String = data.get("sprite", "")
+	if tex_path != "" and ResourceLoader.exists(tex_path):
+		icon.texture = load(tex_path)
+	icon.modulate = data.color
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	vbox.add_child(icon)
 

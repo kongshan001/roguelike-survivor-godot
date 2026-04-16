@@ -413,10 +413,12 @@ func _spawn_food_at(pos: Vector2) -> void:
 	circle.radius = 6.0
 	shape.shape = circle
 	food.add_child(shape)
-	var sprite: ColorRect = ColorRect.new()
-	sprite.size = Vector2(8, 8)
-	sprite.position = Vector2(-4, -4)
-	sprite.color = Color(0.4, 0.9, 0.3)
+	var sprite: Sprite2D = Sprite2D.new()
+	var tex_path: String = "res://assets/sprites/pickups/food.png"
+	if ResourceLoader.exists(tex_path):
+		sprite.texture = load(tex_path)
+	sprite.scale = Vector2(0.25, 0.25)
+	sprite.modulate = Color(0.4, 0.9, 0.3)
 	food.add_child(sprite)
 	food.global_position = pos
 	get_parent().call_deferred("add_child", food)

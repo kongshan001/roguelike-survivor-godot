@@ -2085,3 +2085,76 @@ tween.tween_property(afterimage, "modulate:a", 0.0, fade_duration)
 
 - 1070 tests total, 1068 passing, 2 pending (chest sprite), 0 failures, 0 orphans
 - 与 R14 基线一致，无回归
+
+---
+
+## R16: P2 技术债务清理
+
+**日期**: 2026-04-17
+**目标**: 清理 Reviewer 在 R15 识别的 5 个 P2 技术债务
+
+### 1. weapon_fire.gd 未使用常量清理
+
+**文件**: `scripts/weapons/weapon_fire.gd`
+**问题**: `BOOMERANG_MAX_COUNT` 和 `BOOMERANG_LV3_TRACK_ANGLE_MUL` 已迁移至 `weapon_boomerang_fire.gd` 但原文件残留
+**修复**:
+- 删除 `const BOOMERANG_MAX_COUNT: int = 8` (已存在于 weapon_boomerang_fire.gd:6)
+- 删除 `const BOOMERANG_LV3_TRACK_ANGLE_MUL: float = 1.5` (回旋镖 Lv3 追踪已在 weapon_boomerang_fire.gd:51-52 用硬编码 `1.5` 实现)
+
+### 2. spin_blade.gd weapon_level 死代码清理
+
+**文件**: `scripts/spin_blade.gd`, `scripts/weapons/weapon_fire.gd`
+**问题**: `var weapon_level: int = 1` 在 spin_blade.gd 声明但从未读取；weapon_fire.gd:182-183 为其赋值也无意义
+**修复**:
+- 删除 spin_blade.gd 中 `var weapon_level: int = 1` 声明
+- 删除 weapon_fire.gd 中 `if weapon_id == "holywater": instance.weapon_level = level` 赋值块
+- 注: projectile.gd 中的 weapon_level 仍有实际用途（holywater Lv3 冻结减速、knife Lv3 弹射），不受影响
+
+### 3. enemy.gd _spawn_food_at() ColorRect -> Sprite2D 迁移
+
+**文件**: `scripts/enemy.gd`
+**问题**: `_spawn_food_at()` 使用 `ColorRect` 创建食物视觉，但 `food.png` 精灵已存在
+**修复**:
+- 将 `ColorRect` 替换为 `Sprite2D`
+- 加载 `res://assets/sprites/pickups/food.png` 纹理
+- 使用 `scale = Vector2(0.25, 0.25)` 缩放至 8x8 像素等效大小
+- 保留 `modulate = Color(0.4, 0.9, 0.3)` 绿色调以保持食物视觉辨识度
+
+### 4. character_select.gd ColorRect -> TextureRect 迁移
+
+**文件**: `scripts/character_select.gd`
+**问题**: 角色选择图标使用 `ColorRect`，但角色精灵已存在 (mage.png, warrior.png, ranger.png)
+**修复**:
+- 将 `ColorRect` 替换为 `TextureRect`
+- 设置 `stretch_mode = STRETCH_KEEP_ASPECT_CENTERED`
+- 通过 `data.get("sprite", "")` 加载角色纹理
+- 使用 `modulate` 叠加角色颜色
+- 更新数据字典：删除 `"icon"` 字段，添加 `"sprite"` 路径字段
+
+### 5. weapon_select.gd ColorRect -> TextureRect 迁移
+
+**文件**: `scripts/weapon_select.gd`
+**问题**: 武器选择图标使用 `ColorRect`，但武器精灵已存在
+**修复**:
+- 将 `ColorRect` 替换为 `TextureRect`
+- 设置 `stretch_mode = STRETCH_KEEP_ASPECT_CENTERED`
+- 通过 `data.get("sprite", "")` 加载武器纹理
+- 使用 `modulate` 叠加武器颜色
+- 更新数据字典添加 `"sprite"` 路径字段 (holy_water.png, knife.png, lightning.png, boomerang.png)
+
+### 修改文件清单
+
+| 文件 | 变更 |
+|------|------|
+| `scripts/weapons/weapon_fire.gd` | 删除2个未使用常量，删除 weapon_level 赋值 |
+| `scripts/spin_blade.gd` | 删除 weapon_level 死变量 |
+| `scripts/enemy.gd` | _spawn_food_at ColorRect -> Sprite2D + food.png |
+| `scripts/character_select.gd` | ColorRect -> TextureRect + 角色精灵 |
+| `scripts/weapon_select.gd` | ColorRect -> TextureRect + 武器精灵 |
+
+### 测试验证
+
+- 1171 tests total, 1169 passing, 1 failing (pre-existing), 1 risky (pre-existing), 10 orphans
+- 预存失败: `test_save_manager_purchase_exact_cost` (SaveManager 逻辑问题，非本轮引入)
+- 预存风险: `test_evolution_weapon_level_capped_at_1` (Did not assert)
+- 本轮 5 项修复无回归
