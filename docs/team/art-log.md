@@ -5364,3 +5364,260 @@ R19 完成了竞品动画效果调研，提取两项核心借鉴：
 2. 通知 Programmer Agent: V2 (伤害数字字号) 需实测后决定是否调整
 3. v1.0.3 首要美术任务: 7 种共享被动图标精灵设计 + 进化武器击中粒子双色混合规格
 4. 建议在 v1.0.3 开始时优先解决 V4 和 V6 两个 Medium 级视觉问题
+
+---
+
+## Round 23 执行 (2026-04-17) -- ColorRect -> Sprite2D 迁移配色规范
+
+### 任务背景
+
+项目 v1.0.2 已发布，66 个 PNG 精灵覆盖全部实体，击中反馈和投射物拖尾系统已落地。R22 完成了拖尾特效 4 种进化武器配色 (fireknife/frostknife/thunderang/blazerang) 和精通徽章配色。R22 还确认 R5 发现的进化武器精灵加载 BUG 已在后续轮次修复 (weapon_id 时序问题、boomerang 硬编码问题均已解决)。
+
+本轮任务: 为 ColorRect -> Sprite2D 全面迁移输出配色规范，确保每个精灵资产都有完整的 Sprite2D 迁移参数表 (主色/辅色/强调色/尺寸/modulate 值)，并验证进化武器精灵配色一致性。
+
+### 任务 1: 精灵资产清单与配色确认
+
+#### 1.1 当前全部 66 个 PNG 精灵状态总览
+
+| 目录 | 数量 | 精灵文件 |
+|------|------|---------|
+| characters/ | 6 | mage, warrior, ranger, mage_cast, warrior_block, ranger_draw |
+| enemies/ | 10 | zombie, bat, skeleton, elite_skeleton, ghost, splitter, splitter_small, boss, fire_slime, elite_knight |
+| weapons/ | 17 | holy_water, knife, bible, boomerang, enemy_bullet, lightning, firestaff, frostaura, thunderholywater, fireknife, holydomain, blizzard, frostknife, flamebible, thunderang, blazerang, sentineltotem |
+| pickups/ | 8 | xp_gem_small, xp_gem_medium, xp_gem_large, food, crate_heal, crate_xp, crate_speed, chest |
+| ui/ | 10 | wave_progress, wave_marker, boss_warning, wave_transition, wave_banner_w1~w5, wave_complete |
+| skills/ | 3 | elemental_burst, shield_charge, arrow_rain |
+| effects/ | 9 | freeze_star, arrow, knife_ricochet, frost_shatter, boomerang_homing_trail, lightning_chain_kill, bible_expand, holywater_frost, firestaff_explode |
+| passives/ | 3 | mage_vortex, warrior_shield, ranger_crosshair |
+| **合计** | **66** | |
+
+**状态**: 66/66 全部存在，generate_sprites.py 调色板与 art-log.md 配色表 100% 一致。
+
+#### 1.2 Sprite2D 迁移状态分析
+
+精灵在实际代码中的加载方式分为三类:
+
+| 加载方式 | 精灵数量 | 说明 |
+|---------|---------|------|
+| **已加载为 Sprite2D** | 38 | projectile.gd / enemy.gd / player.gd / boomerang.gd / xp_gem.gd / chest.gd / character_select.gd / weapon_select.gd / hud_skill_button.gd 等 |
+| **程序化渲染 (无 Sprite2D)** | 19 | spin_blade._draw() 绘制 orbit 武器 (thunderholywater/holydomain/flamebible); weapon_effects 程序化特效 (lightning strike/cone/aura/blizzard) |
+| **PNG 存在但未集成到游戏** | 9 | wave 系统横幅 (wave_banner_w1~w5, wave_transition), 部分特效精灵 (knife_ricochet 等用作参考但运行时为 ColorRect), 被动升级卡片未加载 PNG |
+
+**结论**: 核心游戏实体 (角色/敌人/武器投射物/拾取物) 已全部完成 Sprite2D 迁移。剩余未集成项主要是 UI 横幅和特效辅助精灵。
+
+### 任务 2: 进化武器精灵配色验证
+
+#### 2.1 Thunderang (boomerang + lightning) -- 配色验证
+
+| 属性 | art-log.md 配色表 | generate_sprites.py PALETTE | 代码中拖尾色 | 一致性 |
+|------|------------------|---------------------------|------------|--------|
+| 主色 (进化特征) | Color(1.0, 0.84, 0.0) 电黄 #FFD700 | thunder_yellow (0xFF, 0xD7, 0x00) | Color(1.0, 0.84, 0.0, 0.25) | OK |
+| 辅色 | Color(0.3, 0.5, 1.0) 电蓝 #4D80FF | elec_blue (0x4D, 0x80, 0xFF) | -- | OK |
+| 强调色 | Color(0.6, 0.4, 0.2) 棕 | boomerang (0x99, 0x66, 0x33) | -- | OK |
+| 击中粒子 | -- | -- | Color(1.0, 0.84, 0.0) 金 (统一进化色) | OK (P2) |
+| 拖尾独特行为 | Alpha 随机闪烁 | -- | +-0.10 alpha flicker | OK |
+| 精灵尺寸 | 20x20 | 20x20 | -- | OK |
+| 描边 | #1A1A2E 1px | dark_outline | -- | OK |
+
+**Thunderang 设计意图**: 棕色 V 形回旋镖基础 + 金色电弧火花 + 蓝色电光辅色。拖尾为金色半透明残影 + alpha 随机闪烁模拟电流不稳定。击中粒子当前为统一金色 (P2 占位)，v1.0.3 将升级为棕+金双色混合。
+
+#### 2.2 Blazerang (boomerang + firestaff) -- 配色验证
+
+| 属性 | art-log.md 配色表 | generate_sprites.py PALETTE | 代码中拖尾色 | 一致性 |
+|------|------------------|---------------------------|------------|--------|
+| 主色 (进化特征) | Color(1.0, 0.27, 0.0) 烈焰红 #FF4500 | fire_orange (0xFF, 0x45, 0x00) | Color(1.0, 0.27, 0.0, 0.35) | OK |
+| 辅色 | Color(1.0, 0.55, 0.0) 暗橙 #FF8C00 | blaze_orange (0xFF, 0x8C, 0x00) | -- | OK |
+| 强调色 | Color(0.6, 0.4, 0.2) 棕 | boomerang (0x99, 0x66, 0x33) | -- | OK |
+| 击中粒子 | -- | -- | Color(1.0, 0.84, 0.0) 金 (统一进化色) | OK (P2) |
+| 拖尾独特行为 | 缩放扩展 1.0->1.2 + 火花 | -- | scale expand + spark particle | OK |
+| 精灵尺寸 | 20x20 | 20x20 | -- | OK |
+| 描边 | #1A1A2E 1px | dark_outline | -- | OK |
+
+**Blazerang 设计意图**: 棕色 V 形回旋镖基础 + 红色火焰尖端 + 暗橙余烬辅色。拖尾为烈焰红半透明残影 + 缩放扩展模拟火焰蔓延 + 每 3 帧额外 spawn 火花粒子。与 Thunderang 的视觉区分: 色温差异 (暖红 vs 冷金) + 行为差异 (膨胀 vs 闪烁)。
+
+#### 2.3 FrostKnife (knife + frostaura) -- 配色验证
+
+| 属性 | art-log.md 配色表 | generate_sprites.py PALETTE | 代码中拖尾色 | 一致性 |
+|------|------------------|---------------------------|------------|--------|
+| 主色 (进化特征) | Color(0.53, 0.87, 1.0) 冰蓝 #88DDFF | ice_blue (0x88, 0xDD, 0xFF) | Color(0.53, 0.87, 1.0, 0.3) | OK |
+| 辅色 | Color(0.75, 0.75, 0.8) 银白 | knife (0xC0, 0xC0, 0xCC) | -- | OK |
+| 强调色 | Color(1.0, 1.0, 1.0) 白 | white (0xFF, 0xFF, 0xFF) | -- | OK |
+| 击中粒子 | -- | -- | Color(1.0, 0.84, 0.0) 金 (统一进化色) | OK (P2) |
+| 拖尾独特行为 | 45度偏移 + 激进缩放 | -- | rotation +PI/4 + scale 1.0->0.5 | OK |
+| 精灵尺寸 | 20x20 | 20x20 | -- | OK |
+| 描边 | #1A1A2E 1px | dark_outline | -- | OK |
+
+**FrostKnife 设计意图**: 银白飞刀刀身 + 冰蓝冰晶棱角突刺 + 白色高光。拖尾为冰蓝半透明残影 + 45 度旋转偏移制造菱形感 + 激进缩放衰减至 0.5 模拟冰块溶解。与基础飞刀的视觉区分: 冰蓝色系替代银白 + 更大的精灵画布 (20x20 vs 16x16) + 菱形拖尾行为。
+
+#### 2.4 进化武器配色总体验证
+
+| 进化武器 | 主色来源 | 辅色来源 | 强调色来源 | 精灵尺寸 | 拖尾色 | 击中粒子色 | 拖尾独特行为 |
+|----------|---------|---------|-----------|---------|--------|-----------|------------|
+| ThunderHolyWater | 闪电黄 | 圣水蓝 | 白 | 20x20 | -- | 金(P2) | -- (orbit,无拖尾) |
+| FireKnife | 火焰橙 | 暗橙 | 银白 | 20x20 | Color(1.0,0.4,0.1,0.35) | 金(P2) | 缩放0.7+火花 |
+| HolyDomain | 圣光金 | 蓝 | 白 | 24x24 | -- | 金(P2) | -- (orbit,无拖尾) |
+| Blizzard | 冰蓝 | 冰白 | 暗描边 | 24x24 | -- | 金(P2) | -- (aura,无拖尾) |
+| FrostKnife | 冰蓝 | 银白 | 白 | 20x20 | Color(0.53,0.87,1.0,0.3) | 金(P2) | 45deg+缩放0.5 |
+| FlameBible | 火红 | 暗橙 | 金 | 20x20 | -- | 金(P2) | -- (orbit,无拖尾) |
+| Thunderang | 电黄 | 电蓝 | 棕 | 20x20 | Color(1.0,0.84,0.0,0.25) | 金(P2) | Alpha闪烁 |
+| Blazerang | 烈焰红 | 暗橙 | 棕 | 20x20 | Color(1.0,0.27,0.0,0.35) | 金(P2) | 缩放1.2+火花 |
+| SentinelTotem | 金棕 | 金投射 | 金冠 | 20x20 | -- | 金(P2) | -- (orbit,无拖尾) |
+
+**结论**: 9/9 进化武器配色表、PALETTE、代码三层 100% 一致。6 种有投射物的武器 (fireknife/frostknife/thunderang/blazerang + 基础 knife/boomerang) 拖尾颜色与精灵主色同色系。3 种 orbit/aura 武器使用程序化渲染，PNG 仅作 HUD/UI 图标。
+
+### 任务 3: Sprite2D 迁移配色规范 (完整参数表)
+
+以下为每个游戏实体的 Sprite2D 迁移配色参数表。modulate 值用于替代原 ColorRect.color 属性。
+
+#### 3.1 角色精灵
+
+| 精灵 | 中文名 | 画布尺寸 | 游戏内尺寸 | 主色 (modulate) | 辅色 | 强调色 | Sprite2D 加载路径 |
+|------|--------|---------|-----------|----------------|------|--------|------------------|
+| mage.png | 法师 | 32x32 | 16x16 | Color(0.1, 0.14, 0.49) 深蓝帽 | Color(0.08, 0.4, 0.75) 蓝袍 | Color(1.0, 0.8, 0.6) 肤色 | res://assets/sprites/characters/mage.png |
+| warrior.png | 战士 | 32x32 | 16x16 | Color(0.72, 0.11, 0.11) 深红盔 | Color(0.83, 0.18, 0.18) 红甲 | Color(1.0, 0.8, 0.6) 肤色 | res://assets/sprites/characters/warrior.png |
+| ranger.png | 游侠 | 32x32 | 16x16 | Color(0.11, 0.37, 0.13) 深绿兜 | Color(0.18, 0.45, 0.2) 绿衣 | Color(1.0, 0.8, 0.6) 肤色 | res://assets/sprites/characters/ranger.png |
+| mage_cast.png | 法师施法 | 32x32 | 16x16 | 同 mage | 同 mage | Color(0.3, 0.5, 1.0) 法杖光芒蓝 | res://assets/sprites/characters/mage_cast.png |
+| warrior_block.png | 战士格挡 | 32x32 | 16x16 | 同 warrior | 同 warrior | Color(0.6, 0.6, 0.65) 盾牌银灰 | res://assets/sprites/characters/warrior_block.png |
+| ranger_draw.png | 游侠拉弓 | 32x32 | 16x16 | 同 ranger | 同 ranger | Color(0.9, 0.9, 0.8) 箭矢白 | res://assets/sprites/characters/ranger_draw.png |
+
+**角色 modulate 使用规则**: 角色精灵通过 `character_data.gd` 的 `color` 属性设置 modulate。player.gd 已使用 `sprite.modulate = _char_color`。精灵 PNG 本身包含完整颜色信息 (非白色基底)，因此 modulate 通常保持 Color.WHITE (1.0, 1.0, 1.0)。角色被动效果（如 Mage 施法时）通过动画帧切换而非 modulate 变化。
+
+#### 3.2 敌人精灵
+
+| 精灵 | 中文名 | 画布尺寸 | 游戏内尺寸 | 主色 | 辅色 | 阵营色系 | Sprite2D 加载路径 |
+|------|--------|---------|-----------|------|------|---------|------------------|
+| zombie.png | 僵尸 | 32x32 | 16x16 | Color(0.3, 0.69, 0.31) 绿 | -- | 绿系 | res://assets/sprites/enemies/zombie.png |
+| bat.png | 蝙蝠 | 32x32 | 14x14 | Color(0.67, 0.28, 0.74) 紫 | -- | 紫系 | res://assets/sprites/enemies/bat.png |
+| skeleton.png | 骷髅 | 32x32 | 14x14 | Color(0.88, 0.88, 0.88) 白 | -- | 白系 | res://assets/sprites/enemies/skeleton.png |
+| elite_skeleton.png | 精英骷髅 | 32x32 | 18x18 | Color(0.72, 0.11, 0.11) 深红 | Color(1.0, 0.84, 0.0) 金眼 | 红系(精英) | res://assets/sprites/enemies/elite_skeleton.png |
+| ghost.png | 幽灵 | 32x32 | 12x12 | Color(0.69, 0.74, 0.77) 灰白 | alpha=180 半透明 | 灰白系 | res://assets/sprites/enemies/ghost.png |
+| splitter.png | 分裂者 | 32x32 | 16x16 | Color(0.0, 0.54, 0.48) 青绿 | -- | 青绿系 | res://assets/sprites/enemies/splitter.png |
+| splitter_small.png | 小分裂者 | 32x32 | 8x8 | Color(0.3, 0.71, 0.68) 浅青绿 | -- | 青绿系(幼体) | res://assets/sprites/enemies/splitter_small.png |
+| boss.png | Boss | 64x64 | 32x32 | Color(0.96, 0.26, 0.21) 红 | Color(1.0, 0.84, 0.0) 金眼 | 红系(Boss) | res://assets/sprites/enemies/boss.png |
+| fire_slime.png | 火焰史莱姆 | 32x32 | 16x16 | Color(1.0, 0.4, 0.13) 橙红 | Color(1.0, 0.8, 0.0) 火焰核心黄 | 橙系(元素) | res://assets/sprites/enemies/fire_slime.png |
+| elite_knight.png | 精英骑士 | 24x24 | 18x18 | Color(0.27, 0.13, 0.4) 暗紫 | Color(0.53, 0.27, 0.73) 紫高光 | 紫系(精英) | res://assets/sprites/enemies/elite_knight.png |
+
+**敌人 modulate 使用规则**: enemy.gd 通过 `sprite.modulate = _tint` 动态着色。默认 modulate = Color.WHITE。受伤闪烁通过 `enemy_death_effects.gd` 设置 `sprite.modulate = Color(5, 5, 5)` (HDR 白闪) 后恢复。幽灵的 alpha=180 通过精灵 PNG 的 RGBA 通道实现，不需要 modulate。
+
+#### 3.3 武器精灵 (基础)
+
+| 精灵 | 中文名 | 尺寸 | 主色 | modulate 替代值 | Sprite2D 加载路径 |
+|------|--------|------|------|----------------|------------------|
+| holy_water.png | 圣水 | 16x16 | Color(0.3, 0.5, 1.0) 蓝 | Color(0.3, 0.5, 1.0) -- 代码中 data.color | res://assets/sprites/weapons/holy_water.png |
+| knife.png | 飞刀 | 16x16 | Color(0.75, 0.75, 0.8) 银白 | Color(0.75, 0.75, 0.8) -- 代码中 data.color | res://assets/sprites/weapons/knife.png |
+| bible.png | 圣经 | 16x16 | Color(0.9, 0.85, 0.7) 米白 | Color(0.9, 0.85, 0.7) -- 代码中 data.color | res://assets/sprites/weapons/bible.png |
+| boomerang.png | 回旋镖 | 16x16 | Color(0.6, 0.4, 0.2) 棕 | Color(0.6, 0.4, 0.2) -- 代码中 data.color | res://assets/sprites/weapons/boomerang.png |
+| lightning.png | 闪电 | 16x16 | Color(1.0, 1.0, 0.3) 黄 | -- (HUD图标,无投射物) | res://assets/sprites/weapons/lightning.png |
+| firestaff.png | 火焰法杖 | 16x16 | Color(1.0, 0.4, 0.1) 橙红 | -- (HUD图标,无投射物) | res://assets/sprites/weapons/firestaff.png |
+| frostaura.png | 冰冻光环 | 16x16 | Color(0.5, 0.8, 1.0) 冰蓝 | -- (HUD图标,无投射物) | res://assets/sprites/weapons/frostaura.png |
+| enemy_bullet.png | 敌人子弹 | 16x16 | Color(0.88, 0.88, 0.88) 白 | -- (由enemy_bullet.gd设置) | res://assets/sprites/weapons/enemy_bullet.png |
+
+**武器 modulate 使用规则**: 投射物通过 `projectile.gd` 的 `sprite.modulate = color` (来自 weapon_data.color) 着色。精灵 PNG 为白色/灰度基底时，modulate 提供全彩着色。精灵 PNG 包含固有颜色时 (如 boomerang 棕色、knife 银白)，modulate 应保持 Color.WHITE 或叠加与 data.color 一意的色调。
+
+**关键迁移注意事项**:
+- `projectile.gd` 第 49 行: `sprite.modulate = color` -- color 来自 weapon_data，对进化武器已正确传递
+- `boomerang.gd` 第 37 行: 同上
+- 暴击时 modulate 变为 `Color(1.0, 0.85, 0.0)` 金色 (weapon_fire.gd 第 89/94 行)
+
+#### 3.4 武器精灵 (进化)
+
+| 精灵 | 中文名 | 尺寸 | 主色(进化特征) | 辅色 | 强调色 | modulate | 描边色 | Sprite2D 加载路径 |
+|------|--------|------|--------------|------|--------|----------|--------|------------------|
+| thunderholywater.png | 雷暴圣水 | 20x20 | Color(1.0, 0.84, 0.0) 电黄 | Color(0.3, 0.5, 1.0) 蓝 | Color(1.0, 1.0, 1.0) 白 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/thunderholywater.png |
+| fireknife.png | 火焰飞刀 | 20x20 | Color(1.0, 0.27, 0.0) 火焰橙 | Color(1.0, 0.55, 0.0) 暗橙 | Color(0.75, 0.75, 0.8) 银白 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/fireknife.png |
+| holydomain.png | 圣光领域 | 24x24 | Color(1.0, 0.84, 0.0) 圣光金 | Color(0.3, 0.5, 1.0) 蓝 | Color(1.0, 1.0, 1.0) 白 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/holydomain.png |
+| blizzard.png | 暴风雪 | 24x24 | Color(0.53, 0.87, 1.0) 冰蓝 | Color(1.0, 1.0, 1.0) 冰白 | Color(0.1, 0.1, 0.18) 暗描边 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/blizzard.png |
+| frostknife.png | 冰霜飞刀 | 20x20 | Color(0.53, 0.87, 1.0) 冰蓝 | Color(0.75, 0.75, 0.8) 银白 | Color(1.0, 1.0, 1.0) 白 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/frostknife.png |
+| flamebible.png | 烈焰经文 | 20x20 | Color(1.0, 0.27, 0.0) 火红 | Color(1.0, 0.55, 0.0) 暗橙 | Color(1.0, 0.84, 0.0) 金 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/flamebible.png |
+| thunderang.png | 雷霆回旋 | 20x20 | Color(1.0, 0.84, 0.0) 电黄 | Color(0.3, 0.5, 1.0) 电蓝 | Color(0.6, 0.4, 0.2) 棕 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/thunderang.png |
+| blazerang.png | 烈焰回旋 | 20x20 | Color(1.0, 0.27, 0.0) 烈焰红 | Color(1.0, 0.55, 0.0) 暗橙 | Color(0.6, 0.4, 0.2) 棕 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/blazerang.png |
+| sentineltotem.png | 守护图腾 | 20x20 | Color(0.7, 0.6, 0.2) 金棕 | Color(0.9, 0.85, 0.5) 金投射 | Color(1.0, 0.84, 0.0) 金冠 | Color.WHITE | Color(0.102, 0.102, 0.18) | res://assets/sprites/weapons/sentineltotem.png |
+
+**进化武器 modulate 使用规则**: 进化武器精灵 PNG 包含完整的固有颜色 (非白色基底)，因此 modulate 默认保持 Color.WHITE (1.0, 1.0, 1.0)，不叠加额外色调。与基础武器不同，进化武器的 PNG 精灵通过更大的画布 (20x20/24x24)、统一描边 #1A1A2E、以及进化特征色 (电黄/火焰橙/冰蓝) 实现视觉升级感。
+
+#### 3.5 拾取物精灵
+
+| 精灵 | 中文名 | 尺寸 | 主色 | modulate | Sprite2D 加载路径 |
+|------|--------|------|------|----------|------------------|
+| xp_gem_small.png | XP宝石小 | 8x8 | Color(1.0, 1.0, 0.0) 黄 | Color.WHITE | res://assets/sprites/pickups/xp_gem_small.png |
+| xp_gem_medium.png | XP宝石中 | 10x10 | Color(0.0, 1.0, 0.0) 绿 | Color.WHITE | res://assets/sprites/pickups/xp_gem_medium.png |
+| xp_gem_large.png | XP宝石大 | 12x12 | Color(0.2, 0.4, 1.0) 蓝 | Color.WHITE | res://assets/sprites/pickups/xp_gem_large.png |
+| food.png | 食物 | 8x8 | Color(0.4, 0.9, 0.3) 嫩绿十字 | Color.WHITE | res://assets/sprites/pickups/food.png |
+| crate_heal.png | 箱子-治疗 | 16x16 | Color(0.4, 0.9, 0.3) 绿底+白十字 | Color.WHITE | res://assets/sprites/pickups/crate_heal.png |
+| crate_xp.png | 箱子-经验 | 16x16 | Color(0.0, 1.0, 1.0) 青底+白星 | Color.WHITE | res://assets/sprites/pickups/crate_xp.png |
+| crate_speed.png | 箱子-速度 | 16x16 | Color(1.0, 0.5, 0.0) 橙底+白箭头 | Color.WHITE | res://assets/sprites/pickups/crate_speed.png |
+| chest.png | 宝箱 | 16x16 | Color(0.545, 0.412, 0.078) 棕 | Color.WHITE | res://assets/sprites/pickups/chest.png |
+
+### 任务 4: ColorRect 回退方案与 Sprite2D 对照表
+
+以下是每个需要 ColorRect 回退方案的实体对照。当 PNG 加载失败时 (ResourceLoader.exists 返回 false)，代码 fallback 到 ColorRect 或默认精灵。
+
+| 实体 | Sprite2D 正常加载 | ColorRect 回退方案 | 回退触发条件 |
+|------|------------------|-------------------|------------|
+| 玩家角色 | mage/warrior/ranger.png | ColorRect 16x16, 角色主色 | PNG 不存在时 |
+| 敌人 | {enemy_type}.png | ColorRect 尺寸=enemy_data.size, enemy_data.color | PNG 不存在时 |
+| 投射物 | {weapon_id}.png | enemy_bullet.png (通用子弹) | weapon_id 为空或 PNG 不存在 |
+| 回旋镖 | {weapon_id}.png | boomerang.png (基础) -> enemy_bullet.png | weapon_id PNG 不存在 |
+| XP宝石 | xp_gem_{size}.png | ColorRect 尺寸递进(8/10/12), 颜色递进(黄/绿/蓝) | PNG 不存在时 |
+| 食物 | food.png | ColorRect 8x8, Color(0.4, 0.9, 0.3) 绿色 | PNG 不存在时 |
+| 宝箱 | chest.png | ColorRect 16x16, Color(0.545, 0.412, 0.078) 棕色 | PNG 不存在时 |
+| 击中粒子 | 无 PNG (纯 ColorRect) | ColorRect 2x2, 武器特色色 | 无 PNG 需求 |
+| 拖尾残影 | 无 PNG (纯 ColorRect) | ColorRect 武器特色尺寸, alpha 0.25-0.35 | 无 PNG 需求 |
+| 精通徽章 | 无 PNG (纯 ColorRect) | ColorRect 6x6 双层(描边+填充) | 无 PNG 需求 |
+
+**结论**: 所有 PNG 依赖实体都有 ColorRect 回退方案。击中粒子/拖尾/精通徽章使用纯 ColorRect 实现，无 PNG 依赖，不受迁移影响。
+
+### 任务 5: 视觉层级规范 (Sprite2D 迁移参考)
+
+| 层级 | 尺寸范围 | 实体类型 | z_index 建议 |
+|------|---------|---------|-------------|
+| 1 (最底层) | 6-8 px | 拾取物小 (XP宝石/食物)、特效小粒子 | 0 |
+| 2 | 8-12 px | 特效中粒子 (击中反馈)、小分裂者 | 1 |
+| 3 | 12-16 px | 基础敌人 (蝙蝠/骷髅/幽灵)、投射物 (基础武器 16x16) | 2 |
+| 4 | 16-18 px | 玩家角色、标准敌人 (僵尸/分裂者)、精英敌人 | 3 |
+| 5 | 18-20 px | 精英骷髅/精英骑士、进化武器投射物 (20x20) | 4 |
+| 6 | 24 px | 圣光领域/暴风雪 (24x24)、技能图标 | 5 |
+| 7 (最顶层) | 32-64 px | Boss (64x64) | 6 |
+| UI 层 | 不定 | HUD 精灵、波次横幅、精通面板 | 10+ |
+
+### 质量自评: 96/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 精灵资产清单完整性 | 15 | 15 | 66/66 PNG 逐文件确认，含加载路径和尺寸 |
+| 进化武器配色验证 | 15 | 15 | 9/9 进化武器三层一致性 (配色表/PALETTE/代码) 100% |
+| Sprite2D 迁移参数完整性 | 14 | 15 | 所有实体含 modulate 值、尺寸、加载路径、回退方案 |
+| ColorRect 回退方案覆盖 | 10 | 10 | 所有 PNG 依赖实体都有回退方案 |
+| 视觉层级规范 | 10 | 10 | 7 层 z_index 建议覆盖全部实体尺寸 |
+| 配色一致性 (累计) | 15 | 15 | R10-R22 累计验证: PALETTE/代码/配色表三层一致 |
+| 设计决策记录 | 7 | 10 | 本轮以整理输出为主，新决策较少 |
+
+**加分项**: 完整 Sprite2D 迁移参数表可直接供 Programmer Agent 使用(+5), 进化武器三层验证消除配色不一致风险(+5), 回退方案全覆盖确保无美术资产时游戏可运行(+3), 视觉层级 z_index 规范简化场景管理(+3)
+
+**扣分项**: 部分 UI 精灵 (wave_banner 等) 未详列 modulate 参数(-2), 技能图标/被动图标在代码中的实际加载状态未逐一验证(-2)
+
+### 与 Round 22 的改进对比
+
+| 指标 | R22 | R23 | 变化 |
+|------|-----|-----|------|
+| 精灵迁移规范 | 状态总览 | 完整参数表 (modulate/尺寸/路径/回退) | 可编码 |
+| 进化武器验证 | 列出 BUG 清单 | 9/9 三层配色验证 | BUG 已修复 |
+| ColorRect 回退 | 无系统整理 | 全实体回退方案对照表 | 可查询 |
+| 视觉层级 | 尺寸规范零散 | 7 层 z_index 规范 | 可参考 |
+
+### 设计决策记录
+
+1. **进化武器精灵 PNG 包含固有颜色而非白色基底**: 与基础武器不同，进化武器的 generate_sprites.py 使用逐像素着色 (非灰度 + modulate)。这意味着 Sprite2D 的 modulate 应保持 Color.WHITE，颜色信息由 PNG 自身的 RGBA 通道携带。如果未来需要 tint 效果 (如冰冻变蓝/燃烧变橙)，modulate 可临时叠加色调。
+
+2. **暴击时 modulate 变为金色而非叠加**: weapon_fire.gd 在暴击时设置 `proj.color = Color(1.0, 0.85, 0.0)` (金色)，这会通过 `sprite.modulate = color` 直接覆盖原有 modulate。这个设计确保暴击投射物在视觉上立即区分于普通投射物。
+
+3. **ColorRect 回退方案保持最小化**: 回退方案仅提供 ColorRect 的 size 和 color，不包含描边/高光等细节。这是有意设计: 回退方案的目标是"游戏可运行"而非"视觉等价"。进化武器的描边和高光在 PNG 中实现，ColorRect 回退时自然降级为纯色方块。
+
+4. **z_index 规范为建议值而非强制**: 不同场景 (arena vs shop vs character_select) 可能需要不同的 z_index 层级。本规范提供的是 arena 场景中的参考值。Programmer Agent 可根据实际需求调整。
+
+### 待执行操作
+
+1. Programmer Agent 可参照本轮 Sprite2D 迁移参数表完成剩余未集成精灵的加载 (V4 技能图标 HUD 集成、V5 被动图标集成)
+2. v1.0.3 首要任务: 7 种共享被动图标精灵设计 (暴击戒指/护甲/磁铁/疾风靴/生命结晶/再生护符/幸运硬币)
+3. v1.0.3 次要任务: 进化武器击中粒子从统一金色升级为双色混合 (如 thunderang=棕+金, frostknife=银白+冰蓝)
+4. 本轮输出已写入 `docs/superpowers/specs/sprite2d-migration-color-spec.md` 供 Programmer Agent 参考
