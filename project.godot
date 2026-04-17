@@ -21,6 +21,7 @@ GameManager="*res://scripts/autoload/game_manager.gd"
 UpgradePool="*res://scripts/autoload/upgrade_pool.gd"
 SynergyManager="*res://scripts/autoload/synergy_manager.gd"
 SaveManager="*res://scripts/autoload/save_manager.gd"
+AudioManager="*res://scripts/autoload/audio_manager.gd"
 
 [display]
 

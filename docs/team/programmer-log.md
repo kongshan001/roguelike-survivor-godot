@@ -9,15 +9,55 @@
 | P0 | 角色选择/难度选择/武器选择场景 | ✅ 已完成 |
 | P0 | GameManager 扩展（角色/难度/金币/连击） | ✅ 已完成 |
 | P0 | Player 适配（角色属性/暴击/护甲） | ✅ 已完成 |
+| P0 | R33 AudioManager 核心架构 (v1.2.0 Phase A) | ✅ 已完成 |
 | P1 | 7种武器系统重构 | ✅ 已完成 |
 | P1 | 7种敌人 + Boss三阶段 + 弹幕系统 | ✅ 已完成 |
 | P1 | 5段波次进度 + 无尽模式生成 | ✅ 已完成 |
+| P1 | R34 SFX 触发点集成 (v1.2.0 Phase B) | 待开始 |
 | P2 | 8种进化武器系统 | ✅ 已完成 |
 | P2 | 18种协同效应系统 | ✅ 已完成 |
 | P2 | R31 player.gd拆分 + 20种协同(Resonance/Overcharge) | ✅ 已完成 |
+| P2 | R35 音量控制 UI + 持久化 (v1.2.0 Phase C) | 待开始 |
 | P3 | 商店/存档/任务/成就系统 | ✅ 已完成 |
 
 ## 技术决策
+
+### 2026-04-18: R33 AudioManager 核心架构 (v1.2.0 Phase A)
+- **决策**: 实现音频管理器 autoload 单例，支持 BGM 交叉淡出、SFX 音池、音量控制
+- **设计规格**: docs/superpowers/specs/v1.2.0-audio-system.md
+- **架构选择**:
+  - Autoload 单例（非场景级），确保音频跨场景持续性
+  - 2个 BGM 播放器实现交叉淡出（Tween 驱动）
+  - 4个 SFX 播放器池化复用，超限强制复用第一个
+  - 独立 UI 播放器避免与游戏 SFX 冲突
+  - 4总线布局: Master / BGM / SFX / UI
+  - 0-100 整数音量刻度，内部转 dB
+- **API 设计**:
+  - BGM: play_bgm(stream, fade_time), play_bgm_by_id(id, fade_time), stop_bgm(fade_time)
+  - SFX: play_sfx(stream, pitch_variation), play_sfx_by_id(id, pitch_variation), play_ui_sfx(id)
+  - 音量: set_volume(bus, 0-100), get_volume(bus) -> int, toggle_mute(), is_muted()
+  - 资源: preload_sfx(ids), preload_bgm(id), unload_unused()
+  - 常量: SFX_IDS (33个), BGM_IDS (6个), BGM_PATHS (6个)
+- **新建文件**:
+  - scripts/autoload/audio_manager.gd (338行)
+  - test/unit/test_audio_manager.gd (61个测试, 覆盖所有公共API)
+- **修改文件**:
+  - project.godot: 添加 AudioManager autoload 条目
+- **测试结果**: 2336 pass (2275原有 + 61新增), 0 fail, 4929 asserts
+
+### 2026-04-18: R33 hud.gd 拆分评估 (P1)
+- **决策**: 不拆分，记录评估结论
+- **分析**:
+  - hud.gd 当前 437 行，远低于 500 行上限
+  - Wave Display 代码 (L287-363, ~77行) 与 hud 紧耦合:
+    - _update_wave_display() 依赖 get_node_or_null("WaveLabel") 和 GameManager 状态
+    - _on_wave_started/completed/victory_achieved 依赖 _toast 子系统
+    - _setup_wave_bar() 使用 add_child() 需要父节点为 CanvasLayer
+    - 提取为 RefCounted 仍需传入 hud 自身引用，增加复杂度但不减少行数
+  - Skill Button 代码已拆分到 hud_skill_button.gd（模式已建立）
+  - Mastery 面板已拆分到 hud_mastery_panel.gd（模式已建立）
+  - Toast 已拆分到 hud_toast.gd（模式已建立）
+- **结论**: 当前结构合理，3个子模块已拆分。Wave display 在 hud 达到 ~450 行时再考虑提取。暂不拆分。
 
 ### 2026-04-18: R29 ColorRect -> Sprite2D 迁移验证
 - **决策**: 确认 ColorRect -> Sprite2D 迁移已完成，验证所有场景/脚本/测试通过

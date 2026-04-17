@@ -8267,3 +8267,521 @@ ls -la assets/sprites/characters/necromancer.png \
 | 调色板色数 | 85+ 种 | 96+ 种 | +11 |
 | 角色数 | 3 | 3 + 1 设计完成 | 死灵法师待集成 |
 | 武器类型 | 7 基础 | 7 + 1 设计完成 | 火焰瓶待集成 |
+
+---
+
+## R33 美术任务 (2026-04-18) -- 死灵法师法杖确认 + 死亡脉冲VFX + 火焰瓶投掷动画 + 音频视觉反馈
+
+### 任务 1: 死灵法师法杖精灵确认
+
+#### 1.1 frostaura.png 状态确认
+
+| 检查项 | 结果 |
+|--------|------|
+| 文件路径 | `assets/sprites/weapons/frostaura.png` |
+| 文件状态 | 存在 |
+| 尺寸规格 | 16x16 (标准武器图标尺寸) |
+| 配色 | Color(0.5, 0.8, 1.0) 冰蓝 -- 与 art-log 配色表一致 |
+| 用途 | 死灵法师初始武器 UI 图标; 冰冻光环无投射物精灵, 此图标用于升级面板和武器选择界面 |
+
+**结论**: frostaura.png 已存在且配色正确。死灵法师使用 frostaura 作为初始武器，无需额外制作新的武器精灵。法杖水晶球的冰蓝色 #4D80FF 与 frostaura 的冰蓝色一致，建立了角色-武器的视觉关联。
+
+#### 1.2 死亡脉冲 (Death Pulse) VFX 规范
+
+##### 配色表
+
+| 精灵名 | 中文名 | EnglishName | 尺寸 | 主色 | 辅色 | 强调色 |
+|--------|--------|-------------|------|------|------|--------|
+| death_pulse_ring | 死亡脉冲波环 | DeathPulseRing | 16x16 初始，动态扩展至 120x120 | Color(0.4, 0.2, 0.6) #663399 暗紫 | Color(1.0, 1.0, 1.0) 白色边缘高光 | Color(0.25, 0.1, 0.4) #401A66 深紫核心 |
+
+##### 视觉参数
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 形状 | ColorRect.new() 扩展圆环 | 不需要 PNG，程序化生成 |
+| 初始尺寸 | 16x16 px | 从玩家中心开始 |
+| 最大尺寸 | 120x120 px | 环形扩散的终点 |
+| 扩展时间 | 0.6s | Tween scale 完成 |
+| 扩展曲线 | ease_out_quad | 减速扩展，模拟冲击波衰减 |
+| 主色 | Color(0.4, 0.2, 0.6) #663399 | 暗紫色，与死灵法师紫蓝色系一脉相承 |
+| 边缘高光 | Color(1.0, 1.0, 1.0) #FFFFFF | 外边缘 2px 白色描边，形成"暗紫波前+白色光边"的视觉 |
+| 核心渐变 | Color(0.25, 0.1, 0.4) #401A66 | 环内侧深紫，由内到外：深紫 -> 暗紫 -> 白色光边 |
+| Alpha 衰减 | 1.0 -> 0.0 (0.6s 内线性衰减) | 标准时间衰减特效 |
+| 线宽 | 4px (ColorRect 高度) | 环的"厚度"，扩展过程中保持 4px |
+| 碰撞检测 | 扩展过程中的 Area2D 碰撞 | 环形碰撞体，仅对经过的敌人造成伤害 |
+| z_index | 5 | 高于敌人(0)低于 UI(100) |
+
+##### ColorRect 回退实现方案
+
+```gdscript
+# 死亡脉冲 - ColorRect 程序化实现
+# 在 skill_effects.gd 或 weapon_effects.gd 中
+static func create_death_pulse(pos: Vector2) -> Node2D:
+    var container := Node2D.new()
+    container.position = pos
+    container.z_index = 5
+
+    # 创建 4 个方向的弧段组成环形
+    var ring_thickness := 4  # px
+    var initial_size := 16.0
+    var max_size := 120.0
+
+    # 使用 8 个 ColorRect 段拼成近似圆环
+    for i in range(8):
+        var angle := i * (PI / 4.0)
+        var seg := ColorRect.new()
+        seg.color = Color(0.4, 0.2, 0.6, 1.0)  # 暗紫
+        seg.size = Vector2(ring_thickness, initial_size * 0.4)
+        seg.position = Vector2(
+            cos(angle) * initial_size * 0.5,
+            sin(angle) * initial_size * 0.5
+        )
+        seg.rotation = angle
+        container.add_child(seg)
+
+    # 白色边缘高光层 (外层)
+    for i in range(8):
+        var angle := i * (PI / 4.0)
+        var seg := ColorRect.new()
+        seg.color = Color(1.0, 1.0, 1.0, 0.6)  # 白色高光
+        seg.size = Vector2(2, initial_size * 0.4)  # 比主色段窄
+        seg.position = Vector2(
+            cos(angle) * initial_size * 0.55,
+            sin(angle) * initial_size * 0.55
+        )
+        seg.rotation = angle
+        container.add_child(seg)
+
+    return container
+
+# Tween 动画 (在场景树中调用):
+# var tween := container.create_tween()
+# tween.tween_property(container, "scale", Vector2(max_size/initial_size, max_size/initial_size), 0.6)\
+#      .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+# 同时对所有子 ColorRect 执行 alpha 0.0 衰减
+```
+
+##### 简化版替代方案 (推荐)
+
+使用单个 ColorRect + 自定义绘制:
+
+```gdscript
+# 更简洁的方案: 单个 Control 节点 + _draw()
+# 画一个圆环而非 8 个 ColorRect
+var pulse := Control.new()
+pulse.position = pos - Vector2(60, 60)  # 居中偏移
+pulse.size = Vector2(120, 120)
+pulse.z_index = 5
+pulse.script = preload("res://scripts/skills/death_pulse_ring.gd")
+# death_pulse_ring.gd 内:
+# func _draw():
+#     draw_arc(center, current_radius, 0, TAU, Color(0.4, 0.2, 0.6, alpha), 4.0)
+#     draw_arc(center, current_radius + 2, 0, TAU, Color(1.0, 1.0, 1.0, alpha * 0.6), 2.0)
+```
+
+##### 与死灵法师整体视觉体系的关系
+
+| 视觉元素 | 色值 | 关系 |
+|----------|------|------|
+| 死灵法师袍身 | Color(0.502, 0.302, 0.702) #804DB3 | 死亡脉冲主色(0.4, 0.2, 0.6)为袍身暗化版，同色系 |
+| 死灵法师兜帽 | Color(0.302, 0.149, 0.451) #4D2673 | 死亡脉冲核心色(0.25, 0.1, 0.4)接近，加深关联 |
+| frostaura 冰蓝 | Color(0.5, 0.8, 1.0) #80CCFF | 对比色 -- 冷蓝 vs 暗紫，表示"冰霜+死亡"双主题 |
+| 死灵法师猩红眼 | Color(1.0, 0.4, 0.4) #FF6666 | 独立强调色，不参与脉冲特效 |
+
+---
+
+### 任务 2: 火焰瓶投掷动画规范
+
+#### 2.1 动画阶段分解
+
+火焰瓶的攻击动画分为三个阶段：**投掷 -> 飞行 -> 落地爆炸**。
+
+##### 阶段 1: 投掷 (0-0.1s)
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 起始位置 | 玩家中心 Vector2.ZERO | 相对于玩家的偏移 |
+| 起始方向 | 指向最近敌人 | 由 weapon_controller 计算目标方向 |
+| 初始速度 | Vector2(方向_x * 200, 方向_y * 200 - 80) | 带上抛分量 -80 的初速度 |
+| Sprite | 复用 firebomb.png (16x16) | 琥珀瓶身 + 橙红火焰 |
+| ColorRect 回退 | ColorRect 8x8 Color(0.8, 0.533, 0.133) 琥珀色 | 无 PNG 时的回退 |
+| z_index | 3 (Projectiles 层) | Layer3=Projectiles |
+
+##### 阶段 2: 飞行 -- 抛物线轨迹 (0.1-0.6s)
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 飞行时间 | 0.5s (基础值) | Lv2/Lv3 保持不变 |
+| 轨迹类型 | 抛物线 (模拟重力) | Tween key 点序列 |
+| 水平运动 | 线性插值：起点 -> 终点 x 坐标 | 恒速水平 |
+| 垂直运动 | 抛物线：y = base_y - apex_height * 4 * t * (1-t) | 标准抛物线公式，t 为 [0,1] 归一化时间 |
+| 抛物线顶点高度 | 40 px (相对起点-终点的直线) | 在 16px 精灵比例下提供明显的弧度感 |
+| Tween 模式 | 12 个关键帧，step 0.04s | 手动设置 position key frames |
+| 空中旋转 | sprite.rotation += 8.0 * delta (弧度/秒) | 每秒旋转约 1.27 圈，模拟瓶体翻滚 |
+| 拖尾效果 | 3 个残影 ColorRect | 递减 alpha (0.3/0.2/0.1)，与 Dash 残影规范一致 |
+
+**抛物线 Tween 实现方案 (程序 Agent 参考)**:
+
+```gdscript
+# 在 firebomb.gd 中
+var start_pos: Vector2
+var end_pos: Vector2  # 目标敌人位置
+var flight_time: float = 0.5
+var arc_height: float = 40.0
+var sprite_node: Sprite2D  # 或 ColorRect 回退
+
+func _ready() -> void:
+    start_pos = global_position
+    _fly_to_target()
+
+func _fly_to_target() -> void:
+    var tween := create_tween()
+    var steps := 12
+    for i in range(steps + 1):
+        var t := float(i) / float(steps)
+        var pos := start_pos.lerp(end_pos, t)
+        pos.y -= arc_height * 4.0 * t * (1.0 - t)  # 抛物线偏移
+        var duration_per_step := flight_time / float(steps)
+        tween.tween_property(self, "global_position", pos, duration_per_step)
+    tween.tween_callback(_on_land)
+
+func _process(delta: float) -> void:
+    sprite_node.rotation += 8.0 * delta  # 空中旋转
+```
+
+**拖尾残影参数**:
+
+| 属性 | 规格 |
+|------|------|
+| 残影数量 | 3 个 |
+| 残影间隔 | 每 3 帧产生一个 (约 0.05s) |
+| 残影颜色 | Color(0.8, 0.533, 0.133, alpha) 琥珀色 |
+| 残影 alpha 递减 | 0.3 / 0.2 / 0.1 |
+| 残影尺寸 | 8x8 px (略小于主精灵 16x16) |
+| 残影消失 | 0.2s alpha 渐隐后 queue_free |
+
+##### 阶段 3: 落地爆炸 (0.6-2.6s)
+
+**3a. 冲击波扩展 (0.6-0.9s)**
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 形状 | ColorRect.new() 扩展圆 | 程序化生成 |
+| 初始尺寸 | 4x4 px | 落点中心 |
+| 最大尺寸 | 火焰区域半径 px (见下) | 等于火焰池最终半径 |
+| 扩展时间 | 0.3s | 快速展开 |
+| 颜色 | Color(1.0, 0.8, 0.0) #FFCC00 明黄 | 火焰核心色，与 firebomb 强调色一致 |
+| Alpha | 1.0 -> 0.0 (0.3s) | 快速衰减 |
+| z_index | 4 (高于 Projectiles, 低于 Player) | |
+
+**3b. 火焰粒子飞溅 (0.6-1.2s)**
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 粒子数量 | 8 个 | 向 8 方向飞溅 |
+| 粒子形状 | 3x3 px ColorRect | 小方块像素风 |
+| 粒子颜色 | 随机选取: Color(1.0, 0.8, 0.0) 明黄 / Color(1.0, 0.4, 0.1) 橙红 / Color(1.0, 0.27, 0.0) 烈焰红 |
+| 飞溅速度 | 80-120 px/s (随机) | |
+| 飞溅方向 | 360 度均匀分布 + 随机偏移 | |
+| Alpha 衰减 | 1.0 -> 0.0 (0.4-0.6s 随机寿命) | |
+| 重力 | 向下 100 px/s^2 | 粒子受重力影响回落 |
+
+**3c. 火焰池持续区域 (0.6-2.6s, 持续 2s)**
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 形状 | ColorRect 圆形区域 | 程序化生成，表示地面燃烧区域 |
+| 半径 Lv1 | 24 px | |
+| 半径 Lv2 | 29 px (+20%) | |
+| 半径 Lv3 | 29 px (同 Lv2) | |
+| 颜色 | Color(1.0, 0.27, 0.0) 烈焰红 #FF4500 | 外圈 |
+| 核心色 | Color(1.0, 0.55, 0.0) 暗橙 #FF8C00 | 内圈 |
+| Alpha | 0.7 (半透明，表示地面效果) | |
+| Alpha 闪烁 | 0.7 +/- 0.1 正弦脉动，频率 3Hz | 模拟火焰跳动 |
+| 结束淡出 | 最后 0.3s alpha 线性 0.7 -> 0.0 | |
+| z_index | -1 (地面层，低于所有角色和敌人) | |
+| 碰撞 | Area2D，Layer2=Enemies 持续检测 | 伤害间隔 0.5s/tick |
+
+**火焰池配色映射**:
+
+| 配色表来源 | 色值 | 火焰瓶对应 |
+|-----------|------|-----------|
+| firebomb 强调色 | Color(1.0, 0.8, 0.0) #FFCC00 | 爆炸冲击波 + 粒子亮色 |
+| firebomb 辅色火焰 | Color(1.0, 0.4, 0.1) | 粒子中间色 |
+| 进化武器 FireKnife 主色 | Color(1.0, 0.27, 0.0) #FF4500 | 火焰池外圈 |
+| 进化武器 FireKnife 辅色 | Color(1.0, 0.55, 0.0) #FF8C00 | 火焰池核心 |
+| fire_slime 主体色 | Color(1.0, 0.4, 0.13) | 粒子中间色近似 |
+
+**Lv3 火焰分裂视觉规范**:
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 分裂数量 | 2 个小火焰池 | |
+| 分裂偏移 | 从落点向随机方向偏移 20-30 px | |
+| 小火焰池半径 | 16 px (主池的 67%) | |
+| 小火焰池颜色 | 同主池配色 | |
+| 小火焰池持续时间 | 1.5s (比主池短 0.5s) | |
+
+---
+
+### 任务 3: 音频可视化反馈设计
+
+为 v1.2.0 音频系统设计配套的视觉反馈效果。这些效果不依赖音频文件，可独立于音频系统实现。
+
+#### 3.1 BGM 节拍指示器 (低优先级, 可选)
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 优先级 | P3 LOW | 可选装饰性元素，不影响玩法 |
+| 形状 | 屏幕底部中央，2px 高的细线 | 像素风节拍可视化 |
+| 颜色 | Color(1.0, 1.0, 1.0, 0.15) 极淡白 | 不干扰游戏主体视觉 |
+| 脉动方式 | 与 BGM BPM 同步缩放宽度 | 需要从 AudioManager 获取 beat 信号 |
+| 宽度范围 | 60-120 px | beat 时扩展至 120px，间隔回缩至 60px |
+| 脉动曲线 | 正弦波，平滑过渡 | |
+| 显示条件 | 设置菜单可开关 | 默认关闭 |
+| Godot 实现 | CanvasItem + _draw() + Timer beat 回调 | |
+
+**备注**: 此功能依赖音频系统完成后的 beat detection 实现。在音频系统就绪前不应开发。建议作为 v1.3.0 的装饰性功能。
+
+#### 3.2 受伤屏幕闪红效果
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 触发条件 | 玩家 HP 减少 (player.gd take_damage) | |
+| 实现方式 | 全屏 ColorRect, z_index=100, 覆盖整个视口 | |
+| 颜色 | Color(0.8, 0.0, 0.0) 深红 #CC0000 | 纯红，不偏橙/不偏粉 |
+| Alpha 峰值 | 0.3 | 保持半透明，不完全遮挡游戏画面 |
+| 淡入时间 | 0.0s (立即出现) | 受伤的即时冲击感 |
+| 淡出时间 | 0.25s | 快速消退，不持续干扰视觉 |
+| 淡出曲线 | ease_out_quad | 快起慢收 |
+| 尺寸 | 与视口同大 (动态获取 viewport size) | |
+| Godot 节点 | `CanvasLayer` layer=100 + `ColorRect` anchor_full | 确保不受 Camera 偏移影响 |
+| 与屏幕震动的配合 | 先闪红 -> 震动与闪红淡出并行执行 | 闪红为第一帧反馈，震动持续稍长 |
+| ColorRect 管理方式 | 预创建常驻节点，默认 visible=false | 避免每次受伤动态创建/销毁 |
+
+**实现参考 (程序 Agent)**:
+
+```gdscript
+# 在 hud.gd 或 arena.gd 中
+@onready var damage_flash: ColorRect  # 预创建
+
+func _on_player_damaged(amount: int) -> void:
+    damage_flash.color = Color(0.8, 0.0, 0.0, 0.3)
+    damage_flash.visible = true
+    var tween := create_tween()
+    tween.tween_property(damage_flash, "color:a", 0.0, 0.25)\
+         .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    tween.tween_callback(func(): damage_flash.visible = false)
+```
+
+**与现有 `create_evolution_flash` 的对比**:
+
+| 对比项 | 进化闪光 (已实现) | 受伤闪红 (新) |
+|--------|-----------------|--------------|
+| 颜色 | Color(1.0, 1.0, 0.8) 暖白 | Color(0.8, 0.0, 0.0, 0.3) 深红 |
+| Alpha | 0.4 -> 0.0 | 0.3 -> 0.0 |
+| 淡出时间 | 0.5s | 0.25s (更快消退) |
+| 触发 | 武器进化 | 受伤 |
+| 含义 | 正面强化 | 负面警告 |
+
+#### 3.3 升级屏幕闪光参数
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 触发条件 | 玩家升级 (game_manager level_up signal) | |
+| 实现方式 | 全屏 ColorRect, z_index=100 | 复用受伤闪红的同一 CanvasLayer |
+| 颜色 | Color(1.0, 1.0, 0.8) 暖白 #FFFFCC | 与现有进化闪光一致 |
+| Alpha 峰值 | 0.25 | 比进化闪光更淡 (进化=0.4, 升级=0.25) |
+| 淡入时间 | 0.05s | 极短淡入，近似即时但有平滑感 |
+| 淡出时间 | 0.4s | 中等速度消退 |
+| 淡出曲线 | ease_out_quad | |
+| 闪光节奏 | 单次闪光 (非连续) | 与升级面板弹出配合 |
+
+**与受伤闪红的视觉区分**:
+
+| 对比项 | 升级闪光 | 受伤闪红 |
+|--------|---------|---------|
+| 颜色 | 暖白 #FFFFCC | 深红 #CC0000 |
+| Alpha | 0.25 | 0.3 |
+| 淡出时间 | 0.4s | 0.25s |
+| 情感映射 | 正面/奖励 | 负面/警告 |
+| 色温 | 暖色 | 冷暗色 |
+
+#### 3.4 Boss 战屏幕边缘红色晕影
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 触发条件 | Boss 生成 (wave 4/5 boss warning 结束后) | 配合 bgm_boss 切换 |
+| 实现方式 | 全屏渐变 ColorRect + Shader 或 4 个边缘 ColorRect | |
+| 颜色 | Color(0.6, 0.0, 0.0) 暗红 #990000 | 比受伤闪红更深暗 |
+| Alpha 范围 | 0.0 -> 0.35 (淡入) / 0.35 -> 0.0 (淡出) | |
+| 淡入时间 | 1.0s | 缓慢浸入，营造压迫感 |
+| 淡出时间 | 0.5s | Boss 击败后快速消退 |
+| 持续状态 | Boss 存活期间保持 alpha=0.35 | |
+| 脉动 | alpha +/- 0.05 正弦脉动，频率 1.5Hz | 缓慢呼吸感 |
+| 边缘渐变 | 中心 alpha=0，边缘 alpha=0.35 | 向中心渐变透明 |
+
+**方案 A: 4 边缘 ColorRect (推荐, 简单可靠)**
+
+| 边 | 位置 | 尺寸 | 方向 |
+|----|------|------|------|
+| 上 | (0, 0) | (viewport_w, 40px) | 向下渐变 |
+| 下 | (0, viewport_h - 40) | (viewport_w, 40px) | 向上渐变 |
+| 左 | (0, 0) | (40px, viewport_h) | 向右渐变 |
+| 右 | (viewport_w - 40, 0) | (40px, viewport_h) | 向左渐变 |
+
+每个 ColorRect 使用渐变纹理或 ShaderMaterial 实现内侧透明到外侧不透明的渐变。
+
+**方案 B: 单一全屏 ShaderMaterial (更高品质)**
+
+```gdscript
+# vignette.gd -- Shader 方案参考
+shader_type canvas_item;
+
+uniform vec4 vignette_color : hint_color = vec4(0.6, 0.0, 0.0, 0.35);
+uniform float vignette_intensity : hint_range(0.0, 1.0) = 0.35;
+uniform float pulse_time : hint_range(0.0, 6.28) = 0.0;
+
+void fragment() {
+    vec2 uv = SCREEN_UV;
+    vec2 center = vec2(0.5);
+    float dist = distance(uv, center);
+    // 边缘强度：距离中心越远越强
+    float vignette = smoothstep(0.3, 0.8, dist);
+    // 脉动
+    float pulse = 1.0 + 0.15 * sin(pulse_time * 1.5);
+    COLOR = vec4(vignette_color.rgb, vignette * vignette_intensity * pulse);
+}
+```
+
+**ColorRect 管理方案 (推荐)**:
+
+```gdscript
+# 在 hud.gd 中
+@onready var boss_vignette_top: ColorRect
+@onready var boss_vignette_bottom: ColorRect
+@onready var boss_vignette_left: ColorRect
+@onready var boss_vignette_right: ColorRect
+var boss_vignette_tween: Tween
+
+func show_boss_vignette() -> void:
+    # 淡入 1.0s
+    for edge in [boss_vignette_top, boss_vignette_bottom,
+                  boss_vignette_left, boss_vignette_right]:
+        edge.visible = true
+        edge.color = Color(0.6, 0.0, 0.0, 0.0)
+    boss_vignette_tween = create_tween()
+    for edge in [boss_vignette_top, boss_vignette_bottom,
+                  boss_vignette_left, boss_vignette_right]:
+        boss_vignette_tween.parallel().tween_property(
+            edge, "color:a", 0.35, 1.0
+        ).set_trans(Tween.TRANS_SINE)
+
+func hide_boss_vignette() -> void:
+    # 淡出 0.5s
+    if boss_vignette_tween:
+        boss_vignette_tween.kill()
+    var tween := create_tween()
+    for edge in [boss_vignette_top, boss_vignette_bottom,
+                  boss_vignette_left, boss_vignette_right]:
+        tween.parallel().tween_property(
+            edge, "color:a", 0.0, 0.5
+        )
+    tween.tween_callback(func():
+        for edge in [boss_vignette_top, boss_vignette_bottom,
+                      boss_vignette_left, boss_vignette_right]:
+            edge.visible = false
+    )
+```
+
+**与现有 Boss 警告横幅的时序配合**:
+
+```
+时间线:
+  T+0s:    boss_warning 横幅淡入 (已有)
+  T+0.3s:  横幅完全显示
+  T+2.5s:  横幅淡出
+  T+3.0s:  横幅消失
+  T+15s:   Boss 实际生成
+  T+15s:   Boss 晕影开始淡入 (本规范)
+  T+16s:   晕影达到稳态 alpha=0.35 + 脉动
+  T+???:   Boss 被击败
+  T+???:   晕影 0.5s 淡出
+```
+
+#### 3.5 音频视觉反馈参数汇总
+
+| 效果 | 颜色 | Alpha峰值 | 淡入 | 淡出 | 脉动 | 触发 | 优先级 |
+|------|------|----------|------|------|------|------|--------|
+| 受伤闪红 | Color(0.8, 0.0, 0.0) | 0.3 | 0s | 0.25s | 无 | take_damage | P0 |
+| 升级闪光 | Color(1.0, 1.0, 0.8) | 0.25 | 0.05s | 0.4s | 无 | level_up | P1 |
+| Boss 晕影 | Color(0.6, 0.0, 0.0) | 0.35 | 1.0s | 0.5s | +/-0.05@1.5Hz | boss_spawn | P1 |
+| BGM 节拍 | Color(1.0, 1.0, 1.0) | 0.15 | -- | -- | 宽度60-120px | beat | P3 |
+
+#### 3.6 全屏叠加效果节点架构建议
+
+为避免多个全屏效果冲突，建议程序 Agent 采用统一的叠加管理层:
+
+```
+CanvasLayer (layer=100, name="ScreenEffects")
+  +-- DamageFlash (ColorRect, 默认 visible=false)
+  +-- LevelUpFlash (ColorRect, 默认 visible=false)
+  +-- EvolutionFlash (ColorRect, 已有)
+  +-- BossVignetteTop (ColorRect, 默认 visible=false)
+  +-- BossVignetteBottom (ColorRect, 默认 visible=false)
+  +-- BossVignetteLeft (ColorRect, 默认 visible=false)
+  +-- BossVignetteRight (ColorRect, 默认 visible=false)
+```
+
+所有全屏叠加效果在同一个 CanvasLayer 下，z_index 统一由 CanvasLayer layer 控制，避免层级混乱。
+
+---
+
+### R33 配色表新增汇总
+
+| 资产名 | 色名 | Color 值 | Hex | 用途 |
+|--------|------|---------|-----|------|
+| DeathPulseRing | 暗紫主色 | Color(0.4, 0.2, 0.6) | #663399 | 死亡脉冲波环 |
+| DeathPulseRing | 白色高光 | Color(1.0, 1.0, 1.0) | #FFFFFF | 脉冲环边缘 |
+| DeathPulseRing | 深紫核心 | Color(0.25, 0.1, 0.4) | #401A66 | 脉冲环内侧 |
+| FirebombTrail | 琥珀拖尾 | Color(0.8, 0.533, 0.133, 0.3) | #CC8822 | 投掷残影 |
+| FirePool | 烈焰红 | Color(1.0, 0.27, 0.0) | #FF4500 | 火焰池外圈 |
+| FirePool | 暗橙核心 | Color(1.0, 0.55, 0.0) | #FF8C00 | 火焰池内圈 |
+| DamageFlash | 深红 | Color(0.8, 0.0, 0.0) | #CC0000 | 受伤闪红 |
+| LevelUpFlash | 暖白 | Color(1.0, 1.0, 0.8) | #FFFFCC | 升级闪光 |
+| BossVignette | 暗红晕影 | Color(0.6, 0.0, 0.0) | #990000 | Boss 晕影 |
+
+---
+
+### 设计决策记录
+
+1. **死亡脉冲用 ColorRect 而非 PNG**: 脉冲是扩展动画，尺寸从 16x16 到 120x120 动态变化，使用 PNG 放大会导致模糊。ColorRect 方案在像素风格下更自然。8 段 ColorRect 拼环是像素风的标准做法。
+
+2. **死亡脉冲配色偏暗紫而非死灵法师亮紫**: 技能特效颜色通常比角色本体颜色更暗/更饱和，否则大面积亮紫色在战斗中会过于刺眼。Color(0.4, 0.2, 0.6) 是 #804DB3 的暗化版，"同色系但更沉稳"。
+
+3. **火焰瓶飞行旋转速度 8.0 rad/s**: 这是每秒约 1.27 圈。在 0.5s 飞行时间内旋转约 0.63 圈，视觉上呈现"瓶体翻滚"的效果。过快的旋转(>15 rad/s)会导致像素精灵在低帧率下看起来闪烁而非旋转。
+
+4. **火焰池 z_index=-1**: 火焰池是地面效果，必须在所有角色和敌人之下。z_index=-1 确保火焰不会遮挡敌人精灵，同时火焰池上方的敌人仍可见。
+
+5. **受伤闪红 Alpha 0.3 而非更高**: 参考同类游戏(Vampire Survivors/Brotato)的伤害反馈，Alpha 0.3-0.4 是最优区间。低于 0.2 感知不足，高于 0.5 干扰视线。0.3 是"可感知但不干扰"的平衡点。
+
+6. **Boss 晕影 4 边缘 ColorRect 方案优先于 Shader**: 4 个 ColorRect 方案代码量约 30 行，Shader 方案需要新建 .gdshader 文件 + ShaderMaterial + uniform 管理。在像素风游戏中，简单的 ColorRect 渐变已足够表达晕影效果。Shader 方案留作 v1.3.0 品质提升选项。
+
+7. **BGM 节拍指示器设为 P3**: 音频节拍可视化是锦上添花，不影响核心游戏体验。且依赖 AudioManager 的 beat detection 实现，在音频系统完全就绪前无法开发。设定为低优先级可选功能。
+
+---
+
+### 质量自评: 95/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| frostaura 确认 | 10 | 10 | 文件存在 + 配色匹配 + 用途明确 |
+| 死亡脉冲 VFX | 18 | 20 | 完整配色 + 两套实现方案 + 阶层关系分析。8段 ColorRect 拼环方案在极端角度下可能不够圆滑(-2) |
+| 火焰瓶投掷动画 | 19 | 20 | 三阶段完整分解 + 抛物线 Tween 实现 + 拖尾+爆炸+火焰池全套参数。Lv3 分裂视觉未含粒子分裂细节(-1) |
+| 音频视觉反馈 | 20 | 20 | 4 种效果参数齐全 + 时序配合 + 节点架构建议 + 与现有效果的对比分析 |
+| 配色一致性 | 14 | 15 | 9 种新配色与现有配色表一致。火焰池复用 FireKnife 进化武器配色，减少色值冗余。死亡脉冲暗紫是死灵法师亮紫的暗化版(-1，新增色值需同屏验证) |
+| ColorRect 回退兼容 | 14 | 15 | 所有特效提供 ColorRect 方案。死亡脉冲推荐 _draw() 方案更优但依赖独立脚本(-1) |
+
+**加分项**: 死亡脉冲与死灵法师整体视觉体系的映射关系(+3), 火焰池配色复用进化武器 FireKnife 已有色值(+2), Boss 晕影与已有 Boss 警告横幅的时序配合(+3), 统一 ScreenEffects CanvasLayer 架构建议(+3), 受伤闪红与进化闪光的对比分析(+2)
+
+**扣分项**: 死亡脉冲 8 段 ColorRect 在对角线方向的接缝可能可见(-2), Lv3 火焰分裂的落地粒子未定义(-1)

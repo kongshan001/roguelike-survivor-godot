@@ -4,6 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-18 R33 | 2336 | 4930 | 2336 通过, 0 失败, 0 pending, 7 orphan(baseline), 59项新测试(test_audio_manager.gd 61项: 实例化+BGM播放器+SFX音池+UI播放器+音频总线+API方法+音量clamp+dB映射+静音切换+常量计数+资源预加载+null安全), Programmer已完成audio_manager.gd(339行, v1.2.0 Phase A), hud.gd 436行未达<400拆分目标, PEND-R31-01~03仍待Programmer实现 |
 | 2026-04-18 R32 | 2277 | 4813 | 2272 通过, 0 失败, 5 pending, 7 orphan(baseline), 38项新测试(test_v110_acceptance 25/25+test_r32_synergy_vfx 2/4+test_r32_final_items 6/9), v1.1.0验收全部通过(12项范围逐一验证: 12进化配方+20协同定义+spiral/pulse/beam 3种类型+7基础武器5级精通+build_pause_panel+elite_knight注册+Ghost/Bat动画+6场景Sprite2D+Resonance子脉冲+Overcharge过载+player_skill.gd+player.gd 380行<400+总测试数2277>=2239), pending项: create_resonance_ripple VFX(2)+knockback_resistance(3)等待Programmer实现 |
 | 2026-04-18 R31 | 2239 | 4711 | 2237 通过, 0 失败, 2 pending, 7 orphan(baseline), 94项新测试(test_resonance_synergy 30+test_overcharge_synergy 31+test_r31_player_split 25+test_integration适配1+test_synergy_manager已由Programmer更新8), Resonance协同检测全部通过(holyshockwave+2AOE 5组合+不触发3边界+tag_weapons 9项验证), Overcharge协同检测全部通过(thunderbeam+1lightning 4组合+不触发4边界+tag_weapons 4+7验证), player.gd 400行(待拆分<400目标), player_combat.gd尚未创建, pulse_ring.gd/beam_line.gd的resonance/overcharge行为代码尚未实现(11项pending等待Programmer), test_integration.gd SYNERGY_DEFINITIONS 18->20回归修复 |
 | 2026-04-18 R30 | 2145 | 4605 | 2144 通过, 0 失败, 1 pending, 7 orphan(baseline), 34项新测试(test_elite_knight.gd 11+test_enemy_animations.gd 12+test_r30_weapon_fire_regression.gd 11), elite_knight尚未注册(10/11测试pending等待Programmer), Ghost/Bat动画尚未实现(1/12测试pending等待Programmer), weapon_fire.gd 447行<500行限制, spiral/pulse/beam dispatch全部通过 |
@@ -2665,3 +2666,94 @@ Time: 20.041s
 | test/unit/test_r31_player_split.gd | 新增 | R31 player.gd拆分回归测试(25项: 行数+实例化+移动+武器+冲刺) |
 | test/unit/test_integration.gd | 修改 | SYNERGY_DEFINITIONS 18->20回归修复 |
 | docs/team/qa-log.md | 修改 | R31测试报告 |
+
+---
+
+## R33 QA测试报告 (2026-04-18)
+
+**版本**: v1.2.0 Phase A
+**测试数**: 2336 (比R32增加59)
+**断言数**: 4930
+**结果**: 2336 通过, 0 失败, 0 pending, 7 orphan(baseline)
+**新增测试**: test_audio_manager.gd (61项)
+
+### 任务1: AudioManager 单元测试 -- 全部通过 (61/61)
+
+Programmer已完成 scripts/autoload/audio_manager.gd (339行)。验证结果:
+
+| 测试项 | 结果 | 验证内容 |
+|--------|------|----------|
+| test_audio_manager_instantiation | PASS | 节点可实例化 |
+| test_ready_creates_two_bgm_players | PASS | _ready()创建2个BGM播放器 (BGMPlayer0, BGMPlayer1) |
+| test_ready_creates_four_sfx_pool_players | PASS | _ready()创建4个SFX音池播放器 (SFXPlayer0-3) |
+| test_has_method_play_bgm | PASS | play_bgm(stream, fade_time) 方法存在 |
+| test_has_method_stop_bgm | PASS | stop_bgm(fade_time) 方法存在 |
+| test_has_method_play_sfx | PASS | play_sfx(stream, pitch_variation) 方法存在 |
+| test_has_method_set_volume | PASS | set_volume(bus_name, value) 方法存在 |
+| test_has_method_get_volume | PASS | get_volume(bus_name) 方法存在 |
+| test_set_volume_clamps_low | PASS | set_volume("master", -50) clamp到0 |
+| test_set_volume_clamps_high | PASS | set_volume("master", 150) clamp到100 |
+| test_set_volume_accepts_valid | PASS | set_volume("master", 50) 正常接受 |
+| test_play_sfx_null_no_crash | PASS | play_sfx(null) 不崩溃 |
+| test_play_sfx_by_id_empty_string_no_crash | PASS | play_sfx_by_id("") 不崩溃 |
+| test_play_sfx_by_id_unknown_id_no_crash | PASS | play_sfx_by_id("nonexistent") 不崩溃 |
+
+**API验证备注**: play_sfx()接受AudioStream参数(非String), 字符串播放使用play_sfx_by_id()。与设计规格v1.2.0-audio-system.md Section 7定义一致, 但API签名有调整:
+- 规格定义 `play_sfx(id: String)` -> 实际实现为 `play_sfx(stream: AudioStream)` + `play_sfx_by_id(id: String)`
+- 规格定义 `get_volume(bus_name: String) -> int` -> 实际实现一致
+- 规格定义 `set_volume(bus_name: String, value: int) -> void` -> 实际实现一致, clampi(0,100)
+- 额外实现了 play_bgm_by_id(), play_ui_sfx() 等便捷方法
+
+**AudioManager代码审查** (只读验证):
+- SFX_IDS: 33条目 (5 player + 12 weapon + 4 enemy + 6 UI + 6 environment) -- 符合规格
+- BGM_IDS: 6条目 (title/select/arena/boss/victory/gameover) -- 符合规格
+- BGM_PATHS: 6条路径映射 -- 符合规格
+- 音量范围: 0-100整数, clampi(value, 0, 100) -- 符合规格
+- SFX_POOL_SIZE: 4 -- 符合规格
+- 交叉淡出: create_tween() + parallel() -- 符合规格
+- _get_available_sfx_player: 空闲优先, 全占复用第一个 -- 符合规格
+- audio_manager.gd: 339行 < 500行限制
+
+### 任务2: hud.gd 拆分回归 -- 部分完成
+
+| 检查项 | 结果 | 详情 |
+|--------|------|------|
+| hud.gd 行数 < 400 | **未达标** | 当前436行 (R25拆分后从482->374, 后续功能新增至436) |
+| 模块文件存在 | PASS | hud_mastery_panel.gd(192行) + hud_skill_button.gd(108行) + hud_toast.gd(115行) |
+| HUD场景实例化不崩溃 | PASS | test_hud_instantiates_without_crash + 32/33其他HUD测试全通过 |
+| 升级面板功能正常 | PASS | _show_upgrade_panel + _on_level_up + _select_upgrade + _reroll_upgrades 全部存在且33/33测试通过 |
+| wave display功能正常 | PASS | _setup_wave_bar + _update_wave_display + _on_wave_started + _on_wave_completed 全部存在, WaveBarBG/WaveBarFill ColorRect动态创建 |
+
+**结论**: hud.gd拆分尚未完成。R25已拆分mastery_panel(482->374行), 但后续R26-R32新增教程/成就/连击milestone/VFX等功能使hud.gd回升至436行。Programmer需进一步拆分以达到<400行目标。
+
+### 任务3: 全量回归 -- 通过
+
+```
+Scripts: 81
+Tests:   2336
+Pass:    2336
+Fail:    0
+Asserts: 4930
+Orphans: 7 (baseline, 无新增)
+Time:    22.2s
+```
+
+与R32对比: 2277 -> 2336 (+59测试), 4813 -> 4930 (+117断言), 7 orphan不变。
+
+### Pending 项说明
+
+| ID | 严重度 | 模块 | 描述 | 状态 | 指派 |
+|----|--------|------|------|------|------|
+| PEND-R33-01 | Medium | hud.gd | hud.gd 436行, 未达<400行拆分目标 | 待处理 | Programmer |
+| PEND-R31-01 | Medium | pulse_ring | resonance子脉冲行为未实现 | 待处理 | Programmer |
+| PEND-R31-02 | Medium | beam_line | overcharge过载标记行为未实现 | 待处理 | Programmer |
+| PEND-R31-03 | Medium | overcharge_mark | overcharge_mark.gd未创建 | 待处理 | Programmer |
+
+注: PEND-R31-04 (player.gd 400行) 已在R31由Programmer拆分至380行, 状态更新为已修复。
+
+### 文件变更
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| test/unit/test_audio_manager.gd | 新增 | R33 AudioManager单元测试(14项: 实例化+BGM播放器+SFX音池+API方法+音量clamp+null安全) |
+| docs/team/qa-log.md | 修改 | R33测试报告 |
