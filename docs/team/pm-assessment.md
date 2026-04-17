@@ -2541,3 +2541,146 @@ R22 作为 v1.0.2 收尾声，聚焦精通UI徽章集成、拖尾特效增强、
 | 23D | Designer | v1.0.3功能设计细化 |
 | 23E | Art | 精灵资产配色最终确认(为Sprite2D迁移准备) |
 | 23F | Reviewer | R22代码审核 + v1.0.2发布最终确认 |
+
+---
+
+# R23 综合评估 (2026-04-18)
+
+## 执行概况
+
+R23 是文档与审计轮次。Designer 完成3个新规格文档，Programmer 确认进化武器已注册，Reviewer 发布 v1.0.2 PASS 判定。QA 因 API 500 错误失败。
+
+## 各 Agent 评分
+
+| Agent | PM评分 | 关键产出 |
+|-------|--------|---------|
+| Designer | 92 | 教程扩展规格(Steps 6-8)、进化武器注册规格(3缺失)、Sprite2D迁移确认 |
+| Programmer | 88 | 进化武器注册验证(已确认完成)、代码健康检查通过 |
+| QA | 65 | API 500失败，无产出(PM手动验证测试) |
+| Art | 90 | 66/66 PNG确认、Sprite2D迁移配色规范 |
+| Reviewer | 93 | v1.0.2 PASS判定、save_manager 476行+ hud 463行预警 |
+
+## 反思复盘
+
+**项目综合评分 92.4 >= 80, 不强制反思。**
+
+**QA连续问题**: R22 测试不匹配、R23 API 500失败。QA Agent 稳定性需关注。建议增加重试机制。
+
+**R23 无代码变更**: 本轮全部是文档和审计工作，1700测试保持零失败。Sprite2D迁移已被 Art 和 Designer 独立确认已完成。
+
+---
+
+# R24 综合评估 (2026-04-18)
+
+## 执行概况
+
+R24 聚焦教程扩展和架构准备。Programmer 实现 Steps 6-8，Designer 输出 hud 拆分规格，QA 修复了教程测试失败，Art 设计被动图标和双色粒子。Reviewer 发现 autoload 交叉引用违规。
+
+## 各 Agent 评分
+
+| Agent | PM评分 | 关键产出 |
+|-------|--------|---------|
+| Designer | 96 | hud拆分规格(463→383行)、进化武器完整数值表(DPS平衡)、决策记录 |
+| Programmer | 92 | 教程Steps 6-8实现(+19测试)、hud拆分方案记录、所有文件<500行 |
+| QA | 88 | 修复3个教程测试失败(R23遗留)、验证Steps 6-8实现、1719测试零失败 |
+| Art | 93 | 7种被动图标设计(形状优先原则)、9种进化武器双色粒子规格 |
+| Reviewer | 93 | autoload交叉引用违规发现、P1拆分建议(achievement_checker+hud_mastery) |
+
+## R24 评分细则
+
+### Designer (96/100)
+**优点**: hud拆分规格精确到行号范围(82行提取→2行委托); 数值表含DPS比较和平衡评估; 发现原始实现遗漏(tier_up未更新徽章颜色)
+**不足**: hud-mastery-panel-spec.md 创建时序晚于Programmer检查
+**建议**: 规格文件应在Programmer开始前创建
+
+### Programmer (92/100)
+**优点**: 教程Steps 6-8实现简洁(辅助函数提取干净); 向后兼容(completed=true跳过); 19个新测试覆盖完整
+**不足**: hud拆分未执行(规格文件时序问题); 与Designer并行导致规格未及时就位
+**建议**: R25优先执行hud拆分
+
+### QA (88/100)
+**优点**: 修复R23遗留3个教程测试失败; 验证Steps 6-8实现(API+常量+辅助函数); 全面审计pending状态
+**不足**: R22测试不匹配问题的教训在本轮得到改善但仍需持续
+**建议**: 保持"先读取实现再写测试"的工作流
+
+### Art (93/100)
+**优点**: 被动图标设计遵循形状优先原则(色觉障碍友好); 双色粒子规格含实现代码; 9种进化武器全覆盖
+**不足**: 需Programmer配合更新generate_sprites.py和hit_feedback.gd
+**建议**: 下轮配合Programmer实现
+
+### Reviewer (93/100)
+**优点**: 发现autoload交叉引用违规(CLAUDE.md明确禁止); P1拆分建议精确(save_manager ~110行); 项目健康度评分客观
+**不足**: 未检查hud-mastery-panel-spec.md是否在Designer完成后创建成功
+**建议**: 继续跟踪autoload违规修复
+
+---
+
+## R24 新增功能
+
+| 功能 | 实现 | 代码量 |
+|------|------|--------|
+| 教程Step 6(进化提示) | tutorial_manager.gd _process_step_6 | +约15行 |
+| 教程Step 7(连击奖励) | tutorial_manager.gd _process_step_7 | +约10行 |
+| 教程Step 8(协同效果) | tutorial_manager.gd _process_step_8 | +约15行 |
+| 教程辅助函数 | _has_two_weapons_at_level() | +约8行 |
+| 教程测试 | test_tutorial_system.gd 19新测试 | +约120行 |
+
+---
+
+## R24 测试统计
+
+| 指标 | R23 | R24 | 变化 |
+|------|-----|-----|------|
+| 总测试数 | 1700 | 1719 | +19 |
+| 断言数 | 3729 | 3767 | +38 |
+| 失败数 | 0 | 0 | = |
+| 脚本数 | 60 | 60 | = |
+
+---
+
+## R24 架构发现
+
+**Autoload 交叉引用违规** (Reviewer 发现):
+- save_manager.gd 直接引用 GameManager(7次) 和 SynergyManager(7次)
+- upgrade_pool.gd 引用 GameManager.selected_character
+- CLAUDE.md 明确规定"autoload 单例间禁止互相引用"
+- 建议方案: 提取 achievement_checker.gd + 参数化 selected_character
+
+**行数压力**:
+- save_manager.gd: 475行 (余量25行) — P1拆分 achievement_checker.gd
+- hud.gd: 462行 (余量38行) — P1拆分 hud_mastery.gd
+
+---
+
+## 反思复盘
+
+**项目综合评分 95.6 >= 80, 不强制反思。**
+
+**跨Agent时序改进**: R24 Designer和Programmer并行运行导致规格文件未及时就位。解决方案: 下一轮先运行Designer 15分钟，再启动Programmer。
+
+**连续11轮零失败**: 从R14到R24，测试稳定性极高。
+
+**技术债务管理**: Autoload交叉引用是CLAUDE.md明确违规，应在R25优先修复。
+
+---
+
+## 下轮优先级路线 (Round 25)
+
+| Phase | 负责角色 | 任务 |
+|-------|---------|------|
+| 25A | Designer | 先运行15分钟，输出hud拆分最终规格 |
+| 25B | Programmer | hud.gd精通代码拆分(按hud-mastery-panel-spec.md) |
+| 25C | Programmer | save_manager.gd拆分achievement_checker.gd |
+| 25D | QA | hud拆分测试 + achievement_checker测试 |
+| 25E | Art | 被动图标PNG生成配合 |
+| 25F | Reviewer | 拆分后代码审核 + autoload违规验证 |
+
+---
+
+## 技能迭代记录 (R24)
+
+本轮新增可复用模式:
+- 教程扩展模式 (TUTORIAL_TOTAL_STEPS常量扩展、步骤条件触发、自动dismiss)
+- Autoload交叉引用检测 (grep autoload间import/call)
+- hud拆分规格模式 (行号范围精确提取、RefCounted委托、2行替换)
+- 被动图标设计原则 (形状优先于颜色、色觉障碍友好、7种独特轮廓)

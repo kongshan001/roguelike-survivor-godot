@@ -2568,3 +2568,123 @@ Asserts            3622
 | 代码健康检查 | 30 | 30 | 所有文件 <= 500 行, 类型注解完整, 无硬编码 |
 | 测试零回归 | 20 | 20 | 1700 tests 全部通过, 0 failures |
 | 记录完整性 | 10 | 10 | programmer-log 完整 |
+
+---
+
+## R24: 教程 Steps 6-8 实现 + hud.gd 精通代码拆分准备
+
+**日期**: 2026-04-17
+**状态**: DONE
+
+### 任务A: 教程扩展 Steps 6-8
+
+按 `docs/superpowers/specs/tutorial-extension.md` 规格实现三个中局发现提示步骤。
+
+#### 实现内容
+
+| Step | 名称 | 触发条件 | 超时 | 位置 |
+|------|------|----------|------|------|
+| 6 | Evolution Hint | 玩家拥有 2 把 Lv2+ 武器 | 4.0s | 顶部居中 |
+| 7 | Combo Bonus | combo_count >= 5 | 3.5s | 顶部居中 |
+| 8 | Synergy Activation | active_synergies 计数增加 | 4.0s | 顶部居中 |
+
+#### 技术决策
+
+1. **TUTORIAL_TOTAL_STEPS** 从 5 更新为 8, 所有引用该常量的代码自动适配
+2. **Step 6 触发**: 轮询 `player.owned_weapons`, 使用 `_has_two_weapons_at_level()` 辅助函数检查武器数量和等级
+3. **Step 7 触发**: 轮询 `GameManager.combo_count`, 达到阈值 5 时触发
+4. **Step 8 触发**: 轮询 `SynergyManager.get_active_count()` (Option A per spec), 无需修改 SynergyManager
+5. **三个步骤均为 auto-dismiss timeout**, 无需玩家交互确认
+6. **向后兼容**: 已有 `tutorial_completed = true` 的存档会跳过所有 8 步; `tutorial_step = 5` 且 `tutorial_completed = false` 的存档会自然进入 Steps 6-8
+
+#### 新增常量
+
+| 常量名 | 值 | 来源 |
+|--------|-----|------|
+| TUTORIAL_STEP6_TIMEOUT | 4.0 | tutorial-extension.md |
+| TUTORIAL_STEP7_TIMEOUT | 3.5 | tutorial-extension.md |
+| TUTORIAL_STEP8_TIMEOUT | 4.0 | tutorial-extension.md |
+| TUTORIAL_STEP6_MIN_WEAPONS | 2 | tutorial-extension.md |
+| TUTORIAL_STEP6_MIN_LEVEL | 2 | tutorial-extension.md |
+| TUTORIAL_STEP7_COMBO_THRESHOLD | 5 | tutorial-extension.md |
+
+#### 新增测试 (19 tests)
+
+- Part 12: Steps 6-8 常量验证 (3 tests)
+- Step 6-8 触发条件 (4 tests: trigger/not-trigger)
+- Step 6-8 显示文本 (3 tests)
+- Step 6-8 超时值 (3 tests)
+- Step 6-8 dismiss action (3 tests)
+- Step 7 不设 completed (1 test)
+- 已完成存档跳过 6-8 (1 test)
+- `_has_two_weapons_at_level` 辅助函数单元测试 (1 test)
+
+### 任务B: hud.gd 精通代码拆分准备
+
+`docs/superpowers/specs/hud-mastery-panel-spec.md` 不存在, 按指示不拆分, 记录拆分方案建议。
+
+#### 精通相关代码分析
+
+hud.gd 中精通相关代码约 65 行, 分布在:
+- **常量/变量** (lines 23-43): 6 个 MASTERY_* 常量 + 2 个状态变量, 约 21 行
+- **信号连接** (line 68): `mastery_tier_up` 连接, 1 行
+- **工具函数** (lines 403-409): `_get_weapon_display_name()`, 约 7 行 (与 mastery badge 共享)
+- **核心逻辑** (lines 411-462): `_on_mastery_tier_up()`, `_show_mastery_flash()`, `_ensure_mastery_badge()`, `_start_badge_pulse()`, 约 52 行
+
+#### 建议拆分方案
+
+创建 `scripts/hud_mastery_panel.gd` (RefCounted 模块, 参考 `hud_toast.gd` / `hit_feedback.gd` 懒加载模式):
+
+```
+hud_mastery_panel.gd (~70 lines):
+  - 搬入 6 个 MASTERY_* 常量
+  - 搬入 _mastery_badges / _mastery_flash 状态变量
+  - 搬入 _get_weapon_display_name()
+  - 搬入 _on_mastery_tier_up()
+  - 搬入 _show_mastery_flash()
+  - 搬入 _ensure_mastery_badge()
+  - 搬入 _start_badge_pulse()
+  - constructor: new(hud: CanvasLayer) 接收父节点
+```
+
+hud.gd 侧改动:
+- 移除上述代码 (净减 ~65 行, 从 462 行降至 ~397 行)
+- 新增 `var _mastery: RefCounted = null` + 懒加载
+- `_ready()` 中连接 `mastery_tier_up` 信号到 `_mastery` 的处理函数
+
+**等待 Designer 提供正式拆分规格文档后执行。**
+
+### 任务C: 行数检查
+
+| 文件 | 行数 | 变化 | 上限占比 | 合规 |
+|------|------|------|----------|------|
+| scripts/tutorial_manager.gd | 414 | +80 | 82.8% | PASS |
+| scripts/autoload/save_manager.gd | 475 | +1 | 95.0% | PASS |
+| scripts/hud.gd | 462 | 0 | 92.4% | PASS |
+| scripts/arena.gd | 173 | 0 | 34.6% | PASS |
+| test/unit/test_tutorial_system.gd | 653 | +127 | N/A | PASS |
+
+### 测试结果
+
+```
+Scripts: 60, Tests: 1719, Passing: 1719, Asserts: 3767
+Time: 18.66s
+Failures: 0
+```
+
+### 修改文件清单
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `scripts/tutorial_manager.gd` | MODIFY | Steps 6-8 实现, TUTORIAL_TOTAL_STEPS=8, 新常量, 新辅助函数 |
+| `scripts/autoload/save_manager.gd` | MODIFY | 注释更新 (1-5 -> 1-8) |
+| `test/unit/test_tutorial_system.gd` | MODIFY | 19 新测试 + 已有测试适配 8 步 |
+
+### R24 自评分: 100/100
+
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| Steps 6-8 实现 | 40 | 40 | 3/3 步骤按规格实现, 常量/触发/超时/dismiss 全部正确 |
+| 测试覆盖 | 30 | 30 | 19 新测试覆盖触发/文本/超时/dismiss/辅助函数/向后兼容 |
+| hud.gd 拆分准备 | 15 | 15 | 代码分析完成, 拆分方案记录, 等待规格文档 |
+| 行数合规 | 15 | 15 | 所有 .gd <= 500 行, 1719 测试零失败 |

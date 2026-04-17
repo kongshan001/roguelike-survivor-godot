@@ -1,10 +1,11 @@
 extends Node
-## TutorialManager -- 5-step progressive tutorial system.
+## TutorialManager -- 8-step progressive tutorial system.
+## Steps 1-5: core controls. Steps 6-8: mid-game discovery hints.
 ## Shows tooltip bubbles at specific gameplay moments.
 ## Persisted via SaveManager.tutorial_step / tutorial_completed.
 
 # --- Constants (from tutorial-system.md Section 3) ---
-const TUTORIAL_TOTAL_STEPS: int = 5
+const TUTORIAL_TOTAL_STEPS: int = 8
 const TUTORIAL_LABEL_OFFSET: float = 40.0
 const TUTORIAL_STEP_MOVE_TIMEOUT: float = 8.0
 const TUTORIAL_STEP_DASH_TIMEOUT: float = 10.0
@@ -19,8 +20,16 @@ const TUTORIAL_BG_PADDING: Vector2 = Vector2(8, 4)
 const FADE_IN_DURATION: float = 0.3
 const FADE_OUT_DURATION: float = 0.2
 
+# Steps 6-8 constants (from tutorial-extension.md Section 3)
+const TUTORIAL_STEP6_TIMEOUT: float = 4.0
+const TUTORIAL_STEP7_TIMEOUT: float = 3.5
+const TUTORIAL_STEP8_TIMEOUT: float = 4.0
+const TUTORIAL_STEP6_MIN_WEAPONS: int = 2
+const TUTORIAL_STEP6_MIN_LEVEL: int = 2
+const TUTORIAL_STEP7_COMBO_THRESHOLD: int = 5
+
 # --- State ---
-var _step: int = 0  # 0=not started, 1..5 = completed step
+var _step: int = 0  # 0=not started, 1..8 = completed step
 var _idle_timer: float = 0.0
 var _tooltip_active: bool = false
 var _current_tooltip: PanelContainer = null
@@ -30,6 +39,7 @@ var _prev_kills: int = 0
 var _step4_pending: bool = false
 var _prev_skill_ready: bool = true
 var _arena: Node2D = null
+var _prev_synergy_count: int = 0  # For Step 8: track synergy count changes
 
 
 func setup(arena: Node2D) -> void:
@@ -75,6 +85,12 @@ func _physics_process(delta: float) -> void:
 			_process_step_upgrade(delta, player)
 		4:
 			_process_step_skill(delta, player)
+		5:
+			_process_step_evolution(delta, player)
+		6:
+			_process_step_combo(delta, player)
+		7:
+			_process_step_synergy(delta, player)
 
 	# Update tooltip position if active
 	if _tooltip_active and _current_tooltip and is_instance_valid(_current_tooltip):
@@ -149,6 +165,42 @@ func _process_step_skill(delta: float, player: Node2D) -> void:
 			_complete_step()
 
 	_prev_skill_ready = skill_ready
+
+
+# --- Step 5: Evolution Hint ---
+func _process_step_evolution(delta: float, player: Node2D) -> void:
+	if not _tooltip_active:
+		var owned_weapons: Dictionary = player.get("owned_weapons") if player.get("owned_weapons") != null else {}
+		if _has_two_weapons_at_level(owned_weapons, TUTORIAL_STEP6_MIN_LEVEL):
+			_show_tooltip_top("Weapons evolve at Lv3! Check combinations when both are maxed.", TUTORIAL_STEP6_TIMEOUT)
+	else:
+		_tooltip_timer += delta
+		if _tooltip_timer >= _tooltip_timeout:
+			_complete_step()
+
+
+# --- Step 6: Combo Bonus ---
+func _process_step_combo(delta: float, _player: Node2D) -> void:
+	if not _tooltip_active:
+		if GameManager.combo_count >= TUTORIAL_STEP7_COMBO_THRESHOLD:
+			_show_tooltip_top("Combo kills give bonus XP! Keep killing to maintain your streak.", TUTORIAL_STEP7_TIMEOUT)
+	else:
+		_tooltip_timer += delta
+		if _tooltip_timer >= _tooltip_timeout:
+			_complete_step()
+
+
+# --- Step 7: Synergy Activation ---
+func _process_step_synergy(delta: float, _player: Node2D) -> void:
+	if not _tooltip_active:
+		var current_count: int = SynergyManager.get_active_count() if SynergyManager else 0
+		if current_count > _prev_synergy_count:
+			_show_tooltip_top("Synergy activated! Some weapon+passive combos create powerful effects.", TUTORIAL_STEP8_TIMEOUT)
+		_prev_synergy_count = current_count
+	else:
+		_tooltip_timer += delta
+		if _tooltip_timer >= _tooltip_timeout:
+			_complete_step()
 
 
 # --- Signal handlers ---
@@ -258,6 +310,16 @@ func _has_enemy_in_range(player: Node2D, range_val: float) -> bool:
 	return false
 
 
+func _has_two_weapons_at_level(owned_weapons: Dictionary, min_level: int) -> bool:
+	var qualifying_count: int = 0
+	for weapon_id: String in owned_weapons:
+		if owned_weapons[weapon_id] >= min_level:
+			qualifying_count += 1
+			if qualifying_count >= TUTORIAL_STEP6_MIN_WEAPONS:
+				return true
+	return false
+
+
 # --- Public API for testing ---
 
 ## Check if a given step should show based on save state.
@@ -285,6 +347,12 @@ func get_step_text(step: int) -> String:
 			return "\u70b9\u51fb\u5361\u724c\u6216\u6309 1/2/3 \u9009\u62e9\u5347\u7ea7"
 		5:
 			return "\u6309 E \u4f7f\u7528\u89d2\u8272\u6280\u80fd"
+		6:
+			return "Weapons evolve at Lv3! Check combinations when both are maxed."
+		7:
+			return "Combo kills give bonus XP! Keep killing to maintain your streak."
+		8:
+			return "Synergy activated! Some weapon+passive combos create powerful effects."
 		_:
 			return ""
 
@@ -302,6 +370,12 @@ func get_step_timeout(step: int) -> float:
 			return -1.0
 		5:
 			return TUTORIAL_STEP_SKILL_TIMEOUT
+		6:
+			return TUTORIAL_STEP6_TIMEOUT
+		7:
+			return TUTORIAL_STEP7_TIMEOUT
+		8:
+			return TUTORIAL_STEP8_TIMEOUT
 		_:
 			return 0.0
 
@@ -319,6 +393,12 @@ func get_dismiss_action(step: int) -> String:
 			return "upgrade_select"
 		5:
 			return "skill"
+		6:
+			return "timeout"
+		7:
+			return "timeout"
+		8:
+			return "timeout"
 		_:
 			return ""
 

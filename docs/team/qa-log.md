@@ -4,6 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-17 R24 | 1719 | 3768 | 1719 通过, 0 失败, 0 pending, 0 orphan, 19项新测试(教程步骤6-8扩展), 3项已有测试适配(TUTORIAL_TOTAL_STEPS 5->8, complete_step边界更新) |
 | 2026-04-17 R21 | 1635 | 3623 | 1635 通过, 0 失败, 0 pending, 0 orphan, 115项新测试(击中反馈55+投射物拖尾44+已有测试适配7+enemy_loot.gd提取适配6+weapon_lv3修复2), enemy.gd 359行(从500行降低), 3项回归BUG修复(_handle_splitter_death参数变更, die()函数体搜索范围扩展, _spawn_food_at迁移) |
 | 2026-04-17 R20 | 1520 | 3486 | 1520 通过, 0 失败, 0 pending, 0 orphan, 122项新测试(XP曲线31+T4商店39+武器精通52), 2项已有测试适配(max_level 3->4, achievements 28->30), BUG-275 已修复 |
 | 2026-04-17 R16 | 1191 | 2935 | 1191 通过, 0 失败, 0 pending, 0 orphan, 79项边界压力测试新增 |
@@ -2036,3 +2037,86 @@ R16 的 `test_lightning_lv3_chain_bonus_constant` 访问 `wf.LIGHTNING_LV3_CHAIN
 - 扣分 -5 (BUG-274 Critical: set_relative 导致 9 处 Tween 动画不生效, 产生大量 SCRIPT ERROR 日志)
 - 扣分 -3 (BUG-003 chest.png 缺失仍存在)
 - 扣分 -2 (test_arena_screen_shake 的 Camera2D ERROR 日志仍存在)
+
+## R24 QA 测试报告
+
+### 任务完成状态
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 任务A: test_character_animation.gd pending 测试 | 完成 | 文件中无 pending 测试，全部 31 项通过 |
+| 任务A: 全量 pending 测试审计 | 完成 | 审计全部 60 个测试文件，确认 pending guard 均为功能守卫（模块加载失败时跳过），非断言缺失 |
+| 任务A: 修复 R23 遗留 3 项失败测试 | 完成 | TUTORIAL_TOTAL_STEPS 5->8 适配 |
+| 任务B: 验证 Programmer R23 步骤 6-8 扩展 | 完成 | 确认 _process_step_evolution/combo/synergy 实现，get_step_text/timeout/dismiss_action 已扩展 |
+| 任务C: 回归测试 | 完成 | 1719 测试全部通过，0 失败 |
+
+### 修复的 3 项失败测试
+
+R23 将 TUTORIAL_TOTAL_STEPS 从 5 扩展到 8，但测试未同步更新，导致 3 项断言失败：
+
+| 测试函数 | 失败原因 | 修复内容 |
+|----------|----------|----------|
+| `test_tutorial_constants_total_steps` | 断言 `== 5`，实际 `== 8` | 改为 `assert_eq(..., 8, ...)` |
+| `test_tutorial_step_5_sets_completed` | `complete_step(5, ...)` 不再设置 completed (5 < 8) | 改名为 `test_tutorial_step_8_sets_completed`，断言 `complete_step(8, ...)` |
+| `test_tutorial_step_internal_state_after_complete_step` | 步骤 5 不再是 final step | 扩展为完成步骤 3/4/5/8，最终断言 `complete_step(8, ...)` 设置 completed |
+
+### 同步更新的关联测试
+
+| 测试函数 | 修改内容 |
+|----------|----------|
+| `test_no_step_triggers_at_step5` | 改名 `test_no_step_triggers_at_step8`，范围 `range(1, 9)` |
+| `test_completed_tutorial_skips_all_steps` | 范围 `range(1, 6)` 改为 `range(1, 9)` |
+| `test_invalid_step_number_returns_no_text` | 步骤 6 改为有效，无效边界改为 9 |
+| `test_invalid_step_number_no_trigger` | 步骤 6 改为有效，无效边界改为 9 |
+
+### 教程步骤 6-8 扩展验证
+
+Programmer R23 已完整实现步骤 6-8 扩展（tutorial-extension.md spec）：
+
+- `_process_step_evolution(delta, player)` -- 步骤 6：进化提示，触发条件 2 武器 Lv2+
+- `_process_step_combo(delta, _player)` -- 步骤 7：连击奖励，触发条件 combo >= 5
+- `_process_step_synergy(delta, _player)` -- 步骤 8：协同激活，触发条件 synergy count 增加
+- `_has_two_weapons_at_level(dict, min_level)` 辅助函数
+- `get_step_text()` 新增步骤 6/7/8 match case
+- `get_step_timeout()` 新增步骤 6/7/8 match case
+- `get_dismiss_action()` 新增步骤 6/7/8 match case（全部 "timeout"）
+
+新增常量验证：
+- `TUTORIAL_STEP6_TIMEOUT = 4.0`
+- `TUTORIAL_STEP7_TIMEOUT = 3.5`
+- `TUTORIAL_STEP8_TIMEOUT = 4.0`
+- `TUTORIAL_STEP6_MIN_WEAPONS = 2`
+- `TUTORIAL_STEP6_MIN_LEVEL = 2`
+- `TUTORIAL_STEP7_COMBO_THRESHOLD = 5`
+
+### 全量 Pending 测试审计
+
+审计全部 60 个测试脚本中的 `pending()` 调用：
+
+| 文件 | Pending 数 | 类型 | 说明 |
+|------|-----------|------|------|
+| test_hud_toast_module.gd | 21 | 功能守卫 | `_has_toast_module()` 检查，模块存在时不触发，全部 22/22 通过 |
+| test_fire_slime.gd | 3 | 功能守卫 | `has_method("apply_burn")` 检查，player.gd 已有 apply_burn，不触发 |
+| test_fire_slime.gd | 1 | 功能守卫 | `ENEMY_TEMPLATES.has("fire_slime")` 检查，模板已注册，不触发 |
+| test_tutorial_system.gd | 3 | 功能守卫 | `"_prev_skill_ready" in tm` 检查，字段已存在，不触发 |
+| test_weapon_lv3_transforms.gd | 1 | 功能守卫 | `fireknife` 注册检查，已注册，不触发 |
+| test_weapon_lv3_transforms.gd | 6 | 功能守卫 | `enemy.gd` 加载检查，已正常加载，不触发 |
+
+所有 pending 均为功能守卫（guard clause），目标功能已全部实现。运行时无任何 pending 实际触发。
+
+### 测试统计
+
+| 指标 | R23 | R24 | 变化 |
+|------|-----|-----|------|
+| 测试总数 | 1700 | 1719 | +19 |
+| 断言总数 | 3729 | 3768 | +39 |
+| 失败数 | 3 | 0 | -3 (已修复) |
+| 测试脚本 | 60 | 60 | 0 |
+| 运行时间 | 17.3s | 16.9s | -0.4s |
+
+### 修改文件清单
+
+| 文件 | 修改类型 | 说明 |
+|------|----------|------|
+| `test/unit/test_tutorial_system.gd` | 修改 | 修复 3 项失败断言 + 更新 4 项关联测试适配 8 步教程 |
+| `docs/team/qa-log.md` | 更新 | 追加 R24 测试报告 |

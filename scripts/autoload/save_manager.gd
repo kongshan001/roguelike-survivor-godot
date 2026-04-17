@@ -19,7 +19,7 @@ var characters_cleared: Dictionary = {}
 # Track cumulative evolution/synergy history across sessions
 var evolution_history: Dictionary = {}  # evo_id -> true
 var synergy_history: Dictionary = {}    # synergy_id -> true
-# Tutorial progress: 0=not started, 1-5=steps completed, tutorial_completed=all done
+# Tutorial progress: 0=not started, 1-8=steps completed, tutorial_completed=all done
 var tutorial_step: int = 0
 var tutorial_completed: bool = false
 # Weapon mastery kill counts (base weapons only)

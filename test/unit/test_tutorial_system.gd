@@ -39,7 +39,7 @@ func test_tutorial_manager_script_exists():
 
 func test_tutorial_constants_total_steps():
 	var tm = _create_tutorial_ref()
-	assert_eq(tm.TUTORIAL_TOTAL_STEPS, 5, "Should have 5 tutorial steps per design spec")
+	assert_eq(tm.TUTORIAL_TOTAL_STEPS, 8, "Should have 8 tutorial steps (5 core + 3 mid-game hints)")
 
 
 func test_tutorial_constants_label_offset():
@@ -194,12 +194,12 @@ func test_step5_triggers_after_step4():
 	assert_true(result, "Step 5 should trigger when tutorial_step == 4")
 
 
-func test_no_step_triggers_at_step5():
+func test_no_step_triggers_at_step8():
 	var tm = _create_tutorial_ref()
-	_save_mgr.tutorial_step = 5
-	for step: int in range(1, 6):
+	_save_mgr.tutorial_step = 8
+	for step: int in range(1, 9):
 		var result: bool = tm.should_show_step(step, _save_mgr)
-		assert_false(result, "No step %d should trigger when tutorial_step == 5" % step)
+		assert_false(result, "No step %d should trigger when tutorial_step == 8" % step)
 
 
 # ============================================================
@@ -283,16 +283,16 @@ func test_step5_dismiss_on_e_key():
 func test_completed_tutorial_skips_all_steps():
 	var tm = _create_tutorial_ref()
 	_save_mgr.tutorial_completed = true
-	for step: int in range(1, 6):
+	for step: int in range(1, 9):
 		var result: bool = tm.should_show_step(step, _save_mgr)
 		assert_false(result, "Step %d should not show when tutorial_completed is true" % step)
 
 
-func test_tutorial_step_5_sets_completed():
+func test_tutorial_step_8_sets_completed():
 	var tm = _create_tutorial_ref()
-	_save_mgr.tutorial_step = 4
-	tm.complete_step(5, _save_mgr)
-	assert_true(_save_mgr.tutorial_completed, "tutorial_completed should be true after completing step 5")
+	_save_mgr.tutorial_step = 7
+	tm.complete_step(8, _save_mgr)
+	assert_true(_save_mgr.tutorial_completed, "tutorial_completed should be true after completing step 8")
 
 
 func test_tutorial_step_4_does_not_set_completed():
@@ -391,15 +391,15 @@ func test_invalid_step_number_returns_no_text():
 	var tm = _create_tutorial_ref()
 	var text: String = tm.get_step_text(0)
 	assert_eq(text, "", "Step 0 should return empty text")
-	text = tm.get_step_text(6)
-	assert_eq(text, "", "Step 6 (beyond range) should return empty text")
+	text = tm.get_step_text(9)
+	assert_eq(text, "", "Step 9 (beyond range) should return empty text")
 
 
 func test_invalid_step_number_no_trigger():
 	var tm = _create_tutorial_ref()
 	_save_mgr.tutorial_step = 0
 	assert_false(tm.should_show_step(0, _save_mgr), "Step 0 should never trigger")
-	assert_false(tm.should_show_step(6, _save_mgr), "Step 6 should never trigger")
+	assert_false(tm.should_show_step(9, _save_mgr), "Step 9 should never trigger")
 
 
 func test_completed_flag_overrides_step_value():
@@ -501,10 +501,142 @@ func test_tutorial_step_internal_state_after_complete_step():
 	tm.complete_step(4, _save_mgr)
 	assert_eq(_save_mgr.tutorial_step, 4, "tutorial_step should advance to 4")
 	assert_false(_save_mgr.tutorial_completed, "tutorial should not be completed after step 4")
-	# Complete step 5 (final)
+	# Complete step 5 (not final -- 8 steps total now)
 	tm.complete_step(5, _save_mgr)
 	assert_eq(_save_mgr.tutorial_step, 5, "tutorial_step should advance to 5")
-	assert_true(_save_mgr.tutorial_completed, "tutorial should be completed after step 5")
+	assert_false(_save_mgr.tutorial_completed, "tutorial should not be completed after step 5")
+	# Complete step 8 (final)
+	tm.complete_step(8, _save_mgr)
+	assert_eq(_save_mgr.tutorial_step, 8, "tutorial_step should advance to 8")
+	assert_true(_save_mgr.tutorial_completed, "tutorial should be completed after step 8")
+
+
+# ============================================================
+# Part 12: Steps 6-8 Extension (tutorial-extension.md)
+# Verify mid-game discovery hint steps.
+# ============================================================
+
+func test_step6_constants():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.TUTORIAL_STEP6_TIMEOUT, 4.0, "Step 6 timeout should be 4.0s")
+	assert_eq(tm.TUTORIAL_STEP6_MIN_WEAPONS, 2, "Step 6 min weapons should be 2")
+	assert_eq(tm.TUTORIAL_STEP6_MIN_LEVEL, 2, "Step 6 min level should be 2")
+
+
+func test_step7_constants():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.TUTORIAL_STEP7_TIMEOUT, 3.5, "Step 7 timeout should be 3.5s")
+	assert_eq(tm.TUTORIAL_STEP7_COMBO_THRESHOLD, 5, "Step 7 combo threshold should be 5")
+
+
+func test_step8_constants():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.TUTORIAL_STEP8_TIMEOUT, 4.0, "Step 8 timeout should be 4.0s")
+
+
+func test_step6_triggers_after_step5():
+	var tm = _create_tutorial_ref()
+	_save_mgr.tutorial_step = 5
+	var result: bool = tm.should_show_step(6, _save_mgr)
+	assert_true(result, "Step 6 should trigger when tutorial_step == 5")
+
+
+func test_step6_does_not_trigger_before_step5():
+	var tm = _create_tutorial_ref()
+	_save_mgr.tutorial_step = 4
+	var result: bool = tm.should_show_step(6, _save_mgr)
+	assert_false(result, "Step 6 should not trigger when tutorial_step == 4")
+
+
+func test_step7_triggers_after_step6():
+	var tm = _create_tutorial_ref()
+	_save_mgr.tutorial_step = 6
+	var result: bool = tm.should_show_step(7, _save_mgr)
+	assert_true(result, "Step 7 should trigger when tutorial_step == 6")
+
+
+func test_step8_triggers_after_step7():
+	var tm = _create_tutorial_ref()
+	_save_mgr.tutorial_step = 7
+	var result: bool = tm.should_show_step(8, _save_mgr)
+	assert_true(result, "Step 8 should trigger when tutorial_step == 7")
+
+
+func test_step6_display_text():
+	var tm = _create_tutorial_ref()
+	var text: String = tm.get_step_text(6)
+	assert_true(text.find("evolve") >= 0 or text.find("Evolve") >= 0, "Step 6 text should mention evolution, got: " + text)
+
+
+func test_step7_display_text():
+	var tm = _create_tutorial_ref()
+	var text: String = tm.get_step_text(7)
+	assert_true(text.find("Combo") >= 0, "Step 7 text should mention Combo, got: " + text)
+
+
+func test_step8_display_text():
+	var tm = _create_tutorial_ref()
+	var text: String = tm.get_step_text(8)
+	assert_true(text.find("Synergy") >= 0, "Step 8 text should mention Synergy, got: " + text)
+
+
+func test_step6_timeout():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.get_step_timeout(6), 4.0, "Step 6 timeout should be 4.0s")
+
+
+func test_step7_timeout():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.get_step_timeout(7), 3.5, "Step 7 timeout should be 3.5s")
+
+
+func test_step8_timeout():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.get_step_timeout(8), 4.0, "Step 8 timeout should be 4.0s")
+
+
+func test_step6_dismiss_on_timeout():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.get_dismiss_action(6), "timeout", "Step 6 should dismiss on timeout")
+
+
+func test_step7_dismiss_on_timeout():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.get_dismiss_action(7), "timeout", "Step 7 should dismiss on timeout")
+
+
+func test_step8_dismiss_on_timeout():
+	var tm = _create_tutorial_ref()
+	assert_eq(tm.get_dismiss_action(8), "timeout", "Step 8 should dismiss on timeout")
+
+
+func test_step7_does_not_set_completed():
+	var tm = _create_tutorial_ref()
+	_save_mgr.tutorial_step = 6
+	tm.complete_step(7, _save_mgr)
+	assert_false(_save_mgr.tutorial_completed, "tutorial_completed should still be false after step 7")
+
+
+func test_existing_completed_save_skips_steps_6_8():
+	var tm = _create_tutorial_ref()
+	_save_mgr.tutorial_completed = true
+	assert_false(tm.should_show_step(6, _save_mgr), "Step 6 should not show for returning players")
+	assert_false(tm.should_show_step(7, _save_mgr), "Step 7 should not show for returning players")
+	assert_false(tm.should_show_step(8, _save_mgr), "Step 8 should not show for returning players")
+
+
+func test_has_two_weapons_at_level_helper():
+	var tm: Node = _create_tutorial_ref() as Node
+	# Empty dict: no qualifying weapons
+	assert_false(tm._has_two_weapons_at_level({}, 2), "Should be false with no weapons")
+	# One weapon at level 2
+	assert_false(tm._has_two_weapons_at_level({"knife": 2}, 2), "Should be false with only 1 weapon")
+	# Two weapons but one below min level
+	assert_false(tm._has_two_weapons_at_level({"knife": 2, "holywater": 1}, 2), "Should be false when 1 weapon below min level")
+	# Two weapons both at min level
+	assert_true(tm._has_two_weapons_at_level({"knife": 2, "holywater": 2}, 2), "Should be true with 2 weapons at level 2")
+	# Two weapons above min level
+	assert_true(tm._has_two_weapons_at_level({"knife": 3, "holywater": 3}, 2), "Should be true with 2 weapons above level 2")
 
 
 # ============================================================

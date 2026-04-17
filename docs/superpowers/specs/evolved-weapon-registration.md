@@ -2,7 +2,7 @@
 
 **Author**: Designer Agent
 **Date**: 2026-04-17
-**Round**: R23
+**Round**: R23 (R24 updated with detailed numerical tables)
 **Status**: Design Spec
 **Priority**: P2 LOW
 **Context**: 12 evolved weapons are defined in evolution-expansion.md (R9), but only 9 are registered in upgrade_pool.gd and weapon_registry.gd. The missing 3 (frostvortex/spiral, holyshockwave/pulse, thunderbeam/beam) have full numerical specs but no registration entries. This means players who build the correct dual-Lv3 combo for these 3 paths get no evolution reward. v1.0.3 roadmap item 4.4.
@@ -177,7 +177,183 @@ These should be added to `tools/generate_sprites.py` as new generation functions
 
 ---
 
-## 5. Decision Record
+## 5. Detailed Numerical Tables (R24 Update)
+
+The following tables provide exhaustive numerical definitions for the 3 missing evolved weapons, consolidating values from evolution-expansion.md Sections 5.1/5.3/5.4 into a single registration-ready reference.
+
+### 5.1 Frost Vortex (frostvortex) -- Complete Numerical Reference
+
+**Attack Pattern**: 6 ice blades spiral outward from the player in an expanding vortex. Blades damage, slow, and can freeze enemies on contact. The vortex continuously expands from min to max radius, then resets to the player position and restarts. Always active (cooldown 999.0).
+
+| Property | Value | Unit | Source | Rationale |
+|---|---|---|---|---|
+| `weapon_id` | `"frostvortex"` | string | evolution-expansion.md 5.1 | Unique identifier |
+| `weapon_name` | `"霜刃旋涡"` | string | evolution-expansion.md 5.1 | Chinese display name |
+| `weapon_type` | `"spiral"` | string | evolution-expansion.md 5.1 | New type -- expanding spiral trajectory |
+| `damage` | 3.0 | HP | evolution-expansion.md 5.1 | Per blade contact. Between knife (2.0) and fireknife (3.0) -- spiral has more blades (6) so per-blade is lower |
+| `cooldown` | 999.0 | seconds | evolution-expansion.md 5.1 | Always active, like orbit/aura weapons |
+| `spiral_blade_count` | 6 | count | evolution-expansion.md 5.1 | More than orbit count (3-4) for visual density. 6 blades at 60-degree separation |
+| `spiral_min_radius` | 20.0 | pixels | evolution-expansion.md 5.1 | Start close to player body |
+| `spiral_max_radius` | 180.0 | pixels | evolution-expansion.md 5.1 | Larger than holydomain orbit (130). Covers significant screen area |
+| `spiral_expand_speed` | 60.0 | px/s | evolution-expansion.md 5.1 | Time to max: 180/60 = 3.0s per cycle |
+| `slow_pct` | 0.4 | fraction | evolution-expansion.md 5.1 | Same as frostknife slow. 40% movement speed reduction |
+| `freeze_pct` | 0.08 | fraction | evolution-expansion.md 5.1 | Same as frostaura Lv3 freeze. 8% chance per hit |
+| `projectile_size` | 5.0 | px width | evolution-expansion.md 5.1 | Blade visual size: 5x12 rectangular blade |
+| `color` | `Color(0.3, 0.7, 1.0)` | Color | evolution-expansion.md 5.1 | Ice blue |
+| `is_evolved` | true | bool | -- | Mark as evolution result |
+| `description` | `"螺旋冰刃扩散+减速"` | string | -- | Upgrade card description |
+
+**DPS Analysis**:
+- Raw DPS: 6 blades x 3.0 dmg x ~0.33 hits/s (blade contact frequency in dense group) = ~6.0 DPS
+- With slow+freeze utility: effective value ~8.0 DPS equivalent
+- Synergy (Frostbite Loop): Freeze triggers accelerate blades 1.5x for 0.5s (ICD 1.0s/enemy)
+- Tier: B (utility-focused, not raw DPS)
+
+**Visual Specification**:
+- Blade: Rectangle 5x12 px, Color(0.3, 0.7, 1.0)
+- Trail: Fading line, Color(0.3, 0.7, 1.0, 0.2), alpha decay 0.3s
+- Rotation: 4.0 rad/s (defined in evolution-expansion.md but not a WeaponData field -- set in weapon_fire.gd)
+
+**Evolution Recipe**: knife (Lv3) + frostaura (Lv3) -> frostvortex
+
+**Sprite Asset**: `assets/sprites/weapons/frostvortex.png`, 20x20 px, ice_blue + white
+
+---
+
+### 5.2 Holy Shockwave (holyshockwave) -- Complete Numerical Reference
+
+**Attack Pattern**: Periodically emits an expanding ring of holy fire centered on the player. The ring expands from 0 to max radius over 0.3 seconds, damaging and burning all enemies it passes through. Screen shake accompanies each pulse. Unlike aura (continuous), pulse is a discrete periodic event.
+
+| Property | Value | Unit | Source | Rationale |
+|---|---|---|---|---|
+| `weapon_id` | `"holyshockwave"` | string | evolution-expansion.md 5.3 | Unique identifier |
+| `weapon_name` | `"圣焰冲击"` | string | evolution-expansion.md 5.3 | Chinese display name |
+| `weapon_type` | `"pulse"` | string | evolution-expansion.md 5.3 | New type -- expanding damage ring |
+| `damage` | 12.0 | HP | R10 buffed from 8.0 | Per pulse. Was lowest DPS evolved weapon at 8.0; 12.0 brings it to competitive level |
+| `cooldown` | 2.5 | seconds | R10 reduced from 3.0 | Faster pulses increase DPS and feel more impactful |
+| `pulse_max_radius` | 200.0 | pixels | evolution-expansion.md 5.3 | Larger than blizzard aura (160). Covers most of the screen center |
+| `pulse_expand_time` | 0.3 | seconds | evolution-expansion.md 5.3 | Fast expansion -- 0-200px in 0.3s = 667 px/s expansion speed |
+| `pulse_ring_width` | 12.0 | pixels | evolution-expansion.md 5.3 | Thickness of the expanding ring for hit detection and visual |
+| `burn_dps` | 2.0 | HP/s | evolution-expansion.md 5.3 | Same as BURN_DPS in weapon_fire.gd. Consistent with firestaff burn |
+| `burn_duration` | 2.0 | seconds | evolution-expansion.md 5.3 | Same as BURN_DURATION in weapon_fire.gd |
+| `color` | `Color(1.0, 0.85, 0.3)` | Color | evolution-expansion.md 5.3 | Gold (center color). Edge transitions to Color(1.0, 0.4, 0.1) orange-red |
+| `is_evolved` | true | bool | -- | Mark as evolution result |
+| `description` | `"周期性圣焰脉冲+燃烧"` | string | -- | Upgrade card description |
+
+**DPS Analysis**:
+- Pulses per 57s wave: 57 / 2.5 = 22.8 pulses
+- Raw DPS: 12.0 / 2.5 = 4.8 DPS
+- Effective DPS with burn: 4.8 + (2.0 x 2.0 / 2.5) = 4.8 + 1.6 = 6.4 DPS
+- With Resonance synergy (dense waves, ~3 kills/pulse): CD reduces to ~1.6s, DPS scales to ~10.0
+- Guaranteed hit on all enemies in range (no targeting needed)
+- Tier: B (lowest raw DPS, compensated by guaranteed AoE + Resonance scaling)
+
+**Visual Specification**:
+- Ring: Circle outline expanding 0 -> 200px radius, gold-to-orange gradient
+- Ring width: 12px fixed during expansion
+- Screen shake: 2.0 intensity for 0.1s per pulse
+- Edge color: Color(1.0, 0.4, 0.1) orange-red
+
+**Evolution Recipe**: holywater (Lv3) + firestaff (Lv3) -> holyshockwave
+
+**Sprite Asset**: `assets/sprites/weapons/holyshockwave.png`, 20x20 px, gold + fire_orange
+
+---
+
+### 5.3 Thunder Beam (thunderbeam) -- Complete Numerical Reference
+
+**Attack Pattern**: Fires a long-range penetrating lightning beam toward the nearest enemy. The beam damages all enemies along its path with periodic ticks and chains lightning to nearby enemies. Active for 1.0 seconds every 2.5 second cycle (40% uptime). The beam extends the full arena width in the target direction.
+
+| Property | Value | Unit | Source | Rationale |
+|---|---|---|---|---|
+| `weapon_id` | `"thunderbeam"` | string | evolution-expansion.md 5.4 | Unique identifier |
+| `weapon_name` | `"雷霆射线"` | string | evolution-expansion.md 5.4 | Chinese display name |
+| `weapon_type` | `"beam"` | string | evolution-expansion.md 5.4 | New type -- long-range penetrating line |
+| `damage` | 4.0 | HP | evolution-expansion.md 5.4 | Per tick. 3 ticks/activation = 12.0 per activation |
+| `cooldown` | 2.5 | seconds | evolution-expansion.md 5.4 | Between lightning (2.0) and boomerang (1.8) |
+| `beam_active_duration` | 1.0 | seconds | evolution-expansion.md 5.4 | Beam fires for 1.0s, then 1.5s pause = 40% uptime |
+| `beam_tick_interval` | 0.3 | seconds | evolution-expansion.md 5.4 | 3 ticks per activation (1.0 / 0.3 = 3.33, floored to 3) |
+| `beam_width` | 12.0 | pixels | evolution-expansion.md 5.4 | Collision width. Visual is 2px, collision is 12px for reliable hit detection |
+| `chain_count` | 2 | count | evolution-expansion.md 5.4 | Lightning chains after beam hits. Same as thunderang chains |
+| `projectile_range` | 1200.0 | pixels | evolution-expansion.md 5.4 | Effectively unlimited (arena is 2500-3000 wide). Limited to prevent off-screen computation |
+| `color` | `Color(1.0, 1.0, 0.4)` | Color | evolution-expansion.md 5.4 | Electric yellow |
+| `is_evolved` | true | bool | -- | Mark as evolution result |
+| `description` | `"穿透闪电射线+连锁电击"` | string | -- | Upgrade card description |
+
+**Additional Constants** (defined in weapon_fire.gd, not WeaponData):
+
+| Constant | Value | Unit | Source | Rationale |
+|---|---|---|---|---|
+| `THUNDERBEAM_CHAIN_DAMAGE` | 6.0 | HP | evolution-expansion.md 5.4 | Chain lightning damage (separate from beam tick) |
+| `THUNDERBEAM_CHAIN_RANGE` | 120.0 | pixels | evolution-expansion.md 5.4 | Chain targeting range from hit enemy |
+| `THUNDERBEAM_VISUAL_WIDTH` | 2.0 | pixels | evolution-expansion.md 5.4 | Visual beam line width (vs 12px collision) |
+| `THUNDERBEAM_SPARK_COLOR` | `Color(1.0, 1.0, 1.0)` | Color | evolution-expansion.md 5.4 | White sparks along beam |
+
+**DPS Analysis**:
+- Beam active 1.0s every 2.5s cycle = 40% uptime
+- Tick damage: 4.0 HP every 0.3s = 3 ticks per activation = 12.0 HP per activation
+- Single-target DPS: 12.0 / 2.5 = 4.8 DPS
+- With chain lightning (2 chains, 6.0 each): +12.0 / 2.5 = +4.8 DPS against groups
+- Total multi-target DPS: ~9.6 DPS
+- Highest multi-target DPS of the 3 new weapons, but requires enemies lined up in beam direction
+- Tier: B (positional dependency limits practical DPS)
+
+**Synergy (Overcharge)**:
+- While beam active: +15% movement speed
+- Encourages strafing to sweep beam across enemies
+- Speed bonus matches speedboots passive value
+
+**Visual Specification**:
+- Beam line: 2px visual (12px collision), Color(1.0, 1.0, 0.4) electric yellow
+- Sparks: 2x2 ColorRect, Color(1.0, 1.0, 1.0) white, random flicker along beam
+- Chain lightning: Jagged line, Color(0.5, 0.8, 1.0), same as existing lightning effect
+
+**Evolution Recipe**: lightning (Lv3) + knife (Lv3) -> thunderbeam
+
+**Sprite Asset**: `assets/sprites/weapons/thunderbeam.png`, 20x20 px, thunder_yellow + elec_blue
+
+---
+
+### 5.4 DPS Comparison of 3 New Weapons
+
+| Weapon | Raw DPS | Effective DPS | Utility | Best Scenario |
+|---|---|---|---|---|
+| frostvortex (spiral) | ~6.0 | ~8.0 | Slow + Freeze | Dense clustered enemies near player |
+| holyshockwave (pulse) | 4.8 | 6.4 + burn | Guaranteed AoE + Burn | Dense waves (Resonance scales to ~10.0) |
+| thunderbeam (beam) | 4.8 (single) | 9.6 (multi) | Long range + Chain | Enemies lined up in one direction |
+
+**Balance assessment**: All 3 weapons fall in the B-tier range (6.4-9.6 effective DPS), compared to A-tier existing weapons (fireknife 20.0, thunderang 28.5). This is intentional -- the 3 new weapons provide unique utility (slow/freeze, guaranteed AoE, long-range penetration) rather than raw DPS. They are situationally powerful rather than universally dominant.
+
+---
+
+### 5.5 WeaponData.gd Fields Verification
+
+The following fields must exist in `scripts/data/weapon_data.gd` for these registrations to work:
+
+| Field | Type | Default | Used By | Status |
+|---|---|---|---|---|
+| `spiral_blade_count` | int | 6 | frostvortex | Needs verification |
+| `spiral_min_radius` | float | 20.0 | frostvortex | Needs verification |
+| `spiral_max_radius` | float | 180.0 | frostvortex | Needs verification |
+| `spiral_expand_speed` | float | 60.0 | frostvortex | Needs verification |
+| `pulse_max_radius` | float | 200.0 | holyshockwave | Needs verification |
+| `pulse_expand_time` | float | 0.3 | holyshockwave | Needs verification |
+| `pulse_ring_width` | float | 12.0 | holyshockwave | Needs verification |
+| `beam_active_duration` | float | 1.0 | thunderbeam | Needs verification |
+| `beam_tick_interval` | float | 0.3 | thunderbeam | Needs verification |
+| `beam_width` | float | 12.0 | thunderbeam | Needs verification |
+| `orbit_fire_rate` | float | 0.0 | sentineltotem (already exists) | Confirmed in weapon_data.gd line 23 |
+| `slow_pct` | float | 0.0 | frostvortex (already exists) | Confirmed in weapon_data.gd line 38 |
+| `freeze_pct` | float | 0.0 | frostvortex (already exists) | Confirmed in weapon_data.gd line 39 |
+| `burn_dps` | float | 0.0 | holyshockwave (already exists) | Confirmed in weapon_data.gd line 34 |
+| `burn_duration` | float | 0.0 | holyshockwave (already exists) | Confirmed in weapon_data.gd line 35 |
+| `chain_count` | int | 0 | thunderbeam (already exists) | Confirmed in weapon_data.gd line 26 |
+
+**Fields needing addition**: 10 new fields (spiral: 4, pulse: 3, beam: 3). This matches the evolution-expansion.md Section 6 specification. Phase B of registration adds these ~13 lines to weapon_data.gd.
+
+---
+
+## 6. Decision Record
 
 | Decision | Why | Alternative Considered |
 |---|---|---|
@@ -185,10 +361,12 @@ These should be added to `tools/generate_sprites.py` as new generation functions
 | Register all 3 simultaneously | All 3 have complete specs in evolution-expansion.md. Partial registration would be inconsistent | Register only the most impactful one (inconsistent player experience) |
 | No fallback behavior for unhandled types | Adding a "warning" log or placeholder attack would be misleading. Silent match fallthrough is the cleanest approach | Show a "coming soon" toast (immersion-breaking) |
 | New sprites at 20x20 (same as other evolved weapons) | Consistent with fireknife/frostknife/thunderang sprite sizes | 32x32 (too large for a weapon slot) |
+| R24: Detailed numerical tables consolidated from evolution-expansion.md | Registration requires a single source of truth. Previously values were scattered across evolution-expansion.md Sections 5.1/5.3/5.4 with no consolidated reference for the Programmer Agent to implement from | Keep values only in evolution-expansion.md (requires cross-referencing 3 sections during implementation) |
+| R24: Added DPS comparison table | Programmer and QA Agents need to verify balance. A consolidated DPS table makes it possible to write balance assertions in tests | No DPS comparison (each weapon's DPS only in its own section, hard to compare) |
 
 ---
 
-## 6. Test Cases
+## 7. Test Cases
 
 | Case | Verification | Priority |
 |---|---|---|

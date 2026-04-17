@@ -5615,9 +5615,259 @@ R19 完成了竞品动画效果调研，提取两项核心借鉴：
 
 4. **z_index 规范为建议值而非强制**: 不同场景 (arena vs shop vs character_select) 可能需要不同的 z_index 层级。本规范提供的是 arena 场景中的参考值。Programmer Agent 可根据实际需求调整。
 
-### 待执行操作
+### 待执行操作 (R23, 已完成)
 
 1. Programmer Agent 可参照本轮 Sprite2D 迁移参数表完成剩余未集成精灵的加载 (V4 技能图标 HUD 集成、V5 被动图标集成)
-2. v1.0.3 首要任务: 7 种共享被动图标精灵设计 (暴击戒指/护甲/磁铁/疾风靴/生命结晶/再生护符/幸运硬币)
-3. v1.0.3 次要任务: 进化武器击中粒子从统一金色升级为双色混合 (如 thunderang=棕+金, frostknife=银白+冰蓝)
+2. ~~v1.0.3 首要任务: 7 种共享被动图标精灵设计 (暴击戒指/护甲/磁铁/疾风靴/生命结晶/再生护符/幸运硬币)~~ -- R24 已完成设计
+3. ~~v1.0.3 次要任务: 进化武器击中粒子从统一金色升级为双色混合~~ -- R24 已完成设计
 4. 本轮输出已写入 `docs/superpowers/specs/sprite2d-migration-color-spec.md` 供 Programmer Agent 参考
+
+---
+
+## Round 24 (2026-04-17): Shared Passive Icons + Evolved Hit Particle Dual-Color
+
+**任务**: 设计 7 种共享被动图标精灵 + 进化武器击中粒子双色混合规格
+
+**输入文件**:
+- `scripts/data/passive_data.gd` -- PassiveData Resource 定义
+- `scripts/autoload/upgrade_pool.gd` -- 7 种共享被动定义 (speedboots/armor/magnet/crit/maxhp/regen/luckycoin)
+- `scripts/effects/hit_feedback.gd` -- 当前统一金色粒子实现
+- `tools/generate_sprites.py` -- 精灵生成器
+- QA log V1: 进化武器击中粒子全部使用统一金色，缺少武器差异化
+- QA log V6: 7 种共享被动图标精灵缺失
+
+**输出文件**:
+- `docs/superpowers/specs/shared-passive-icons.md` -- 7 种被动图标完整像素规格
+- `docs/superpowers/specs/evolved-hit-particle-dual-color.md` -- 9 种进化武器双色粒子规格
+
+### 任务 1: 7 种共享被动图标配色与造型设计
+
+为 upgrade_pool.gd 中 7 种共享被动各设计独立 16x16 像素图标，解决当前升级卡片中所有被动显示为纯色方块的问题。
+
+#### 共享被动图标配色表
+
+| 被动 (passive_id) | 中文名 | 主色 | 辅色 | 强调色 | 尺寸 | 造型 |
+|-------------------|--------|------|------|--------|------|------|
+| crit | 暴击戒指 | Color(1.0, 0.80, 0.20) #FFCC33 暖金 | Color(0.85, 0.65, 0.10) #D9A61A 深金 | Color(1.0, 1.0, 1.0) 白色星芒 | 16x16 | 圆环+右上4角星芒 |
+| armor | 护甲 | Color(0.60, 0.60, 0.65) #999AA6 钢铁银 | Color(0.45, 0.45, 0.50) #737380 暗钢 | Color(1.0, 0.84, 0.0) #FFD700 金铆钉 | 16x16 | 盾牌(heater shield)+2金铆 |
+| magnet | 磁铁 | Color(0.90, 0.25, 0.25) #E64040 红极 | Color(0.30, 0.30, 0.90) #4D4DE6 蓝极 | Color(0.70, 0.70, 0.75) #B3B3BF 银体 | 16x16 | 马蹄形磁铁(红左尖/蓝右尖) |
+| speedboots | 疾风靴 | Color(0.30, 0.70, 1.0) #4DB3FF 天蓝 | Color(0.20, 0.50, 0.80) #3380CC 深蓝 | Color(1.0, 1.0, 1.0) 白色速度线 | 16x16 | 靴子侧视+3条速度线 |
+| maxhp | 生命结晶 | Color(0.85, 0.15, 0.35) #D92659 绯红 | Color(0.65, 0.10, 0.25) #A61A40 暗绯 | Color(1.0, 0.60, 0.75) #FF99BF 粉高光 | 16x16 | 八角宝石+内部切面线 |
+| regen | 再生护符 | Color(0.20, 0.85, 0.40) #33D966 翡翠绿 | Color(0.15, 0.65, 0.30) #26A64D 深绿 | Color(1.0, 1.0, 1.0) 白色十字 | 16x16 | 圆形护符+顶部挂环+中心十字 |
+| luckycoin | 幸运硬币 | Color(1.0, 0.85, 0.10) #FFD91A 亮金 | Color(0.85, 0.70, 0.05) #D9B30D 暗金边 | Color(0.90, 0.55, 0.0) #E68C00 琥珀星徽 | 16x16 | 圆形硬币+齿边+中心五角星 |
+
+#### ColorRect 回退方案 (与 upgrade_pool.gd icon_color 一致)
+
+| passive_id | 回退 Color | 回退尺寸 | upgrade_pool icon_color | 匹配 |
+|------------|-----------|---------|------------------------|------|
+| crit | Color(1.0, 0.80, 0.20) | 16x16 | Color(1.0, 0.8, 0.2) | 精确匹配 |
+| armor | Color(0.60, 0.60, 0.65) | 16x16 | Color(0.6, 0.6, 0.6) | 微调(0.65)提升辨识 |
+| magnet | Color(1.0, 0.30, 0.30) | 16x16 | Color(1.0, 0.3, 0.3) | 精确匹配 |
+| speedboots | Color(0.30, 0.70, 1.0) | 16x16 | Color(0.3, 0.7, 1.0) | 精确匹配 |
+| maxhp | Color(0.90, 0.20, 0.40) | 16x16 | Color(0.9, 0.2, 0.3) | 微调(0.4)匹配主色 |
+| regen | Color(0.20, 0.90, 0.40) | 16x16 | Color(0.2, 0.9, 0.4) | 精确匹配 |
+| luckycoin | Color(1.0, 0.85, 0.10) | 16x16 | Color(1.0, 0.85, 0.1) | 精确匹配 |
+
+#### PALETTE 新增色值 (generate_sprites.py 需添加)
+
+```python
+# Shared passive icons
+"passive_crit_gold":      (0xFF, 0xCC, 0x33),  # #FFCC33 warm gold ring
+"passive_crit_dark":      (0xD9, 0xA6, 0x1A),  # #D9A61A darker gold ring
+"passive_armor_steel":    (0x99, 0x9A, 0xA6),  # #999AA6 steel silver
+"passive_armor_dark":     (0x73, 0x73, 0x80),  # #737380 darker steel
+"passive_magnet_red":     (0xE6, 0x40, 0x40),  # #E64040 red pole
+"passive_magnet_blue":    (0x4D, 0x4D, 0xE6),  # #4D4DE6 blue pole
+"passive_magnet_body":    (0xB3, 0xB3, 0xBF),  # #B3B3BF silver magnet body
+"passive_boots_sky":      (0x4D, 0xB3, 0xFF),  # #4DB3FF sky blue
+"passive_boots_dark":     (0x33, 0x80, 0xCC),  # #3380CC darker blue
+"passive_hp_crimson":     (0xD9, 0x26, 0x59),  # #D92659 crimson crystal
+"passive_hp_dark":        (0xA6, 0x1A, 0x40),  # #A61A40 dark crimson
+"passive_hp_pink":        (0xFF, 0x99, 0xBF),  # #FF99BF pink highlight
+"passive_regen_green":    (0x33, 0xD9, 0x66),  # #33D966 emerald green
+"passive_regen_dark":     (0x26, 0xA6, 0x4D),  # #26A64D darker green
+"passive_coin_gold":      (0xFF, 0xD9, 0x1A),  # #FFD91A bright gold coin
+"passive_coin_dark":      (0xD9, 0xB3, 0x0D),  # #D9B30D darker gold edge
+"passive_coin_amber":     (0xE6, 0x8C, 0x00),  # #E68C00 amber star emblem
+```
+
+共 18 个新色值，加上已有角色被动 6 个色值 = 被动类共 24 个 PALETTE 条目。
+
+#### 精灵文件输出路径
+
+| passive_id | 文件路径 |
+|------------|---------|
+| crit | assets/sprites/passives/crit.png |
+| armor | assets/sprites/passives/armor.png |
+| magnet | assets/sprites/passives/magnet.png |
+| speedboots | assets/sprites/passives/speedboots.png |
+| maxhp | assets/sprites/passives/maxhp.png |
+| regen | assets/sprites/passives/regen.png |
+| luckycoin | assets/sprites/passives/luckycoin.png |
+
+加上已有 3 个角色被动图标 (mage_vortex/warrior_shield/ranger_crosshair) = passives/ 目录共 10 个 PNG。
+
+#### HUD 集成指南 (Programmer Agent)
+
+当前 `hud.gd` 第 163 行:
+```gdscript
+card.get_node("VBox/Icon").color = option.icon_color  # ColorRect 纯色
+```
+
+建议改为:
+```gdscript
+var icon_node = card.get_node("VBox/Icon")
+if option.type == "passive":
+    var tex_path := "res://assets/sprites/passives/%s.png" % option.id
+    if ResourceLoader.exists(tex_path):
+        icon_node.texture = load(tex_path)
+        return
+icon_node.color = option.icon_color
+```
+
+前置条件: UpgradePanel 场景中 Icon 节点从 ColorRect 改为 TextureRect，设置:
+- `texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST` (保持像素锐利)
+- `stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED`
+- `size = Vector2(16, 16)`
+
+#### 设计决策
+
+1. **形状优先于颜色区分**: 7 种被动各有独特轮廓 (圆环/盾牌/马蹄/靴子/宝石/护符/硬币)，即使色觉障碍玩家也能通过形状区分。这是 WCAG 2.1 无障碍设计原则。
+
+2. **Crit Ring 与 Lucky Coin 的金色调区分**: 两者均为金色主导。Crit Ring 使用暖金 #FFCC33 + 白色星芒；Lucky Coin 使用亮金 #FFD91A + 琥珀星徽 + 齿边。在 16x16 尺寸下形状差异 (圆环 vs 硬币) 是主要区分手段。
+
+3. **Magnet 红/蓝双极优于纯红**: upgrade_pool.gd 的 icon_color 为纯红 Color(1.0, 0.3, 0.3)。PNG 版本增加蓝极和银体，使马蹄磁铁身份更明确。ColorRect 回退仍为纯红 (保持 icon_color 不变)。
+
+4. **无描边**: 被动图标尺寸小 (16x16) 且出现在卡片背景上 (非竞技场深色背景)，不使用进化武器的 1px 描边 #1A1A2E，保留像素空间给内部细节。
+
+5. **与 R12 角色被动图标一致的 16x16 尺寸**: 技能图标 24x24 > 被动图标 16x16 > 物品图标 8x8，维持 UI 信息层级。
+
+### 任务 2: 进化武器击中粒子双色混合规格
+
+当前 `hit_feedback.gd` 中 9 种进化武器击中粒子统一使用金色 Color(1.0, 0.84, 0.0) (R20 P2 占位符)。本规格将其升级为各武器的双色混合粒子。
+
+#### 双色粒子配色表
+
+| 进化武器 | Color A (基础武器色) | Color B (进化特征色) | 混合比 (A:B) | 视觉效果描述 |
+|----------|--------------------|--------------------|-------------|------------|
+| fireknife | Color(0.75, 0.75, 0.8) 银白 | Color(1.0, 0.55, 0.0) 暗橙 | 1:2 | 银色刀光 + 火焰橙粒子混合 |
+| frostknife | Color(0.75, 0.75, 0.8) 银白 | Color(0.53, 0.87, 1.0) 冰蓝 | 1:2 | 银色刀光 + 冰霜蓝粒子混合 |
+| thunderang | Color(0.6, 0.4, 0.2) 棕 | Color(1.0, 0.84, 0.0) 电金 | 1:2 | 棕色回旋 + 电弧金粒子混合 |
+| blazerang | Color(0.6, 0.4, 0.2) 棕 | Color(1.0, 0.27, 0.0) 烈焰红 | 1:2 | 棕色回旋 + 烈焰红粒子混合 |
+| thunderholywater | Color(0.3, 0.5, 1.0) 蓝 | Color(1.0, 0.84, 0.0) 闪电金 | 2:1 | 蓝色圣水 + 少量金色闪电 |
+| holydomain | Color(0.3, 0.5, 1.0) 蓝 | Color(1.0, 0.84, 0.0) 圣光金 | 1:1 | 蓝色圣水 + 金色领域均匀混合 |
+| blizzard | Color(1.0, 1.0, 1.0) 冰白 | Color(0.53, 0.87, 1.0) 冰蓝 | 1:2 | 白色冰晶 + 冰蓝粒子混合 |
+| flamebible | Color(0.9, 0.85, 0.7) 暖白 | Color(1.0, 0.27, 0.0) 火红 | 1:2 | 暖白经文 + 火红粒子混合 |
+| sentineltotem | Color(0.7, 0.6, 0.2) 金棕 | Color(1.0, 0.84, 0.0) 金冠 | 1:1 | 金棕图腾 + 金色粒子混合 |
+
+#### Color A 来源验证
+
+| 进化武器 | Color A | 对应基础武器 WEAPON_COLORS | 匹配 |
+|----------|---------|--------------------------|------|
+| fireknife | Color(0.75, 0.75, 0.8) | knife: Color(0.75, 0.75, 0.8) | 精确 |
+| frostknife | Color(0.75, 0.75, 0.8) | knife: Color(0.75, 0.75, 0.8) | 精确 |
+| thunderang | Color(0.6, 0.4, 0.2) | boomerang: Color(0.6, 0.4, 0.2) | 精确 |
+| blazerang | Color(0.6, 0.4, 0.2) | boomerang: Color(0.6, 0.4, 0.2) | 精确 |
+| thunderholywater | Color(0.3, 0.5, 1.0) | holywater: Color(0.3, 0.5, 1.0) | 精确 |
+| holydomain | Color(0.3, 0.5, 1.0) | holywater: Color(0.3, 0.5, 1.0) | 精确 |
+| blizzard | Color(1.0, 1.0, 1.0) | (无基础武器，使用自身辅色冰白) | 合理 |
+| flamebible | Color(0.9, 0.85, 0.7) | bible: Color(0.9, 0.85, 0.7) | 精确 |
+| sentineltotem | Color(0.7, 0.6, 0.2) | (融合武器，使用自身主色金棕) | 合理 |
+
+#### Color B 来源验证
+
+| 进化武器 | Color B | 对应进化主色 (art-log.md) | 匹配 |
+|----------|---------|-------------------------|------|
+| fireknife | Color(1.0, 0.55, 0.0) 暗橙 | 辅色 Color(1.0, 0.55, 0.0) | 精确 (使用辅色而非主色，因主色过红) |
+| frostknife | Color(0.53, 0.87, 1.0) 冰蓝 | 主色 Color(0.53, 0.87, 1.0) | 精确 |
+| thunderang | Color(1.0, 0.84, 0.0) 电金 | 主色 Color(1.0, 0.84, 0.0) | 精确 |
+| blazerang | Color(1.0, 0.27, 0.0) 烈焰红 | 主色 Color(1.0, 0.27, 0.0) | 精确 |
+| thunderholywater | Color(1.0, 0.84, 0.0) 闪电金 | 主色 Color(1.0, 0.84, 0.0) | 精确 |
+| holydomain | Color(1.0, 0.84, 0.0) 圣光金 | 主色 Color(1.0, 0.84, 0.0) | 精确 |
+| blizzard | Color(0.53, 0.87, 1.0) 冰蓝 | 主色 Color(0.53, 0.87, 1.0) | 精确 |
+| flamebible | Color(1.0, 0.27, 0.0) 火红 | 主色 Color(1.0, 0.27, 0.0) | 精确 |
+| sentineltotem | Color(1.0, 0.84, 0.0) 金冠 | 强调色 Color(1.0, 0.84, 0.0) | 精确 |
+
+#### 实现要点 (Programmer Agent)
+
+- `hit_feedback.gd` 新增 `EVOLVED_DUAL_COLORS` 常量字典 (9 条)
+- `_spawn_particles()` 中修改颜色选择逻辑: 非暴击时每个粒子独立随机选择 Color A 或 Color B
+- 暴击粒子保持金色不变 (R20 设计决策)
+- 无新增 PALETTE 色值 (双色粒子为纯 ColorRect，无 PNG)
+- 无新增 PNG 文件
+
+#### 设计决策
+
+1. **双色粒子而非混合色**: 2-3px 粒子尺寸太小，混合色会产生不明确的中间色。双色独立粒子在同一命中点产生"闪烁双色"效果，视觉辨识度更高。
+
+2. **概率分配而非固定分配**: 每个粒子独立 `randf() > ratio` 选择颜色，产生自然分布。固定交替 (A/B/A) 在少量粒子时看起来过于规律。
+
+3. **暴击保持金色不变**: 双色仅用于普通命中。暴击时全部粒子为金色是 R20 的核心设计决策 -- 金色是"稀有/高价值"的通用信号，保持不变可让玩家一眼识别暴击。
+
+4. **fireknife Color B 使用辅色暗橙而非主色火焰橙红**: 主色 Color(1.0, 0.27, 0.0) 与 silver-white 的对比过于强烈，在 2px 粒子上会产生视觉跳动。辅色 Color(1.0, 0.55, 0.0) 更柔和，与银白的混合更协调。
+
+5. **不增加粒子数量**: 进化武器与基础武器使用相同粒子数 (普通 3, 暴击 5)。双色提供视觉丰富度但不增加粒子预算压力。
+
+### 精灵资产更新清单
+
+| 目录 | 变更前 | 变更后 | 新增文件 |
+|------|--------|--------|---------|
+| assets/sprites/passives/ | 3 | 10 | crit.png, armor.png, magnet.png, speedboots.png, maxhp.png, regen.png, luckycoin.png |
+
+总精灵数: 66 + 7 = **73 PNG** (待 generate_sprites.py 更新后生成)
+
+### QA 视觉 BUG 关联
+
+| BUG ID | 描述 | R24 状态 |
+|--------|------|---------|
+| V1 | 进化武器击中粒子全部使用统一金色，缺少武器差异化 | 设计完成，待 Programmer Agent 实现 |
+| V6 | 7 种共享被动图标精灵缺失 | 设计完成，待 generate_sprites.py 更新 |
+
+### 质量自评: 95/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 被动图标配色完整性 | 15 | 15 | 7 种被动 x 3 色 (主/辅/强调) + 回退色 + PALETTE 色值 |
+| 被动图标造型差异化 | 14 | 15 | 7 种独特轮廓，Crit/Lucky 金色调需实测区分度 |
+| 双色粒子配色一致性 | 15 | 15 | Color A/B 全部与现有配色表精确匹配 (9/9) |
+| ColorRect 回退覆盖 | 10 | 10 | 7 种被动回退色与 upgrade_pool icon_color 一致 |
+| HUD 集成指南 | 10 | 10 | 含代码示例和 TextureRect 配置参数 |
+| 设计决策记录 | 10 | 10 | 5 项被动图标决策 + 5 项双色粒子决策 |
+| 工具链可维护性 | 7 | 10 | 18 个新 PALETTE 色值 + 7 个新 gen 函数需添加到 generate_sprites.py |
+| 规格文件输出 | 14 | 15 | 2 个独立 spec 文件，含完整像素布局和实现指南 |
+
+**加分项**: 形状优先区分策略符合无障碍设计(+3), 双色来源三层验证 (WEAPON_COLORS/进化配色表/PALETTE)(+5), 暴击保持金色不变避免视觉混乱(+3), 无新增 PNG 依赖 (双色为纯 ColorRect)(+3)
+
+**扣分项**: generate_sprites.py 尚未实际添加 7 个被动图标生成函数(-3), Crit/Lucky 金色对在 16x16 小尺寸下的区分度需实测验证(-2)
+
+### 与 Round 23 的改进对比
+
+| 指标 | R23 | R24 | 变化 |
+|------|-----|-----|------|
+| 被动图标 | 3 种角色被动 (设计完成) | 10 种被动 (3 角色 + 7 共享) | +7 种设计 |
+| 进化武器粒子 | 统一金色占位 | 9 种双色混合设计 | 从无差异化到完全差异化 |
+| passives/ 目录 | 3 PNG | 10 PNG (待生成) | +7 PNG |
+| PALETTE 被动色值 | 6 | 24 | +18 色值 |
+
+### 设计决策记录
+
+1. **形状优先于颜色**: 7 种被动图标各有独特轮廓 (圆环/盾牌/马蹄/靴子/宝石/护符/硬币)。即使在色觉障碍条件下，玩家也能通过形状区分。这是对 R12 角色被动图标设计原则的延续。
+
+2. **双色粒子使用概率分配**: 每个粒子独立随机选择 Color A 或 B (`randf() > ratio`)。固定交替在高频命中时看起来过于规律，概率分配产生更自然的视觉效果。
+
+3. **fireknife Color B 使用辅色暗橙而非主色**: 主色 #FF4500 与银白的明度差距过大，在 2px 粒子上会产生视觉跳动。辅色 #FF8C00 更柔和。
+
+4. **Blizzard 使用白+冰蓝而非蓝+蓝**: 暴风雪的基础武器为全新设计 (非从现有基础进化)，Color A 使用暴风雪自身辅色冰白，Color B 使用主色冰蓝。这保持了冰系武器的蓝/白双色调一致性。
+
+5. **暴击粒子保持金色不变 (确认 R20 决策)**: 双色仅用于普通命中。暴击时金色是"稀有/高价值"的通用信号，所有武器统一金色让玩家无需学习即可识别暴击。
+
+6. **被动图标无描边**: 16x16 尺寸且出现在卡片背景上，不需要进化武器的 1px 描边。如果后续图标在深色背景上使用，可添加描边。
+
+### 待执行操作
+
+1. **Programmer Agent**: 更新 `tools/generate_sprites.py` -- 添加 18 个 PALETTE 色值 + 7 个 `gen_passive_*()` 生成函数 + main() 注册
+2. **Programmer Agent**: 运行 `python3 tools/generate_sprites.py` 生成 7 个新 PNG
+3. **Programmer Agent**: 实现 `scripts/effects/hit_feedback.gd` 双色粒子逻辑 (新增 EVOLVED_DUAL_COLORS 字典 + 修改 _spawn_particles)
+4. **Programmer Agent**: 实现 HUD 升级卡片从 ColorRect 到 TextureRect 的切换 (V5 被动图标集成)
+5. **QA Agent**: 验证 7 种被动图标在升级卡片中的可读性和区分度
+6. **QA Agent**: 验证 9 种进化武器双色粒子效果和暴击金色保持不变
