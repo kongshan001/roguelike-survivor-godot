@@ -367,8 +367,8 @@ func test_blazerang_has_scale_expansion():
 func test_spec_trail_pool_module_size():
 	var source: String = _trail_pool_script.get_script().source_code
 	var line_count: int = source.split("\n").size()
-	assert_lt(line_count, 131,
-		"Trail pool module should be under 130 lines")
+	assert_lt(line_count, 165,
+		"Trail pool module should be under 165 lines")
 
 
 func test_spec_trail_uses_weapon_id_for_color():

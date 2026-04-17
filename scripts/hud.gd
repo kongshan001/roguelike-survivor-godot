@@ -20,6 +20,27 @@ var _skill_btn: RefCounted = null
 var _run_quests: Array[String] = []
 var _run_achievements: Array[String] = []
 
+# --- Mastery Badge ---
+var _mastery_badges: Dictionary = {}  # weapon_id -> {border: ColorRect, fill: ColorRect}
+var _mastery_flash: ColorRect = null
+const MASTERY_BADGE_SIZE: float = 6.0
+const MASTERY_FILL_SIZE: float = 4.0
+const MASTERY_FILL_OFFSET: float = 1.0
+const MASTERY_TIER_COLORS: Array[Color] = [
+	Color.TRANSPARENT,  # Tier 0: hidden
+	Color(0.80, 0.55, 0.35),  # Tier 1: Bronze
+	Color(0.78, 0.78, 0.82),  # Tier 2: Silver
+	Color(0.95, 0.82, 0.30),  # Tier 3: Gold
+	Color(1.0, 0.85, 0.30),   # Tier 4: Diamond
+]
+const MASTERY_TIER_BORDERS: Array[Color] = [
+	Color.TRANSPARENT,
+	Color(0.50, 0.35, 0.20),  # Deep bronze
+	Color(0.50, 0.50, 0.55),  # Deep silver
+	Color(0.65, 0.55, 0.15),  # Deep gold
+	Color(0.75, 0.60, 0.10),  # Deep diamond
+]
+const MASTERY_TIER_NAMES: Array[String] = ["Novice", "Apprentice", "Adept", "Expert", "Master"]
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -44,6 +65,8 @@ func _ready():
 			SaveManager.quest_completed.connect(_on_quest_completed)
 		if not SaveManager.achievement_unlocked.is_connected(_on_achievement_unlocked):
 			SaveManager.achievement_unlocked.connect(_on_achievement_unlocked)
+		if not SaveManager.mastery_tier_up.is_connected(_on_mastery_tier_up):
+			SaveManager.mastery_tier_up.connect(_on_mastery_tier_up)
 
 	var diff_names: Dictionary = {"easy": "休闲", "normal": "标准", "hard": "噩梦", "endless": "无尽"}
 	$DifficultyLabel.text = diff_names.get(GameManager.selected_difficulty, "")
@@ -72,7 +95,6 @@ func _ready():
 	_skill_btn = load("res://scripts/hud_skill_button.gd").new(self)
 	_skill_btn.setup(_get_player(), GameManager.selected_character)
 
-
 func _process(delta: float):
 	$TimerLabel.text = GameManager.format_time(GameManager.elapsed_time)
 	_update_wave_display()
@@ -80,14 +102,11 @@ func _process(delta: float):
 		_toast.process_queue(delta)
 	_skill_btn.update_display(_get_player())
 
-
 func _on_gold_changed(amount: int):
 	$GoldLabel.text = "Gold: %d" % amount
 
-
 func _on_combo_changed(count: int):
 	$ComboLabel.text = "Combo: %d" % count if count > 1 else ""
-
 
 func _on_combo_milestone(count: int):
 	var labels: Dictionary = {5: "5 连击！", 10: "10 连击！！", 20: "20 连击！！！", 50: "50 连击！！！" }
@@ -99,7 +118,6 @@ func _on_combo_milestone(count: int):
 		50: $ComboLabel.add_theme_color_override("font_color", Color(1.0, 0.1, 0.1))
 	_toast.show_toast("%d 连击!" % count, Color(1.0, 0.85, 0.0))
 
-
 func _on_boss_warning():
 	$BossWarningLabel.text = "💀 Boss 即将来袭！"
 	$BossWarningLabel.visible = true
@@ -108,26 +126,21 @@ func _on_boss_warning():
 		$BossWarningLabel.visible = false
 	)
 
-
 func _on_health_changed(current: float, max_hp: float):
 	$HealthBar.value = (current / max_hp) * 100.0
 	$HealthLabel.text = "%d/%d" % [int(current), int(max_hp)]
-
 
 func _on_xp_changed(current: float, needed: float):
 	$XPBar.value = (current / needed) * 100.0
 	$LevelLabel.text = "Lv %d" % GameManager.player_level
 
-
 func _on_level_up(_new_level: int):
 	_pending_level_ups += 1
 	_show_upgrade_panel()
 
-
 func _on_player_died():
 	GameManager.set_meta("run_quests", _run_quests)
 	GameManager.set_meta("run_achievements", _run_achievements)
-
 
 func _show_upgrade_panel():
 	get_tree().paused = true
@@ -155,11 +168,9 @@ func _show_upgrade_panel():
 	$UpgradePanel.visible = true
 	$UpgradePanel/RerollButton.visible = _rerolls_used < MAX_REROLLS
 
-
 func _on_card_input(event: InputEvent, index: int):
 	if event is InputEventMouseButton and event.pressed:
 		_select_upgrade(index)
-
 
 func _input(event: InputEvent):
 	if $UpgradePanel.visible and event is InputEventKey and event.pressed:
@@ -170,7 +181,6 @@ func _input(event: InputEvent):
 			KEY_R: _reroll_upgrades()
 	if event is InputEventKey and event.pressed and event.keycode == KEY_Q:
 		_on_retreat_pressed()
-
 
 func _select_upgrade(index: int):
 	if index >= _upgrade_options.size():
@@ -194,20 +204,17 @@ func _select_upgrade(index: int):
 	else:
 		get_tree().paused = false
 
-
 func _reroll_upgrades() -> void:
 	if _rerolls_used >= MAX_REROLLS:
 		return
 	_rerolls_used += 1
 	_show_upgrade_panel()
 
-
 func _get_player() -> Node2D:
 	var players = get_tree().get_nodes_in_group("players")
 	if players.size() > 0:
 		return players[0]
 	return null
-
 
 func _perform_evolution(player: Node2D, option: Dictionary) -> void:
 	var weapon_a: String = option.recipe_a
@@ -231,7 +238,6 @@ func _perform_evolution(player: Node2D, option: Dictionary) -> void:
 		var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
 		effects.create_evolution_flash(arena)
 
-
 func _setup_retreat_button() -> void:
 	var btn: Button = Button.new()
 	btn.name = "RetreatButton"
@@ -241,7 +247,6 @@ func _setup_retreat_button() -> void:
 	add_child(btn)
 	btn.pressed.connect(_on_retreat_pressed)
 
-
 func _on_retreat_pressed() -> void:
 	if GameManager.selected_difficulty != "endless":
 		return
@@ -250,16 +255,13 @@ func _on_retreat_pressed() -> void:
 	retreat_pressed.emit()
 	GameManager.retreat_requested.emit()
 
-
 func _on_quest_completed(quest_id: String) -> void:
 	_run_quests.append(quest_id)
 	_toast.show_toast("Quest: %s" % _find_quest_name(quest_id), Color(1.0, 0.84, 0.31))
 
-
 func _on_achievement_unlocked(achievement_id: String) -> void:
 	_run_achievements.append(achievement_id)
 	_toast.show_toast("Achievement: %s" % _find_achievement_name(achievement_id), Color(0.81, 0.58, 0.85))
-
 
 func _find_quest_name(quest_id: String) -> String:
 	if not SaveManager:
@@ -269,7 +271,6 @@ func _find_quest_name(quest_id: String) -> String:
 			return q["name"]
 	return quest_id
 
-
 func _find_achievement_name(achievement_id: String) -> String:
 	if not SaveManager:
 		return achievement_id
@@ -278,13 +279,11 @@ func _find_achievement_name(achievement_id: String) -> String:
 			return a["name"]
 	return achievement_id
 
-
 # --- Wave Display System ---
 var _last_displayed_wave: int = -1
 var _wave_bar_bg: ColorRect = null
 var _wave_bar_fill: ColorRect = null
 var _victory_label: Label = null
-
 
 func _setup_wave_bar() -> void:
 	_wave_bar_bg = ColorRect.new()
@@ -303,7 +302,6 @@ func _setup_wave_bar() -> void:
 	_wave_bar_fill.set_position(Vector2(0, 0))
 	_wave_bar_fill.set_size(Vector2(0, 4))
 	add_child(_wave_bar_fill)
-
 
 func _update_wave_display() -> void:
 	var wave_node: Label = get_node_or_null("WaveLabel")
@@ -336,14 +334,11 @@ func _update_wave_display() -> void:
 		_wave_bar_fill.set_size(Vector2(bg_width * progress, 4))
 		_wave_bar_fill.color = GameManager.get_wave_color()
 
-
 func _on_wave_started(wave: int, wave_name: String) -> void:
 	_toast.show_toast("Wave %d: %s" % [wave, wave_name], GameManager.get_wave_color())
 
-
 func _on_wave_completed(wave: int) -> void:
 	_toast.show_toast("Wave %d Complete!" % wave, Color(0.3, 0.69, 0.31))
-
 
 func _on_victory_achieved(gold_bonus: int) -> void:
 	if _victory_label == null:
@@ -362,7 +357,6 @@ func _on_victory_achieved(gold_bonus: int) -> void:
 	_victory_label.visible = true
 	_toast.show_toast("Victory! +%d gold bonus" % gold_bonus, Color(1.0, 0.84, 0.0))
 
-
 # --- Skill Button Display (delegates to hud_skill_button.gd) ---
 const SKILL_BUTTON_SIZE: float = 48.0
 const SKILL_READY_COLOR: Color = Color(1, 0.85, 0.3)
@@ -376,14 +370,11 @@ var _skill_cooldown_overlay: ColorRect:
 var _skill_key_label: Label:
 	get: return _skill_btn._skill_key_label if _skill_btn else null
 
-
 func _setup_skill_button() -> void:
 	_skill_btn.setup(_get_player(), GameManager.selected_character)
 
-
 func _update_skill_display() -> void:
 	_skill_btn.update_display(_get_player())
-
 
 # --- Card Hover Effects ---
 
@@ -395,7 +386,6 @@ func _on_card_hover(card: Control) -> void:
 		.set_ease(Tween.EASE_OUT)
 	t.parallel().tween_property(card, "modulate", CARD_HOVER_GLOW, CARD_HOVER_DURATION)
 
-
 func _on_card_unhover(card: Control) -> void:
 	if not $UpgradePanel.visible:
 		return
@@ -404,7 +394,69 @@ func _on_card_unhover(card: Control) -> void:
 		.set_ease(Tween.EASE_IN)
 	t.parallel().tween_property(card, "modulate", Color.WHITE, CARD_UNHOVER_DURATION)
 
-
 func _reset_card_state(card: Control) -> void:
 	card.scale = Vector2.ONE
 	card.modulate = Color.WHITE
+
+# --- Mastery Badge & Toast ---
+
+func _get_weapon_display_name(weapon_id: String) -> String:
+	var names: Dictionary = {
+		"knife": "Knife", "holywater": "Holy Water", "lightning": "Lightning",
+		"bible": "Bible", "firestaff": "Fire Staff", "frostaura": "Frost Aura",
+		"boomerang": "Boomerang",
+	}
+	return names.get(weapon_id, weapon_id)
+
+func _on_mastery_tier_up(weapon_id: String, new_tier: int) -> void:
+	var weapon_name: String = _get_weapon_display_name(weapon_id)
+	var tier_color: Color = MASTERY_TIER_COLORS[new_tier]
+	var text: String = "%s Mastery: %s" % [weapon_name, MASTERY_TIER_NAMES[new_tier]]
+	if new_tier == 4:
+		text += " +8% DMG"
+	_toast.show_toast(text, tier_color)
+	if new_tier >= 3:
+		_show_mastery_flash(tier_color)
+
+func _show_mastery_flash(flash_color: Color) -> void:
+	if _mastery_flash == null:
+		_mastery_flash = ColorRect.new()
+		_mastery_flash.name = "MasteryFlash"
+		_mastery_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_mastery_flash.color = Color(flash_color.r, flash_color.g, flash_color.b, 0.15)
+		add_child(_mastery_flash)
+	_mastery_flash.color = Color(flash_color.r, flash_color.g, flash_color.b, 0.15)
+	_mastery_flash.visible = true
+	var tween: Tween = create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_property(_mastery_flash, "color:a", 0.0, 0.4)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(_mastery_flash):
+			_mastery_flash.visible = false
+	)
+
+func _ensure_mastery_badge(weapon_id: String, slot: Control) -> void:
+	if _mastery_badges.has(weapon_id):
+		return
+	var tier: int = SaveManager.get_weapon_mastery_tier(weapon_id) if SaveManager else 0
+	var border: ColorRect = ColorRect.new()
+	border.name = "MasteryBadge"
+	border.size = Vector2(MASTERY_BADGE_SIZE, MASTERY_BADGE_SIZE)
+	border.position = slot.size - Vector2(MASTERY_BADGE_SIZE + 1.0, MASTERY_BADGE_SIZE + 1.0)
+	border.color = MASTERY_TIER_BORDERS[tier]
+	border.visible = tier > 0
+	var fill: ColorRect = ColorRect.new()
+	fill.size = Vector2(MASTERY_FILL_SIZE, MASTERY_FILL_SIZE)
+	fill.position = Vector2(MASTERY_FILL_OFFSET, MASTERY_FILL_OFFSET)
+	fill.color = MASTERY_TIER_COLORS[tier]
+	border.add_child(fill)
+	if tier == 4:
+		_start_badge_pulse(border)
+	slot.add_child(border)
+	_mastery_badges[weapon_id] = {"border": border, "fill": fill}
+
+func _start_badge_pulse(badge: ColorRect) -> void:
+	var pulse: Tween = create_tween().set_loops()
+	pulse.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	pulse.tween_property(badge, "modulate:a", 0.70, 0.75).set_ease(Tween.EASE_IN_OUT)
+	pulse.tween_property(badge, "modulate:a", 1.00, 0.75).set_ease(Tween.EASE_IN_OUT)

@@ -5013,3 +5013,354 @@ progress_width = 60.0 * min(float(current_kills) / float(next_threshold), 1.0)
 3. 建议实现顺序: 先实现通用对象池框架 -> 逐个添加武器参数 -> 最后集成到 enemy.gd / projectile.gd
 4. firestaff 火焰上升效果 (-40 px/s^2 重力) 需实测后可能微调重力值
 5. bible 十字形粒子的双 ColorRect 实现需要确认子节点管理不影响对象池回收效率
+
+---
+
+## Round 22 执行 (2026-04-17) -- v1.0.2 最终视觉验证
+
+### 任务背景
+
+项目 v1.0.2 功能全部落地，66 个 PNG 精灵就绪，击中反馈系统 (`hit_feedback.gd`) 和投射物拖尾系统 (`projectile_trail_pool.gd`) 已实现，商店 T4 和武器精通后端已部署。本轮是 v1.0.2 最终验证轮，美术 Agent 执行全面视觉资产审查和一致性检查。
+
+### 任务 1: v1.0.2 视觉资产最终验证
+
+#### 1.1 精灵文件完整性 -- 全部通过
+
+逐文件检查全部 66 个 PNG 精灵的存在性。
+
+**角色精灵 (3 基础 + 3 动画帧 = 6)**:
+
+| # | 文件 | 尺寸 | 状态 |
+|---|------|------|------|
+| 1 | assets/sprites/characters/mage.png | 32x32 | 存在 |
+| 2 | assets/sprites/characters/warrior.png | 32x32 | 存在 |
+| 3 | assets/sprites/characters/ranger.png | 32x32 | 存在 |
+| 4 | assets/sprites/characters/mage_cast.png | 32x32 | 存在 |
+| 5 | assets/sprites/characters/warrior_block.png | 32x32 | 存在 |
+| 6 | assets/sprites/characters/ranger_draw.png | 32x32 | 存在 |
+
+**敌人精灵 (10)**:
+
+| # | 文件 | 画布尺寸 | 状态 |
+|---|------|---------|------|
+| 1 | assets/sprites/enemies/zombie.png | 32x32 | 存在 |
+| 2 | assets/sprites/enemies/bat.png | 32x32 | 存在 |
+| 3 | assets/sprites/enemies/skeleton.png | 32x32 | 存在 |
+| 4 | assets/sprites/enemies/elite_skeleton.png | 32x32 | 存在 |
+| 5 | assets/sprites/enemies/ghost.png | 32x32 | 存在 |
+| 6 | assets/sprites/enemies/splitter.png | 32x32 | 存在 |
+| 7 | assets/sprites/enemies/splitter_small.png | 32x32 | 存在 |
+| 8 | assets/sprites/enemies/boss.png | 64x64 | 存在 |
+| 9 | assets/sprites/enemies/fire_slime.png | 32x32 | 存在 |
+| 10 | assets/sprites/enemies/elite_knight.png | 24x24 | 存在 |
+
+**武器精灵 (7 基础 + 8 进化 + 1 敌人子弹 + 1 守护图腾 = 17)**:
+
+| # | 文件 | 尺寸 | 类型 | 状态 |
+|---|------|------|------|------|
+| 1 | assets/sprites/weapons/holy_water.png | 16x16 | 基础 | 存在 |
+| 2 | assets/sprites/weapons/knife.png | 16x16 | 基础 | 存在 |
+| 3 | assets/sprites/weapons/bible.png | 16x16 | 基础 | 存在 |
+| 4 | assets/sprites/weapons/boomerang.png | 16x16 | 基础 | 存在 |
+| 5 | assets/sprites/weapons/enemy_bullet.png | 16x16 | 通用 | 存在 |
+| 6 | assets/sprites/weapons/lightning.png | 16x16 | 基础(HUD) | 存在 |
+| 7 | assets/sprites/weapons/firestaff.png | 16x16 | 基础(HUD) | 存在 |
+| 8 | assets/sprites/weapons/frostaura.png | 16x16 | 基础(HUD) | 存在 |
+| 9 | assets/sprites/weapons/thunderholywater.png | 20x20 | 进化 | 存在 |
+| 10 | assets/sprites/weapons/fireknife.png | 20x20 | 进化 | 存在 |
+| 11 | assets/sprites/weapons/holydomain.png | 24x24 | 进化 | 存在 |
+| 12 | assets/sprites/weapons/blizzard.png | 24x24 | 进化 | 存在 |
+| 13 | assets/sprites/weapons/frostknife.png | 20x20 | 进化 | 存在 |
+| 14 | assets/sprites/weapons/flamebible.png | 20x20 | 进化 | 存在 |
+| 15 | assets/sprites/weapons/thunderang.png | 20x20 | 进化 | 存在 |
+| 16 | assets/sprites/weapons/blazerang.png | 20x20 | 进化 | 存在 |
+| 17 | assets/sprites/weapons/sentineltotem.png | 20x20 | 进化 | 存在 |
+
+**拾取物精灵 (8)**:
+
+| # | 文件 | 尺寸 | 状态 |
+|---|------|------|------|
+| 1 | assets/sprites/pickups/xp_gem_small.png | 8x8 | 存在 |
+| 2 | assets/sprites/pickups/xp_gem_medium.png | 10x10 | 存在 |
+| 3 | assets/sprites/pickups/xp_gem_large.png | 12x12 | 存在 |
+| 4 | assets/sprites/pickups/food.png | 8x8 | 存在 |
+| 5 | assets/sprites/pickups/crate_heal.png | 16x16 | 存在 |
+| 6 | assets/sprites/pickups/crate_xp.png | 16x16 | 存在 |
+| 7 | assets/sprites/pickups/crate_speed.png | 16x16 | 存在 |
+| 8 | assets/sprites/pickups/chest.png | 16x16 | 存在 |
+
+**UI 精灵 (10)**:
+
+| # | 文件 | 尺寸 | 状态 |
+|---|------|------|------|
+| 1 | assets/sprites/ui/wave_progress.png | 128x8 | 存在 |
+| 2 | assets/sprites/ui/wave_marker.png | 8x8 | 存在 |
+| 3 | assets/sprites/ui/boss_warning.png | 24x24 | 存在 |
+| 4 | assets/sprites/ui/wave_transition.png | 1280x80 | 存在 |
+| 5 | assets/sprites/ui/wave_banner_w1.png | 600x80 | 存在 |
+| 6 | assets/sprites/ui/wave_banner_w2.png | 600x80 | 存在 |
+| 7 | assets/sprites/ui/wave_banner_w3.png | 600x80 | 存在 |
+| 8 | assets/sprites/ui/wave_banner_w4.png | 600x80 | 存在 |
+| 9 | assets/sprites/ui/wave_banner_w5.png | 600x80 | 存在 |
+| 10 | assets/sprites/ui/wave_complete.png | 40x40 | 存在 |
+
+**技能精灵 (3)**:
+
+| # | 文件 | 尺寸 | 状态 |
+|---|------|------|------|
+| 1 | assets/sprites/skills/elemental_burst.png | 24x24 | 存在 |
+| 2 | assets/sprites/skills/shield_charge.png | 24x24 | 存在 |
+| 3 | assets/sprites/skills/arrow_rain.png | 24x24 | 存在 |
+
+**特效精灵 (9)**:
+
+| # | 文件 | 尺寸 | 状态 |
+|---|------|------|------|
+| 1 | assets/sprites/effects/freeze_star.png | 6x6 | 存在 |
+| 2 | assets/sprites/effects/arrow.png | 4x12 | 存在 |
+| 3 | assets/sprites/effects/knife_ricochet.png | 8x8 | 存在 |
+| 4 | assets/sprites/effects/frost_shatter.png | 16x16 | 存在 |
+| 5 | assets/sprites/effects/boomerang_homing_trail.png | 8x8 | 存在 |
+| 6 | assets/sprites/effects/lightning_chain_kill.png | 12x12 | 存在 |
+| 7 | assets/sprites/effects/bible_expand.png | 16x16 | 存在 |
+| 8 | assets/sprites/effects/holywater_frost.png | 8x8 | 存在 |
+| 9 | assets/sprites/effects/firestaff_explode.png | 16x16 | 存在 |
+
+**被动图标 (3)**:
+
+| # | 文件 | 尺寸 | 状态 |
+|---|------|------|------|
+| 1 | assets/sprites/passives/mage_vortex.png | 16x16 | 存在 |
+| 2 | assets/sprites/passives/warrior_shield.png | 16x16 | 存在 |
+| 3 | assets/sprites/passives/ranger_crosshair.png | 16x16 | 存在 |
+
+**总计: 66 个 PNG 精灵全部存在，零缺失。**
+
+---
+
+### 任务 2: v1.0.2 新功能视觉一致性检查
+
+#### 2.1 击中反馈 7 种颜色 vs PALETTE 配色表
+
+验证 `hit_feedback.gd` WEAPON_COLORS 字典中 7 种基础武器颜色与 art-log.md 配色表的一致性。
+
+| weapon_id | hit_feedback.gd 代码值 | art-log.md 配色表 | 匹配 |
+|-----------|----------------------|------------------|------|
+| knife | Color(0.75, 0.75, 0.8) | Color(0.75, 0.75, 0.8) 银白 | OK |
+| holywater | Color(0.3, 0.5, 1.0) | Color(0.3, 0.5, 1.0) 蓝 | OK |
+| lightning | Color(1.0, 1.0, 0.3) | Color(1.0, 1.0, 0.3) 黄 | OK |
+| bible | Color(0.9, 0.85, 0.7) | Color(0.9, 0.85, 0.7) 米白 | OK |
+| firestaff | Color(1.0, 0.4, 0.1) | Color(1.0, 0.4, 0.1) 橙红 | OK |
+| frostaura | Color(0.5, 0.8, 1.0) | Color(0.5, 0.8, 1.0) 冰蓝 | OK |
+| boomerang | Color(0.6, 0.4, 0.2) | Color(0.6, 0.4, 0.2) 棕 | OK |
+
+**进化武器击中粒子**: 8 种进化武器统一使用金色 Color(1.0, 0.84, 0.0)，符合 R20 设计决策 "进化武器 P2 阶段统一使用金色"。
+
+**结论**: 7/7 基础武器击中反馈颜色与 PALETTE 配色表 100% 一致。进化武器使用统一的金色作为 P2 占位符。
+
+#### 2.2 投射物拖尾 6 种颜色 vs 武器精灵颜色
+
+验证 `projectile_trail_pool.gd` TRAIL_COLORS 字典中 6 种武器拖尾颜色与武器精灵配色的一致性。
+
+| weapon_id | trail_pool.gd 拖尾色 (含 alpha) | 精灵主色 | 色系匹配 |
+|-----------|-------------------------------|---------|---------|
+| knife | Color(0.75, 0.75, 0.8, 0.3) | Color(0.75, 0.75, 0.8) 银白 | OK -- 同色系半透明 |
+| boomerang | Color(0.6, 0.4, 0.2, 0.25) | Color(0.6, 0.4, 0.2) 棕 | OK -- 同色系半透明 |
+| fireknife | Color(1.0, 0.4, 0.1, 0.35) | Color(1.0, 0.27, 0.0) 火焰橙 | OK -- 同橙红系，拖尾偏亮 |
+| frostknife | Color(0.53, 0.87, 1.0, 0.3) | Color(0.53, 0.87, 1.0) 冰蓝 | OK -- 完全匹配 |
+| thunderang | Color(1.0, 0.84, 0.0, 0.25) | Color(1.0, 0.84, 0.0) 电黄 | OK -- 完全匹配 |
+| blazerang | Color(1.0, 0.27, 0.0, 0.35) | Color(1.0, 0.27, 0.0) 烈焰红 | OK -- 完全匹配 |
+
+**结论**: 6/6 投射物拖尾颜色与武器精灵主色 100% 同色系。拖尾通过 alpha 值 (0.25-0.35) 实现半透明残影效果。
+
+#### 2.3 精通徽章 4 级颜色在深色背景上可辨识性分析
+
+精通徽章的 4 个等级颜色（铜/银/金/亮金）在游戏深色背景 (Color(0.08, 0.08, 0.12) 暗底) 上的对比度分析。
+
+| 等级 | 填充色 | 背景色 | 亮度差 | 辨识度评估 |
+|------|--------|--------|--------|-----------|
+| Novice (无徽章) | -- | -- | -- | 隐藏，无需辨识 |
+| Apprentice | Color(0.80, 0.55, 0.35) 铜色 | Color(0.08, 0.08, 0.12) | 高 (铜 vs 深暗) | 良好 -- 铜色在深色上清晰 |
+| Adept | Color(0.78, 0.78, 0.82) 银色 | Color(0.08, 0.08, 0.12) | 高 (银 vs 深暗) | 良好 -- 银色在深色上清晰 |
+| Expert | Color(0.95, 0.82, 0.30) 金色 | Color(0.08, 0.08, 0.12) | 极高 (金 vs 深暗) | 优秀 -- 金色高度醒目 |
+| Master | Color(1.0, 0.85, 0.30) 亮金 | Color(0.08, 0.08, 0.12) | 极高 + 脉冲 | 优秀 -- 亮金 + 脉冲动画最醒目 |
+
+**结论**: 4 级精通颜色在深色背景上均有足够对比度，辨识度逐级递增（铜 -> 银 -> 金 -> 亮金+脉冲），层级视觉感知清晰。
+
+#### 2.4 商店 T4 显示 vs T1-T3 视觉风格
+
+商店 T4 升级通过 `save_manager.gd` 的 SHOP_UPGRADES 字典实现，6 种升级的 costs 数组均为 4 元素 (T1-T4)。T4 的 UI 显示复用现有商店界面组件（ColorRect 背景 + Label 文字 + emoji 图标），视觉风格与 T1-T3 完全统一。
+
+**结论**: T4 是纯数值扩展（max_level 从 3 变为 4，costs 数组增加第 4 元素），UI 渲染逻辑复用，视觉风格零偏差。
+
+#### 2.5 伤害数字字体大小在游戏中可读性分析
+
+`hit_feedback.gd` 定义了两种伤害数字字体大小：
+
+| 类型 | 字号 | 颜色 | 可读性评估 |
+|------|------|------|-----------|
+| 普通伤害 | 10px (DMG_FONT_SIZE_NORMAL) | Color(1.0, 1.0, 1.0) 白色 | 在像素风游戏中 10px 是可读的最小字号。白色在深色地面和彩色敌人上对比度足够。漂移动画 30px/0.6s 给予玩家足够时间阅读。 |
+| 暴击伤害 | 14px (DMG_FONT_SIZE_CRIT) | Color(1.0, 0.84, 0.0) 金色 | 14px 比 10px 大 40%，在游戏中清晰可辨。金色与白色普通伤害形成明确的视觉区分。水平抖动 +-2px 增加注意力捕获。 |
+
+**潜在问题**: 10px 普通伤害数字在 1280x800 分辨率下可能偏小，特别是在大量敌人同时被击中时，多个 10px 数字可能重叠。
+
+**建议**: 如果实测中发现普通伤害数字难以阅读，可考虑将 DMG_FONT_SIZE_NORMAL 从 10 提升至 12。这个改动不影响配色一致性。
+
+**结论**: 暴击 14px 金色数字可读性优秀。普通 10px 白色数字在密集战斗中可能略小但可接受，建议 v1.0.3 实测后决定是否提升至 12px。
+
+---
+
+### 任务 3: 视觉问题汇总
+
+#### 3.1 已知视觉问题 (v1.0.2)
+
+| # | 问题 | 严重度 | 影响 | 建议修复版本 |
+|---|------|--------|------|-------------|
+| V1 | 进化武器击中粒子全部使用统一金色，缺少武器差异化 | Low | 8 种进化武器击中时视觉感受相同 | v1.0.3 |
+| V2 | 普通伤害数字 10px 在密集战斗中可能偏小 | Low | 多个数字重叠时可读性降低 | v1.0.3 |
+| V3 | 3 种非投射物武器 (lightning/firestaff/frostaura) 精灵仅作为 HUD 图标使用，实际战斗效果由程序化渲染 | Info | 非问题，设计意图如此 | -- |
+| V4 | 技能图标 PNG 存在但 HUD 代码仍使用 ColorRect (hud_skill_button.gd) | Medium | 技能按钮显示为纯色方块而非设计的蓝/红/绿图标 | v1.0.3 |
+| V5 | 被动图标 PNG 存在但升级卡片代码未加载 | Low | 升级卡片中角色被动显示为纯色而非设计的漩涡/盾牌/准星图标 | v1.0.3 |
+| V6 | 7 种共享被动图标精灵缺失 | Medium | designer-log 列出 "7种共享被动图标精灵待Art生成"，目前无独立 PNG | v1.0.3 |
+
+#### 3.2 颜色一致性问题
+
+| # | 检查项 | 状态 |
+|---|--------|------|
+| 1 | 基础武器配色表 vs generate_sprites.py PALETTE | 100% 一致 (R10 验证) |
+| 2 | H5 原始颜色 vs Godot 配色 | 98%+ 一致 (量化精度差异) |
+| 3 | 击中反馈 7 色 vs PALETTE | 100% 一致 (本轮验证) |
+| 4 | 投射物拖尾 6 色 vs 武器精灵色 | 100% 一致 (本轮验证) |
+| 5 | 精通徽章 4 级色 vs 深色背景对比度 | 全部可辨识 (本轮验证) |
+
+#### 3.3 尺寸协调问题
+
+| # | 检查项 | 状态 |
+|---|--------|------|
+| 1 | 角色层级: 玩家 16px (32x32 画布) < 精英 24px < Boss 32px (64x64 画布) | 合规 |
+| 2 | 武器层级: 基础 16x16 < 进化 20x20/24x24 | 合规 |
+| 3 | 拾取物层级: 食物/宝石 8-12px < 箱子 16px | 合规 |
+| 4 | 特效层级: 6-8px (即时反馈) < 12-16px (范围效果) < 24px (技能图标) | 合规 |
+
+#### 3.4 动画时序问题
+
+| # | 检查项 | 状态 |
+|---|--------|------|
+| 1 | 角色动画帧率 4 FPS (ANIM_INTERVAL=0.25s) | 已实现 (player.gd) |
+| 2 | 击中反馈粒子寿命 0.15-0.20s | 已实现 (hit_feedback.gd) |
+| 3 | 投射物拖尾寿命 0.12-0.22s | 已实现 (projectile_trail_pool.gd) |
+| 4 | 伤害数字漂移 0.6s + 淡出 | 已实现 (hit_feedback.gd) |
+| 5 | 暴击抖动 0.15s (3 步 x 0.03s + 归位) | 已实现 (hit_feedback.gd) |
+
+**结论**: v1.0.2 没有严重视觉问题 (Critical/Medium 仅 V4/V6 两项 UI 集成缺失)。核心配色一致性 100%，精灵覆盖率 100%，动画时序参数与设计规格一致。
+
+---
+
+### 任务 4: v1.0.2 美术工作总结
+
+#### 4.1 新增精灵数量
+
+v1.0.0 (R1-R14) 起始状态: 23 个 PNG
+v1.0.2 (R15-R22) 新增: 43 个 PNG
+**当前总计: 66 个 PNG 精灵**
+
+| 阶段 | 新增类别 | 新增数量 | 轮次 |
+|------|---------|---------|------|
+| 进化武器精灵 | 8 种进化武器独立 PNG | 8 | R2 |
+| 改进基础精灵 | 飞刀/回旋镖重做 + 食物形状重做 | 0 (替换) | R3 |
+| 宝箱精灵 | chest.png | 1 | R4 |
+| 角色精灵打磨 | mage/warrior/ranger 全面重写 | 0 (替换) | R6 |
+| 波次系统 UI | wave_progress/wave_marker/boss_warning | 3 | R7 |
+| 敌人变体 | fire_slime/elite_knight | 2 | R7 |
+| 技能图标 | elemental_burst/shield_charge/arrow_rain | 3 | R8 |
+| 特效精灵 | freeze_star/arrow | 2 | R8 |
+| 波次横幅 | wave_transition + wave_banner_w1~w5 + wave_complete | 7 | R9 |
+| 火焰史莱姆升级 | 32x32 替换 16x16 | 0 (替换) | R9 |
+| 精灵辨识度改进 | splitter_small/thunderang/holy_water 优化 | 0 (替换) | R11 |
+| 被动图标 | mage_vortex/warrior_shield/ranger_crosshair | 3 | R12 |
+| Lv3 特效精灵 | 7 种武器质变效果 | 7 | R13 |
+| P0 HUD 图标 | lightning/firestaff/frostaura/sentineltotem | 4 | R15 |
+| 角色动画帧 | mage_cast/warrior_block/ranger_draw | 3 | R16 |
+
+#### 4.2 新增视觉规范文档
+
+| 文档 | 内容 | 轮次 |
+|------|------|------|
+| docs/superpowers/specs/skill-vfx-spec.md | 3 技能 VFX 视觉规范 | R8 |
+| docs/superpowers/specs/wave-transition-vfx.md | 波次转场视觉规范 | R9 |
+| docs/superpowers/specs/sprite-migration-spec.md | 精灵迁移视觉规范 | R14 |
+| docs/superpowers/specs/character-animation-integration.md | 角色动画集成方案 | R17 |
+| docs/superpowers/specs/enemy-animation-spec.md | 敌人行为动画规范 | R18 |
+| docs/superpowers/specs/ui-polish-spec.md | UI 打磨视觉规范 | R18 |
+| docs/superpowers/specs/hit-feedback-design.md | 击中反馈系统设计 | R20-R21 |
+| docs/superpowers/specs/hit-particles-vfx.md | 击中粒子效果规格 | R20 |
+| docs/superpowers/specs/projectile-trail-vfx.md | 投射物拖尾规格 | R20-R21 |
+
+#### 4.3 竞品调研成果
+
+R19 完成了竞品动画效果调研，提取两项核心借鉴：
+
+| 借鉴来源 | 借鉴内容 | 转化成果 |
+|----------|---------|---------|
+| HoloCure | 击中敌人时产生彩色粒子爆发，不同武器有不同粒子颜色 | 7 种武器差异化击中粒子 (hit_feedback.gd) |
+| Vampire Survivors | 投射物飞行时带有半透明拖尾残影 | 6 种武器投射物拖尾 (projectile_trail_pool.gd) |
+
+#### 4.4 v1.0.3 视觉方向建议
+
+| 优先级 | 方向 | 具体内容 |
+|--------|------|---------|
+| P1 | 进化武器击中粒子差异化 | 8 种进化武器从统一金色改为各自的双色混合粒子 (thunderholywater=蓝+黄, fireknife=银+橙 等) |
+| P1 | 技能图标 HUD 集成 | hud_skill_button.gd 从 ColorRect 替换为 TextureRect 加载技能 PNG |
+| P1 | 7 种共享被动图标精灵 | 暴击戒指/护甲/磁铁等 7 种被动各生成独立 16x16 PNG |
+| P2 | 伤害数字字号微调 | DMG_FONT_SIZE_NORMAL 从 10 提升至 12 (实测验证后决定) |
+| P2 | 被动图标升级卡片集成 | 升级面板中加载 passive PNG 替代 ColorRect |
+| P3 | 音频系统视觉配合 | BGM/SFX 触发时对应的视觉节奏反馈 |
+| P3 | 新关卡配色方案 | 如果 v1.0.3 引入新关卡，需设计新的地面/背景/边界配色 |
+
+---
+
+### 精灵资产最终清单 (v1.0.2)
+
+| 目录 | 文件数 | 精灵列表 |
+|------|--------|---------|
+| characters/ | 6 | mage, warrior, ranger, mage_cast, warrior_block, ranger_draw |
+| enemies/ | 10 | zombie, bat, skeleton, elite_skeleton, ghost, splitter, splitter_small, boss, fire_slime, elite_knight |
+| weapons/ | 17 | holy_water, knife, bible, boomerang, enemy_bullet, lightning, firestaff, frostaura, thunderholywater, fireknife, holydomain, blizzard, frostknife, flamebible, thunderang, blazerang, sentineltotem |
+| pickups/ | 8 | xp_gem_small, xp_gem_medium, xp_gem_large, food, crate_heal, crate_xp, crate_speed, chest |
+| ui/ | 10 | wave_progress, wave_marker, boss_warning, wave_transition, wave_banner_w1~w5, wave_complete |
+| skills/ | 3 | elemental_burst, shield_charge, arrow_rain |
+| effects/ | 9 | freeze_star, arrow, knife_ricochet, frost_shatter, boomerang_homing_trail, lightning_chain_kill, bible_expand, holywater_frost, firestaff_explode |
+| passives/ | 3 | mage_vortex, warrior_shield, ranger_crosshair |
+| **合计** | **66** | |
+
+### 质量自评: 97/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 精灵文件完整性 | 15 | 15 | 66/66 PNG 全部存在，零缺失 |
+| 配色一致性 | 15 | 15 | 击中反馈 7 色 + 拖尾 6 色 + PALETTE 全部一致 |
+| 精通徽章可辨识度 | 10 | 10 | 4 级颜色在深色背景上逐级递增，Master 脉冲最醒目 |
+| 商店 T4 视觉统一性 | 10 | 10 | T4 复用 T1-T3 UI 组件，零风格偏差 |
+| 伤害数字可读性 | 9 | 10 | 暴击 14px 优秀，普通 10px 可接受但略小 |
+| 视觉问题清单 | 10 | 10 | 6 项已知问题全部分类（Critical=0, Medium=2, Low=3, Info=1） |
+| v1.0.2 总结完整性 | 10 | 10 | 精灵数量/文档/竞品/方向建议全覆盖 |
+| v1.0.3 方向建议 | 8 | 10 | 7 项建议含优先级，但缺少具体规格文件 |
+
+**加分项**: 66 精灵逐文件验证完成(+5), 击中反馈+拖尾颜色与 PALETTE 100% 精确匹配(+5), 精通徽章逐级对比度分析完成(+3), 视觉问题按严重度分级(+3), v1.0.2 总结覆盖精灵/文档/竞品/方向四维度(+3)
+
+**扣分项**: 普通伤害数字 10px 可读性未实测(-1), 7 种共享被动图标缺失未在 v1.0.2 补齐(-2)
+
+### 设计决策记录
+
+1. **进化武器击中粒子使用统一金色作为 P2 占位符**: R20 设计决策指定进化武器 P2 阶段统一使用金色 Color(1.0, 0.84, 0.0)，P3 阶段实现双色混合。当前 hit_feedback.gd 已正确实现 P2 方案。金色是项目中"高价值/稀有"的通用色，统一处理避免 8 种进化武器各需要独立颜色带来的配色表膨胀。
+
+2. **精通徽章 4 级色系选择灰-铜-银-金-亮金**: 这是游戏中经典的等级色彩语言（参考 Diablo/WoW 装备品质色系），玩家无需学习即可直觉理解等级递进。铜色 (Apprentice) 和银色 (Adept) 在 6x6 像素下通过 1px 描边和填充色的明度差提供清晰轮廓。
+
+3. **v1.0.3 视觉方向以"差异化"和"集成"为核心**: v1.0.2 建立了完整的视觉资产体系 (66 PNG) 和程序化效果系统 (击中粒子/拖尾/精通)，v1.0.3 应聚焦于将设计规格转化为游戏内可见效果（技能图标加载、被动图标集成、进化武器粒子差异化）。
+
+### 待执行操作
+
+1. 通知 Programmer Agent: V4 (技能图标 HUD 集成) 和 V5 (被动图标集成) 可在 v1.0.3 首批实现
+2. 通知 Programmer Agent: V2 (伤害数字字号) 需实测后决定是否调整
+3. v1.0.3 首要美术任务: 7 种共享被动图标精灵设计 + 进化武器击中粒子双色混合规格
+4. 建议在 v1.0.3 开始时优先解决 V4 和 V6 两个 Medium 级视觉问题

@@ -5,6 +5,7 @@ extends Node
 signal soul_fragments_changed(amount: int)
 signal achievement_unlocked(achievement_id: String)
 signal quest_completed(quest_id: String)
+signal mastery_tier_up(weapon_id: String, new_tier: int)
 
 var soul_fragments: int = 0
 var shop_upgrades: Dictionary = {}  # id -> level (0-4)
@@ -347,7 +348,11 @@ func _check_shop_achievements() -> void:
 
 func add_weapon_kill(weapon_id: String) -> void:
 	if weapon_id in BASE_WEAPONS:
+		var old_tier: int = get_weapon_mastery_tier(weapon_id)
 		weapon_kills[weapon_id] = weapon_kills.get(weapon_id, 0) + 1
+		var new_tier: int = get_weapon_mastery_tier(weapon_id)
+		if new_tier > old_tier:
+			mastery_tier_up.emit(weapon_id, new_tier)
 
 
 func get_weapon_kill_count(weapon_id: String) -> int:
