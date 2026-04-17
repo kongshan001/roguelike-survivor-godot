@@ -14,7 +14,11 @@
 | ~~P1~~ | ~~武器系统需要重构支持7种武器~~ | ✅ 已解决 |
 | ~~P1~~ | ~~敌人系统需要支持状态效果~~ | ✅ 已解决 |
 | ~~P2~~ | ~~需要协同效应管理器~~ | ✅ 已解决 |
-| P2 | weapon_controller.gd 350行接近上限 | 待观察 |
+| ~~P2~~ | ~~weapon_controller.gd 350行接近上限~~ | R28 已降至152行 |
+| ~~P1~~ | ~~3种进化武器发射逻辑未实现 (BUG-290)~~ | R29 CLOSED |
+| P2 | weapon_fire.gd 448行接近上限 (89.6%) | R29 追踪 |
+| P2 | beam_line.gd load+new 热路径 | R29 新发现 |
+| P2 | save_manager.gd 431行 (86.2%) | 持续追踪 |
 
 ## 优化建议
 
@@ -9272,6 +9276,258 @@ per evolution-expansion.md Section 12.1, Programmer 应创建:
 **修正**: R27 审核报告将 sentineltotem 列入"发射逻辑未实现", 但实际上 sentineltotem 使用 "orbit" 类型 (非新类型), 其 orbit_fire_rate=0.8 在 update_orbit() 的 _fire_orbit_projectiles() 中正确处理。sentineltotem 应该能正常工作。
 
 因此 BUG-290 实际影响范围是 3 种武器 (非 4 种): frostvortex, holyshockwave, thunderbeam。
+
+---
+
+## R29 审核报告 (2026-04-18) -- BUG-290 修复验证 + 全局架构审计
+
+### 审核环境
+
+- 基线测试套件: **2090 tests, 0 failures** (R28 QA 报告)
+- BUG-290 修复状态: **已修复并验证通过** (QA R28 报告确认)
+- 待审核变更: Programmer R28 交付的 spiral/pulse/beam 三种进化武器射击行为
+
+---
+
+### 任务 1: R28 代码审查
+
+#### 1.1 BUG-290 关闭评估: **CLOSED**
+
+| 关闭条件 | 状态 | 证据 |
+|----------|------|------|
+| weapon_controller.gd match 新增 3 分支 | PASS | 行 83-88: "spiral", "pulse", "beam" 均已添加 |
+| weapon_fire.gd 新增 fire 函数 | PASS | update_spiral() (行 370-393), fire_pulse() (行 398-414), fire_beam() (行 422-447) |
+| scripts/weapons/ 新模块文件 | PASS | spiral_blade.gd (98行), pulse_ring.gd (79行), beam_line.gd (137行) |
+| hit_feedback.gd 3 种新颜色 | PASS | frostvortex: Color(0.3, 0.7, 1.0), holyshockwave: Color(1.0, 0.85, 0.3), thunderbeam: Color(1.0, 1.0, 0.4) |
+| QA 回归测试通过 | PASS | R28 报告: 2090 tests, 0 failures |
+
+#### 1.2 文件行数审计
+
+| 文件 | 行数 | 上限占比 | R27 基线 | 变化 | 状态 |
+|------|------|----------|----------|------|------|
+| scripts/hud.gd | 351 | 70.2% | 437 | -86 | PASS (大幅缩减) |
+| scripts/autoload/save_manager.gd | 431 | 86.2% | 430 | +1 | WARNING |
+| scripts/weapons/weapon_fire.gd | 448 | 89.6% | 366 | +82 | WARNING |
+| scripts/player.gd | 374 | 74.8% | 374 | -- | PASS |
+| scripts/enemy.gd | 362 | 72.4% | 359 | +3 | PASS |
+| scripts/autoload/game_manager.gd | 320 | 64.0% | 320 | -- | PASS |
+| scripts/tutorial_manager.gd | 272 | 54.4% | 334 | -62 | PASS |
+| scripts/weapon_controller.gd | 152 | 30.4% | 137 | +15 | PASS |
+| scripts/effects/hit_feedback.gd | 248 | 49.6% | 245 | +3 | PASS |
+| scripts/weapons/spiral_blade.gd | 98 | 19.6% | 新文件 | -- | PASS |
+| scripts/weapons/pulse_ring.gd | 79 | 15.8% | 新文件 | -- | PASS |
+| scripts/weapons/beam_line.gd | 137 | 27.4% | 新文件 | -- | PASS |
+
+**全部文件 < 500 行**: PASS
+
+**weapon_fire.gd 89.6% 警告**: 448 行接近 500 行上限。如需再增加武器类型，必须拆分。
+
+#### 1.3 代码质量审查
+
+**spiral_blade.gd** -- 评级: PASS (附带建议)
+
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| 类型注解 | PASS | 所有变量和函数参数均有类型注解 |
+| signal 使用 | N/A | 无信号，直接调用 enemy 方法 |
+| 碰撞检测 | PASS | 使用 get_cached_enemies() 优化，fallback 到 get_nodes_in_group |
+| _physics_process 性能 | MEDIUM | 每帧遍历 blade_count * all_enemies 进行距离检测 |
+| 资源管理 | MEDIUM | _hit_cooldowns Dictionary 以 enemy 对象为键，死亡敌人引用在冷却衰减后才移除 |
+
+**pulse_ring.gd** -- 评级: PASS
+
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| 类型注解 | PASS | 全部注解完整 |
+| 生命周期管理 | PASS | 扩展完成后 queue_free() 自动销毁 |
+| 碰撞检测 | PASS | 环带检测 (current_radius - ring_width 到 current_radius) 正确 |
+| _hit_enemies 防重复 | PASS | Dictionary 以 enemy 为键避免重复伤害 |
+
+**beam_line.gd** -- 评级: PASS (附带 Medium 问题)
+
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| 类型注解 | PASS | 全部注解完整 |
+| 生命周期管理 | PASS | active_duration 结束后 queue_free() |
+| _hit_enemies 存储 | MEDIUM | Array 存储敌人对象引用，但仅用于 _apply_chain_lightning 终态使用，beam 自身在约1s后销毁，风险可控 |
+| load() 热路径 | **MEDIUM** | 行 135: `_apply_chain_lightning()` 中每次 chain 都 `load("res://scripts/weapons/weapon_effects.gd").new()` 创建新实例，且 create_lightning_effect 是 static 函数无需实例化 |
+
+**weapon_fire.gd +82 行** -- 评级: PASS
+
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| update_spiral() | PASS | 正确管理实例生命周期 (创建/更新 damage/返回) |
+| fire_pulse() | PASS | 创建 pulse_ring Node2D 实例并 setup |
+| fire_beam() | PASS | 正确获取最近敌人方向，创建 beam_line |
+| 新增常量 | PASS | THUNDERBEAM_CHAIN_DAMAGE=6.0, THUNDERBEAM_CHAIN_RANGE=120.0 使用命名常量 |
+
+**weapon_controller.gd +15 行** -- 评级: PASS
+
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| match 新增分支 | PASS | "spiral", "pulse", "beam" 三个分支正确分派 |
+| _spiral_instance 跟踪 | PASS | 行 7 声明，行 84 更新，行 122-124 清理 |
+| _process 位置同步 | PASS | 行 147-151 跟踪 spiral 实例位置到玩家 |
+
+**hit_feedback.gd +3 色** -- 评级: PASS
+
+新增 3 种武器颜色与规格完全一致，WEAPON_COLORS 从 16 增长到 19。
+
+#### 1.4 R28 发现的具体问题
+
+**[MEDIUM-29-1] beam_line.gd 行 135: 每次 chain 闪电都 load + new weapon_effects**
+
+```gdscript
+var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
+effects.create_lightning_effect(...)
+```
+
+问题: `create_lightning_effect` 是 `static func`，不需要实例化。每次 chain 都 `load()` + `.new()` 造成不必要的对象分配。beam 每次生命周期结束时触发一次，最多 chain_count=2 次，即每次 beam 销毁时创建 2 个 RefCounted 对象。
+
+建议: 改为直接调用 static 方法:
+```gdscript
+load("res://scripts/weapons/weapon_effects.gd").create_lightning_effect(...)
+```
+或使用 preload 缓存脚本引用。
+
+**[MEDIUM-29-2] spiral_blade.gd: O(blade_count * enemy_count) 每帧距离计算**
+
+`_physics_process` 中嵌套循环: 6 blades * N enemies，每帧计算 `blade_pos.distance_to(enemy.global_position - global_position)`。
+
+当前影响: blade_count=6，敌人数通常 < 100，总计 600 次距离计算/帧，可接受。但如果敌人数激增 (endless mode 后期)，需关注。
+
+建议: 当 enemy_count > 80 时考虑空间分区 (grid-based)。标记为观察项。
+
+**[LOW-29-1] beam_line.gd _player 引用未校验有效性**
+
+`_player` 在 setup() 中赋值后，_apply_tick_damage 和 _apply_chain_lightning 未检查 `_player` 是否仍然有效。由于 beam 生命周期仅 1.0s，且玩家死亡时游戏暂停，实际风险极低。但为了代码健壮性，建议在 `_physics_process` 开头添加 `if not is_instance_valid(_player): queue_free(); return`。
+
+**[LOW-29-2] pulse_ring.gd _hit_enemies 使用 enemy 对象作为 Dictionary 键**
+
+如果 enemy 在 ring 扩展过程中被 queue_free()，Dictionary 中仍持有失效引用。但 pulse_ring 使用 `is_instance_valid(enemy) and enemy.is_alive` 检查后再查询 `_hit_enemies.has(enemy)`，因此不会误判。ring 生命周期仅 0.3s，风险极低。
+
+**[LOW-29-3] spiral_blade.gd 使用 extends Node2D 而非 Area2D**
+
+R28 审核基线建议使用 Area2D + 碰撞层 Layer3。实际实现使用 Node2D + 手动距离检测。这是合理的性能选择 (避免 Area2D 碰撞矩阵开销)，但应记录为架构决策。
+
+---
+
+### 任务 2: 全局架构审计
+
+#### 2.1 文件行数排行 (400+ 行)
+
+| 文件 | 行数 | 占比 | 风险等级 |
+|------|------|------|----------|
+| scripts/autoload/save_manager.gd | 431 | 86.2% | WARNING |
+| scripts/weapons/weapon_fire.gd | 448 | 89.6% | WARNING |
+| scripts/player.gd | 374 | 74.8% | PASS |
+
+**weapon_fire.gd** 是当前最接近上限的文件。如未来需增加新武器类型，必须按 CLAUDE.md 规范拆分为独立 RefCounted 模块 (参考 weapon_boomerang_fire.gd 的拆分模式)。
+
+**save_manager.gd** 431 行保持稳定，但新增持久化字段会快速增加行数。
+
+#### 2.2 Autoload 交叉引用审计
+
+| Autoload | 引用的 Autoload | 合规性 |
+|----------|----------------|--------|
+| SaveManager | GameManager (行 202-213) | **已知豁免** -- 仅在 check_quests_and_achievements() 中桥接数据到 AchievementChecker |
+| SaveManager | SynergyManager (行 249-252) | **已知豁免** -- 仅在 _collect_active_synergies() 中读取数据 |
+| SaveManager | AchievementChecker (行 228) | PASS -- 使用信号解耦，AchievementChecker 不引用任何 Autoload |
+| GameManager | (无) | PASS -- 不引用其他 Autoload |
+| SynergyManager | (无) | PASS -- 不引用其他 Autoload |
+| UpgradePool | (无) | PASS -- 不引用其他 Autoload |
+
+**评估**: SaveManager -> GameManager/SynergyManager 的引用已被 AchievementChecker 架构缓解。数据以 Dictionary 参数传递给 AchievementChecker，后者通过信号回传结果。这是当前可接受的最小交叉引用方案。
+
+#### 2.3 重复代码模式
+
+**模式 A: "获取范围内敌人" -- 15 处重复**
+
+```
+GameManager.get_cached_enemies() if GameManager else get_tree().get_nodes_in_group("enemies")
+```
+
+出现在: enemy.gd, xp_gem.gd, weapon_controller.gd, projectile.gd, spin_blade.gd, boomerang.gd, beam_line.gd (x2), spiral_blade.gd, pulse_ring.gd, skill_effects.gd (x3), tutorial_manager.gd
+
+建议: 提取为 GameManager 的静态方法或全局辅助函数，减少 fallback 样板代码。标记为 P2 债务。
+
+**模式 B: ProjectileManager 获取 -- 5 处重复**
+
+```gdscript
+var parent: Node = player.get_parent()
+if parent and parent.has_node("ProjectileManager"):
+    return parent.get_node("ProjectileManager")
+```
+
+出现在: weapon_fire.gd (行 40-44), weapon_boomerang_fire.gd (行 15-19), weapon_controller.gd (行 18-22)
+
+建议: 提取为公共辅助方法。标记为 Low 债务。
+
+#### 2.4 Signal 连接泄漏风险
+
+**全项目无 disconnect() 调用**: 55 个 `.connect()` 调用，0 个 `.disconnect()` 调用。
+
+| 场景 | 风险评估 |
+|------|----------|
+| HUD -> GameManager signals (12 个连接) | **MEDIUM** -- 场景切换时如果 HUD 未正确销毁，连接会泄漏。但 Godot 4.x 中 CanvasLayer 作为场景子节点会被自动清理 |
+| Arena -> GameManager signals (5 个连接) | PASS -- Arena 场景切换时自动清理 |
+| SaveManager -> AchievementChecker signals (4 个连接) | PASS -- AchievementChecker 是 RefCounted，每次 check 完成后自动释放 |
+| create_timer().timeout.connect (3 处) | PASS -- 一次性 Timer 自动销毁 |
+
+**结论**: 在 Godot 4.x 中，节点被 queue_free() 时信号自动断开。当前模式安全，无需添加 disconnect()。
+
+---
+
+### 任务 3: 技术债务追踪更新
+
+| # | 债务 | 优先级 | R28 状态 | R29 状态 | 变化 |
+|---|------|--------|---------|---------|------|
+| 1 | die() 60行未重构 | P1 | 未修复 | 未修复 | -- |
+| 7 | save_manager 元数据类型不匹配 | P2 | 未修复 | 未修复 | -- |
+| 13 | chest.gd ColorRect 未迁移 | P2 | 未修复 | 未修复 | -- |
+| 14 | release-readiness.md 过时 | Low | 未修复 | 未修复 | -- |
+| 15 | **3 种进化武器发射逻辑未实现** | **P1** | 部分修复 | **已修复** | BUG-290 CLOSED |
+| 16 | upgrade_pool.gd 每次调用 load+new | P2 | 未修复 | 未修复 | -- |
+| 17 | hud.gd 行数接近上限 | P2 | 437行 | 351行 | **大幅改善** |
+| 18 | hud_mastery_panel 武器名映射需手动同步 | Low | 未修复 | 未修复 | -- |
+| 19 | upgrade_pool.gd 被动数据未提取 | Low | 未修复 | 未修复 | -- |
+| 20 | **weapon_fire.gd 448行 (89.6%)** | **P2** | 新发现 | 追踪 | 接近500行上限，新增武器类型前必须拆分 |
+| 21 | **beam_line.gd load+new 热路径** | **P2** | 新发现 | 追踪 | 每次chain都 load()+new() RefCounted |
+| 22 | "获取范围内敌人" 15处重复代码 | Low | 存在 | 追踪 | 可提取为辅助函数 |
+| 23 | beam_line.gd _player 引用未校验 | Low | 新发现 | 追踪 | 1s 生命周期内风险极低 |
+
+**已关闭债务**:
+- ~~#15: 3种进化武器发射逻辑~~ -- BUG-290 已修复，QA 验证 2090 测试全通过
+
+---
+
+### 审核总结
+
+**整体评级**: PASS -- 项目健康
+
+1. **BUG-290 修复完整**: spiral/pulse/beam 三种进化武器射击行为已正确实现，代码质量良好，QA 2090 测试全通过
+2. **架构合规**: 全部文件 < 500 行，无 autoload 交叉引用违规
+3. **性能可接受**: 当前敌人数规模下，所有 _physics_process 操作合理
+4. **主要关注点**: weapon_fire.gd 行数 89.6%，是下一个需要拆分的文件
+
+### 给各角色的建议
+
+**Programmer**:
+- [MEDIUM-29-1] 修复 beam_line.gd 行 135 的 load+new 问题，改为 static 调用
+- [P2] weapon_fire.gd 在添加下一个武器类型前必须拆分
+- [LOW-29-1] beam_line.gd 添加 _player 有效性校验
+
+**策划**:
+- 数值层与实现层完全一致，所有 12 种进化武器的注册数据与 spec 匹配
+- 无数值平衡性新问题
+
+**美术**:
+- hit_feedback 新增 3 种武器颜色与武器视觉风格一致
+- 进化武器仍使用金色占位符 (已知 Low 级别不一致，P3 polish)
+
+**QA**:
+- R28 测试覆盖全面 (48 项，覆盖数据/调度/行为/回归)
+- 建议: Section D 的视觉效果测试目前仅验证 "不崩溃"，可考虑断言 PM child_count > 0
 
 ---
 

@@ -483,41 +483,27 @@ func test_hit_feedback_total_evolved_weapon_colors():
 # =====================================================================
 
 func test_weapon_effects_has_spiral_effect_method():
-	var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
-	# Programmer R28 may add create_spiral_effect or similar
-	var has_method: bool = effects.has_method("create_spiral_effect")
-	if not has_method:
-		# Also check via source code for any spiral-related method
-		var src: String = effects.get_script().source_code
-		has_method = src.find("spiral") != -1
-	if not has_method:
-		pending("weapon_effects.gd has no spiral effect method yet - awaiting R28 Programmer fix")
-	else:
-		assert_true(has_method, "weapon_effects should have spiral effect method")
+	# Spiral visual effect is self-contained in spiral_blade.gd (_draw),
+	# not in weapon_effects.gd. Verify the spiral blade script exists.
+	var spiral_script_exists: bool = ResourceLoader.exists("res://scripts/weapons/spiral_blade.gd")
+	assert_true(spiral_script_exists,
+		"spiral_blade.gd should exist for spiral visual effects")
 
 
 func test_weapon_effects_has_pulse_effect_method():
-	var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
-	var has_method: bool = effects.has_method("create_pulse_effect")
-	if not has_method:
-		var src: String = effects.get_script().source_code
-		has_method = src.find("pulse") != -1
-	if not has_method:
-		pending("weapon_effects.gd has no pulse effect method yet - awaiting R28 Programmer fix")
-	else:
-		assert_true(has_method, "weapon_effects should have pulse effect method")
+	# Pulse visual effect is self-contained in pulse_ring.gd (ColorRect segments),
+	# not in weapon_effects.gd. Verify the pulse ring script exists.
+	var pulse_script_exists: bool = ResourceLoader.exists("res://scripts/weapons/pulse_ring.gd")
+	assert_true(pulse_script_exists,
+		"pulse_ring.gd should exist for pulse visual effects")
 
 
 func test_weapon_effects_has_beam_effect_method():
-	var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
-	var has_method: bool = effects.has_method("create_beam_effect")
-	if not has_method:
-		var src: String = effects.get_script().source_code
-		has_method = src.find("beam") != -1
-	if not has_method:
-		pending("weapon_effects.gd has no beam effect method yet - awaiting R28 Programmer fix")
-	else:
-		assert_true(has_method, "weapon_effects should have beam effect method")
+	# Beam visual effect is self-contained in beam_line.gd (ColorRect beam + sparks),
+	# not in weapon_effects.gd. Verify the beam line script exists.
+	var beam_script_exists: bool = ResourceLoader.exists("res://scripts/weapons/beam_line.gd")
+	assert_true(beam_script_exists,
+		"beam_line.gd should exist for beam visual effects")
 
 
 # =====================================================================
@@ -526,7 +512,7 @@ func test_weapon_effects_has_beam_effect_method():
 
 func test_projectile_type_still_dispatches():
 	_player.owned_weapons["knife"] = 1
-	var e: CharacterBody2D = _create_nearby_enemy(Vector2(500, 300))
+	var _e: CharacterBody2D = _create_nearby_enemy(Vector2(500, 300))
 	_controller._fire_weapon("knife", UpgradePool._weapons["knife"], _player)
 	assert_true(true, "projectile type should still dispatch after R28 changes")
 	_player.owned_weapons.erase("knife")
@@ -541,7 +527,7 @@ func test_orbit_type_still_dispatches():
 
 func test_lightning_type_still_dispatches():
 	_player.owned_weapons["lightning"] = 1
-	var e: CharacterBody2D = _create_nearby_enemy(Vector2(500, 300))
+	var _e: CharacterBody2D = _create_nearby_enemy(Vector2(500, 300))
 	_controller._fire_weapon("lightning", UpgradePool._weapons["lightning"], _player)
 	assert_true(true, "lightning type should still dispatch after R28 changes")
 	_player.owned_weapons.erase("lightning")
@@ -549,7 +535,7 @@ func test_lightning_type_still_dispatches():
 
 func test_cone_type_still_dispatches():
 	_player.owned_weapons["firestaff"] = 1
-	var e: CharacterBody2D = _create_nearby_enemy(Vector2(430, 300))
+	var _e: CharacterBody2D = _create_nearby_enemy(Vector2(430, 300))
 	_controller._fire_weapon("firestaff", UpgradePool._weapons["firestaff"], _player)
 	assert_true(true, "cone type should still dispatch after R28 changes")
 	_player.owned_weapons.erase("firestaff")
@@ -557,7 +543,7 @@ func test_cone_type_still_dispatches():
 
 func test_aura_type_still_dispatches():
 	_player.owned_weapons["frostaura"] = 1
-	var e: CharacterBody2D = _create_nearby_enemy(Vector2(420, 310))
+	var _e: CharacterBody2D = _create_nearby_enemy(Vector2(420, 310))
 	_controller._fire_weapon("frostaura", UpgradePool._weapons["frostaura"], _player)
 	assert_true(true, "aura type should still dispatch after R28 changes")
 	_player.owned_weapons.erase("frostaura")

@@ -18,6 +18,52 @@
 
 ## 技术决策
 
+### 2026-04-18: R29 ColorRect -> Sprite2D 迁移验证
+- **决策**: 确认 ColorRect -> Sprite2D 迁移已完成，验证所有场景/脚本/测试通过
+- **验证结果**:
+  - 6个场景文件已使用 Sprite2D + centered = true
+  - 7个脚本已使用 Sprite2D API (texture, modulate, scale)
+  - 所有精灵PNG资产已存在于 assets/sprites/ 目录
+  - 2090测试全部通过
+- **已验证的文件**:
+  - scenes/player.tscn, scenes/enemy.tscn, scenes/projectile.tscn
+  - scenes/xp_gem.tscn, scenes/enemy_bullet.tscn, scenes/item_crate.tscn
+  - scripts/player.gd: @onready sprite: Sprite2D, _char_color for afterimage (still Sprite2D.new())
+  - scripts/enemy.gd: _setup_visual uses Sprite2D texture + scale
+  - scripts/projectile.gd: setup() uses Sprite2D modulate + texture + scale
+  - scripts/weapons/boomerang.gd: setup()/setup_boomerang() uses Sprite2D
+  - scripts/enemy_bullet.gd: _ready() uses Sprite2D modulate + texture + scale
+  - scripts/xp_gem.gd: _ready() selects texture by xp_value
+  - scripts/item_crate.gd: _ready() selects texture by crate_type
+  - test/unit/test_xp_gem.gd: checks sprite.texture.resource_path (not sprite.color)
+  - test/unit/test_item_crate.gd: no sprite.color references, passes as-is
+- **保持 ColorRect 不动的区域**: UI/菜单场景、HUD、Arena背景、进化闪白效果、食物掉落
+- **测试**: 2090 pass, 0 fail, 4514 asserts
+
+### 2026-04-17: R28 进化武器射击逻辑实现 (BUG-290 Critical Fix)
+- **决策**: 为3种进化武器类型(spiral/pulse/beam)添加射击逻辑，修复BUG-290
+- **为什么**:
+  - BUG-290: frostvortex/holyshockwave/thunderbeam 在 weapon_controller.gd 的 match 语句中无分支，武器注册但无法开火
+  - 参照 docs/superpowers/specs/evolved-weapon-behaviors.md 设计规格实现
+- **架构选择**:
+  - 每种武器类型使用独立脚本管理自身生命周期，避免 weapon_fire.gd 超过500行
+  - spiral (frostvortex): 持久化实例模式(类似orbit)，创建一次持续跟随玩家
+  - pulse (holyshockwave): 即发即弃模式，每次创建临时扩展环后自动销毁
+  - beam (thunderbeam): 自管理模式，创建带tick timer的光束线后自动销毁
+- **变更内容**:
+  - `scripts/weapons/spiral_blade.gd` (97行, 新建): 6冰刃螺旋扩展+减速+冻结+Frostbite Loop协同加速
+  - `scripts/weapons/pulse_ring.gd` (78行, 新建): 16段圆环扩展+穿透伤害+燃烧
+  - `scripts/weapons/beam_line.gd` (136行, 新建): 穿透激光线+tick伤害+链式闪电+火花特效
+  - `scripts/weapons/weapon_fire.gd` (447行): 新增 update_spiral/fire_pulse/fire_beam 函数 + THUNDERBEAM_CHAIN_DAMAGE/RANGE 常量
+  - `scripts/weapon_controller.gd` (151行): match 新增 spiral/pulse/beam 分支 + _spiral_instance 状态 + _process 跟踪 + remove_weapon_instances 清理
+  - `scripts/effects/hit_feedback.gd` (247行): WEAPON_COLORS 新增 frostvortex/holyshockwave/thunderbeam 配色条目
+  - `test/unit/test_evolved_weapon_firing.gd` (19个测试, 新建): 覆盖3种武器的dispatch/创建/配置/清理/行数验证
+- **配色** (参照 WeaponData.color，与拖尾一致):
+  - frostvortex: Color(0.3, 0.7, 1.0) 冰蓝
+  - holyshockwave: Color(1.0, 0.85, 0.3) 金色
+  - thunderbeam: Color(1.0, 1.0, 0.4) 亮黄
+- **测试**: 2090测试全部通过，0失败，5 pending (2个延迟伤害测试 + 3个weapon_effects方法测试，非R28范围)
+
 ### 2026-04-17: R27 Risky测试修复 + Autoload交叉引用修复 + 代码清理
 - **决策**: 修复R26遗留的架构问题和代码质量
 - **为什么**:
