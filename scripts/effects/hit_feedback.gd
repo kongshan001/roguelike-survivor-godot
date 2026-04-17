@@ -54,6 +54,9 @@ const WEAPON_COLORS: Dictionary = {
 	"blizzard": Color(1.0, 0.84, 0.0),
 	"flamebible": Color(1.0, 0.84, 0.0),
 	"sentineltotem": Color(1.0, 0.84, 0.0),
+	"frostvortex": Color(0.3, 0.7, 1.0),
+	"holyshockwave": Color(1.0, 0.85, 0.3),
+	"thunderbeam": Color(1.0, 1.0, 0.4),
 }
 
 # --- Rate limiting ---

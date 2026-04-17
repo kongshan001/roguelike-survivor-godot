@@ -363,3 +363,85 @@ func fire_boomerang(data: WeaponData, level: int, player: CharacterBody2D, dmg_b
 
 func _create_boomerang(pos: Vector2, dir: Vector2, dmg: float, prc: int, max_dist: float, return_spd: float, track_angle: float, col: Color, sz: float, wpn_id: String = "boomerang") -> Area2D:
 	return _get_boomerang_fire()._create_boomerang(pos, dir, dmg, prc, max_dist, return_spd, track_angle, col, sz, wpn_id)
+
+
+# --- Spiral (frostvortex) ---
+
+func update_spiral(weapon_id: String, data: WeaponData, player: CharacterBody2D, dmg_bonus: float, spiral_instance: Node2D) -> Node2D:
+	# If instance exists and is valid, just update damage
+	if spiral_instance and is_instance_valid(spiral_instance):
+		spiral_instance.damage = data.damage * dmg_bonus
+		return spiral_instance
+	# Create new spiral blade instance
+	var instance := Node2D.new()
+	instance.set_script(load("res://scripts/weapons/spiral_blade.gd"))
+	instance.setup(
+		data.spiral_blade_count,
+		data.damage * dmg_bonus,
+		data.spiral_min_radius,
+		data.spiral_max_radius,
+		data.spiral_expand_speed,
+		data.color,
+		data.slow_pct,
+		data.freeze_pct
+	)
+	instance.weapon_id = weapon_id
+	instance.global_position = player.global_position
+	var pm: Node = _get_pm(player)
+	if pm:
+		pm.call_deferred("add_child", instance)
+	return instance
+
+
+# --- Pulse (holyshockwave) ---
+
+func fire_pulse(data: WeaponData, player: CharacterBody2D, dmg_bonus: float) -> void:
+	var ring: Node2D = Node2D.new()
+	ring.set_script(load("res://scripts/weapons/pulse_ring.gd"))
+	ring.setup(
+		data.damage * dmg_bonus,
+		data.pulse_max_radius,
+		data.pulse_expand_time,
+		data.pulse_ring_width,
+		data.color,
+		data.burn_dps,
+		data.burn_duration
+	)
+	ring.weapon_id = data.weapon_id
+	ring.global_position = player.global_position
+	var pm: Node = _get_pm(player)
+	if pm:
+		pm.call_deferred("add_child", ring)
+
+
+# --- Beam (thunderbeam) ---
+
+const THUNDERBEAM_CHAIN_DAMAGE: float = 6.0
+const THUNDERBEAM_CHAIN_RANGE: float = 120.0
+
+func fire_beam(data: WeaponData, player: CharacterBody2D, dmg_bonus: float) -> void:
+	var enemies := _get_enemies(player, data.projectile_range)
+	if enemies.is_empty():
+		return
+	var target: Node2D = enemies[0]
+	var direction: Vector2 = (target.global_position - player.global_position).normalized()
+
+	var beam: Node2D = Node2D.new()
+	beam.set_script(load("res://scripts/weapons/beam_line.gd"))
+	beam.setup(
+		data.damage * dmg_bonus,
+		data.projectile_range,
+		data.beam_width,
+		data.beam_tick_interval,
+		data.beam_active_duration,
+		data.chain_count,
+		THUNDERBEAM_CHAIN_DAMAGE * dmg_bonus,
+		data.color,
+		direction,
+		player
+	)
+	beam.weapon_id = data.weapon_id
+	beam.global_position = player.global_position
+	var pm: Node = _get_pm(player)
+	if pm:
+		pm.call_deferred("add_child", beam)

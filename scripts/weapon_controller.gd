@@ -4,6 +4,7 @@ var _weapon_timers: Dictionary = {}
 var _registered: bool = false
 var _orbit_instances: Dictionary = {}
 var _boomerang_instances: Array = []
+var _spiral_instance: Node2D = null
 var _effects: RefCounted = null
 var _weapon_fire: RefCounted = null
 
@@ -79,6 +80,12 @@ func _fire_weapon(weapon_id: String, data: WeaponData, player: CharacterBody2D):
 			wf.update_aura(weapon_id, data, level, player, dmg_bonus, _weapon_timers)
 		"boomerang":
 			_boomerang_instances = wf.fire_boomerang(data, level, player, dmg_bonus, _weapon_timers, _boomerang_instances)
+		"spiral":
+			_spiral_instance = wf.update_spiral(weapon_id, data, player, dmg_bonus, _spiral_instance)
+		"pulse":
+			wf.fire_pulse(data, player, dmg_bonus)
+		"beam":
+			wf.fire_beam(data, player, dmg_bonus)
 
 
 func _update_boomerangs(_delta: float):
@@ -112,6 +119,9 @@ func remove_weapon_instances(weapon_id: String) -> void:
 		if is_instance_valid(inst):
 			inst.queue_free()
 		_orbit_instances.erase(weapon_id)
+	if weapon_id == "frostvortex" and is_instance_valid(_spiral_instance):
+		_spiral_instance.queue_free()
+		_spiral_instance = null
 	_boomerang_instances = _boomerang_instances.filter(func(b): return not is_instance_valid(b) or b.get("weapon_id") != weapon_id)
 	_weapon_timers.erase(weapon_id)
 
@@ -134,3 +144,8 @@ func _process(_delta):
 			var player: CharacterBody2D = get_parent()
 			if player and is_instance_valid(player):
 				inst.global_position = player.global_position
+	# Track spiral instance position to player
+	if is_instance_valid(_spiral_instance):
+		var player: CharacterBody2D = get_parent()
+		if player and is_instance_valid(player):
+			_spiral_instance.global_position = player.global_position

@@ -21,6 +21,9 @@ Evolved weapons currently share a single gold particle color. This spec defines 
 | blizzard | Color(1.0, 1.0, 1.0) ice white | Color(0.53, 0.87, 1.0) ice blue | 1:2 | same as frostaura (2x2 diamond) |
 | flamebible | Color(0.9, 0.85, 0.7) warm white | Color(1.0, 0.27, 0.0) flame red | 1:2 | same as bible (2x2 cross) |
 | sentineltotem | Color(0.7, 0.6, 0.2) gold-brown | Color(1.0, 0.84, 0.0) gold crown | 1:1 | same as bible (2x2 cross) |
+| frostvortex | Color(0.75, 0.75, 0.8) knife silver-white | Color(0.53, 0.87, 1.0) ice blue | 1:2 | same as knife (1x3 horizontal) |
+| holyshockwave | Color(0.3, 0.5, 1.0) holy water blue | Color(1.0, 0.27, 0.0) fire orange | 1:1 | same as holywater (3x3 square) |
+| thunderbeam | Color(1.0, 1.0, 0.3) lightning yellow | Color(0.3, 0.5, 1.0) electric blue | 1:2 | same as lightning (1x3 horizontal) |
 
 ## Color Derivation Logic
 
@@ -52,6 +55,9 @@ const EVOLVED_DUAL_COLORS: Dictionary = {
     "blizzard": {"a": Color(1.0, 1.0, 1.0), "b": Color(0.53, 0.87, 1.0), "ratio": 0.33},
     "flamebible": {"a": Color(0.9, 0.85, 0.7), "b": Color(1.0, 0.27, 0.0), "ratio": 0.33},
     "sentineltotem": {"a": Color(0.7, 0.6, 0.2), "b": Color(1.0, 0.84, 0.0), "ratio": 0.50},
+    "frostvortex": {"a": Color(0.75, 0.75, 0.8), "b": Color(0.53, 0.87, 1.0), "ratio": 0.33},
+    "holyshockwave": {"a": Color(0.3, 0.5, 1.0), "b": Color(1.0, 0.27, 0.0), "ratio": 0.50},
+    "thunderbeam": {"a": Color(1.0, 1.0, 0.3), "b": Color(0.3, 0.5, 1.0), "ratio": 0.33},
 }
 ```
 
@@ -123,6 +129,12 @@ Crit particles remain unified gold Color(1.0, 0.84, 0.0) as per R20 design. Dual
 
 6. **No particle count increase**: Evolved weapons use the same 3/5 particle counts as base weapons. The dual-color mix creates visual richness without increasing particle budget. This respects the MAX_PARTICLES=60 cap.
 
+7. **FrostVortex uses knife silver-white + ice blue (R28)**: The frostvortex recipe is knife + frostaura. Color A is knife's silver-white Color(0.75, 0.75, 0.8), Color B is ice blue Color(0.53, 0.87, 1.0). This maintains visual continuity with frostknife (same Color A and B), reinforcing the ice-knife weapon family. Ratio 1:2 (0.33) emphasizes the ice blue evolution identity.
+
+8. **HolyShockwave uses holy water blue + fire orange (R28)**: The holyshockwave recipe is holywater + firestaff. Color A is holywater's blue Color(0.3, 0.5, 1.0), Color B is firestaff's fire orange Color(1.0, 0.27, 0.0). Color B uses fire orange rather than the weapon's own gold primary because gold Color(1.0, 0.84, 0.0) would be visually indistinguishable from thunderbeam's electric yellow in 2x2 particle size. The blue+orange combination creates strong warm-cool contrast. Ratio 1:1 (0.50) gives equal weight to both recipe components.
+
+9. **ThunderBeam uses lightning yellow + electric blue (R28)**: The thunderbeam recipe is lightning + knife. Color A is lightning's yellow Color(1.0, 1.0, 0.3), Color B is electric blue Color(0.3, 0.5, 1.0). Color B uses electric blue rather than knife's silver-white because: (a) silver-white + yellow lacks visual contrast, (b) electric blue is the signature color of the beam's edge glow (v1.1.0-weapon-vfx.md Section 4.4), (c) yellow+blue is the classic lightning visual language. Ratio 1:2 (0.33) emphasizes the electric blue evolution identity.
+
 ## QA Test Suggestions
 
 1. Verify each evolved weapon produces 2 distinct particle colors (not single gold)
@@ -130,3 +142,6 @@ Crit particles remain unified gold Color(1.0, 0.84, 0.0) as per R20 design. Dual
 3. Verify WEAPON_COLORS still works for base weapons (no regression)
 4. Verify MAX_PARTICLES=60 cap still respected with dual-color particles
 5. Verify rate limiting still functions correctly
+6. Verify frostvortex particles are silver-white + ice blue mix (not gold)
+7. Verify holyshockwave particles are blue + fire orange mix (not gold)
+8. Verify thunderbeam particles are yellow + electric blue mix (not gold)

@@ -4,6 +4,8 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-17 R28 | 2090 | 4504 | 2084 通过, 0 失败, 6 pending, 67项新测试(BUG-290射击行为48+hit_feedback颜色4+weapon_effects覆盖3+回归6), BUG-290尚未修复(3种进化武器无射击逻辑, pending中待Programmer R28修复) |
+| 2026-04-17 R27 | 2023 | 4380 | 2023 通过, 0 失败, 0 pending, 0 orphan, 136项新测试(enemy_loot 27+enemy_death_effects 28+skill_effects 30+weapon_type_coverage 29+已有测试适配16+R26 risky修复2) |
 | 2026-04-17 R26 | 1887 | 4167 | 1885 通过, 0 失败, 2 risky, 74项新测试(evolved_weapons 52全部通过+pause_mastery_panel 22通过19/3 guard), Programmer R26进化武器注册验证通过(12配方12武器) |
 | 2026-04-17 R25 | 1813 | 3890 | 1813 通过, 0 失败, 0 pending, 0 orphan, 94项新测试(hud_mastery_panel 47+achievement_checker 47), 5项已有测试适配(源码验证改为检查panel脚本), 3项R25拆分前失败测试修复 |
 | 2026-04-17 R24 | 1719 | 3768 | 1719 通过, 0 失败, 0 pending, 0 orphan, 19项新测试(教程步骤6-8扩展), 3项已有测试适配(TUTORIAL_TOTAL_STEPS 5->8, complete_step边界更新) |
@@ -2362,4 +2364,90 @@ Time: 22.626s
 3. **enemy_loot.gd 武器击杀追踪完整**: 9 种进化武器的父武器映射全部正确, 每种进化武器击杀同时为 2 个父武器计数
 4. **enemy_death_effects.gd 全敌人覆盖**: 10 种敌人的死亡动画时长和分派全部有对应 match 分支, 包含 unknown 默认处理
 5. **skill_effects.gd 常量与 SkillData 一致**: 法师/战士/游侠技能常量全部从 SkillData 引用, 无硬编码偏差
-| docs/team/qa-log.md | 更新 | 追加 R26 测试报告 + BUG-280 |
+
+## R28 -- QA BUG-290 射击行为测试 (2026-04-17)
+
+### 概要
+
+| 指标 | R27 | R28 | 变化 |
+|------|-----|-----|------|
+| 测试总数 | 2023 | 2090 | +67 |
+| 通过数 | 2023 | 2084 | +61 |
+| Risky/Pending | 0 | 6 | +6 (BUG-290 pending) |
+| 失败 | 0 | 0 | 0 |
+| 断言数 | 4379 | 4504 | +125 |
+| 脚本数 | 68 | 70 | +2 |
+| 孤儿节点 | 6 | 7 | +1 |
+
+### BUG-290 状态: 待 Programmer R28 修复
+
+**问题**: `weapon_controller.gd` `_fire_weapon()` 的 match 语句缺少 `spiral`/`pulse`/`beam` 三个分支:
+- `frostvortex` (spiral): 注册正确, 有完整数据(spiral_blade_count=6, slow=0.4, freeze=0.08), 但 `_fire_weapon` 不产生任何攻击效果
+- `holyshockwave` (pulse): 注册正确, 有完整数据(damage=12.0, pulse_max_radius=200.0, burn_dps=2.0), 但 `_fire_weapon` 不产生任何攻击效果
+- `thunderbeam` (beam): 注册正确, 有完整数据(damage=4.0, chain_count=2, beam_active_duration=1.0), 但 `_fire_weapon` 不产生任何攻击效果
+
+**附加问题**: `hit_feedback.gd` WEAPON_COLORS 字典缺少 frostvortex/holyshockwave/thunderbeam 三个条目。
+
+**Programmer R28 需实现**:
+1. `weapon_fire.gd` 新增 `fire_spiral()`, `fire_pulse()`, `fire_beam()` 方法
+2. `weapon_controller.gd` `_fire_weapon()` match 添加 "spiral"/"pulse"/"beam" 分支
+3. `weapon_effects.gd` 新增 `create_spiral_effect()`, `create_pulse_effect()`, `create_beam_effect()` 方法
+4. `hit_feedback.gd` WEAPON_COLORS 字典添加 frostvortex/holyshockwave/thunderbeam
+
+### 任务B: 射击行为测试详情
+
+**新建文件**: `test/unit/test_r28_evolved_weapon_fire.gd` (67 项)
+
+| Section | 测试数 | 覆盖内容 |
+|---------|--------|----------|
+| A: 数据层验证 | 3 | frostvortex spiral字段, holyshockwave pulse字段, thunderbeam beam字段 |
+| B: Timer创建 | 6 | spiral/pulse/beam timer创建+cooldown重置 |
+| C: Dispatch安全 | 3 | spiral/pulse/beam _fire_weapon不崩溃 |
+| D: 视觉效果创建 | 3 | ProjectileManager子节点计数(BUG-290前=0) |
+| E: 伤害验证 | 3 | 敌人current_hp对比(BUG-290前pending) |
+| F: Spiral专项 | 5 | damage公式, slow_pct, freeze_pct, cooldown=999 |
+| G: Pulse专项 | 5 | damage公式, burn_dps/duration, AOE范围, cooldown |
+| H: Beam专项 | 6 | damage公式, chain_count, range, tick_interval, active_duration |
+| I: Hit Feedback颜色 | 4 | frostvortex/holyshockwave/thunderbeam颜色检查+总数19 |
+| J: Weapon Effects覆盖 | 3 | spiral/pulse/beam effect方法存在性 |
+| K: 回归测试 | 6 | projectile/orbit/lightning/cone/aura/boomerang仍正常 |
+| L: 12进化武器全验证 | 1 | 全部12种进化武器_fire_weapon不崩溃 |
+
+### Pending 测试清单 (6项, 均因 BUG-290)
+
+| 测试 | Pending 原因 |
+|------|-------------|
+| test_spiral_damage_with_enemy_nearby | spiral type不造成伤害, 待射击逻辑实现 |
+| test_pulse_damage_with_enemy_nearby | pulse type不造成伤害, 待射击逻辑实现 |
+| test_beam_damage_with_enemy_nearby | beam type不造成伤害, 待射击逻辑实现 |
+| test_weapon_effects_has_spiral_effect_method | weapon_effects.gd无spiral方法 |
+| test_weapon_effects_has_pulse_effect_method | weapon_effects.gd无pulse方法 |
+| test_weapon_effects_has_beam_effect_method | weapon_effects.gd无beam方法 |
+
+### 测试修复记录
+
+| 问题 | 修复 |
+|------|------|
+| enemy.hp -> enemy.current_hp | QA先读取enemy.gd API确认属性名为current_hp |
+| float 3.6==3.6 断言失败 | 改用assert_almost_eq(expected, 3.6, 0.01)处理浮点精度 |
+| float 14.4==14.4 断言失败 | 改用assert_almost_eq(expected, 14.4, 0.01)处理浮点精度 |
+
+### 修改文件清单
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| test/unit/test_r28_evolved_weapon_fire.gd | 新建 | 67项测试: BUG-290射击行为验证 |
+| docs/team/qa-log.md | 修改 | R28测试报告 |
+
+### 缺陷跟踪
+
+| ID | 严重度 | 模块 | 描述 | 状态 | 指派 |
+|----|--------|------|------|------|------|
+| BUG-290 | Critical | weapon_controller | spiral/pulse/beam 三种 weapon_type 在 `_fire_weapon()` match 中无对应分支, frostvortex/holyshockwave/thunderbeam 可获取但无法攻击 | 待处理 | Programmer |
+| BUG-001 | Medium | weapon_controller | `remove_weapon_instances` 中 boomerang 过滤条件无效 | 待处理 | Programmer |
+| BUG-003 | Medium | chest.gd | `_ready()` 加载 `chest.png` 但文件不存在 | 待处理 | Programmer |
+| BUG-005 | Low | test_endless_mode | soul_fragment 浮点精度断言失败 | 待处理 | Programmer |
+| BUG-006 | Low | boomerang.gd | 空 weapon_id 回退逻辑与 projectile.gd 不一致 | 已记录(设计意图) | -- |
+| BUG-007 | Low | game_manager.gd | wave_started 混合类型参数导致 GUT 断言报错 | 已规避 | -- |
+| BUG-008 | Low | skill_effects.gd | Shield Charge 使用 `apply_freeze` 而非 `apply_stun` | 已记录 | Programmer |
+| BUG-273 | Medium | assets/sprites/characters | mage_cast/warrior_block/ranger_draw.png 缺少 .import 文件 | 待处理 | Programmer |

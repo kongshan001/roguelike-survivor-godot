@@ -9009,3 +9009,323 @@ var selected_char: String = GameManager.selected_character if GameManager else "
 **待改进**:
 - 未能在 Godot 环境中实际运行游戏验证 4 种新进化武器的行为 (仅通过代码分析确认 match 缺失)
 - hud.gd 437 行的拆分方案未给出具体实施计划
+
+---
+
+## R28 审核报告 (2026-04-17) -- BUG-290 射击行为实现审核
+
+### 审核环境
+
+- 基线测试套件: **2023 tests, 0 failures** (R27 QA 报告)
+- 待审核变更: Programmer R28 应实现 spiral/pulse/beam 三种进化武器射击行为
+
+### Programmer R28 完成状态: **未完成**
+
+经审核全部源代码文件, Programmer R28 尚未交付任何代码变更:
+
+| 检查项 | 预期 | 实际 | 状态 |
+|--------|------|------|------|
+| weapon_controller.gd match 新增 3 分支 | "spiral", "pulse", "beam" | 仅有 6 分支 (projectile/orbit/lightning/cone/aura/boomerang) | **MISSING** |
+| weapon_fire.gd 新增 fire 函数 | update_spiral(), fire_pulse(), fire_beam() | 无任何新函数 | **MISSING** |
+| scripts/weapons/ 新模块文件 | spiral_blade.gd, pulse_ring.gd, beam_line.gd | 无新文件 | **MISSING** |
+| weapon_data.gd 新字段 | 已有 spiral/pulse/beam 字段 (R26 已完成) | 存在, 默认值正确 | PASS |
+| upgrade_pool.gd 注册 | 12 进化武器含 3 新类型 (R26 已完成) | 存在, 数值与 spec 一致 | PASS |
+| programmer-log.md R28 记录 | R28 实现记录 | 最晚到 R26 | **MISSING** |
+| test/unit/ R28 测试 | 新测试文件 | 无 test_r28*.gd | **MISSING** |
+
+**结论**: Programmer R28 尚未开始工作。BUG-290 修复未交付。
+
+---
+
+### 任务 A: 射击行为审核 (Pre-Implementation Baseline)
+
+由于 Programmer R28 未交付代码, 以下审核为"实现前基线记录", 标记 Programmer 需要完成的具体工作项。
+
+#### A.1 weapon_controller.gd _fire_weapon() match 语句现状
+
+文件: `/Users/ks_128/Documents/godot_demo/scripts/weapon_controller.gd` 行 56-81
+
+当前 match 语句仅覆盖 6 种 weapon_type:
+
+```
+match data.weapon_type:
+    "projectile": ...
+    "orbit": ...
+    "lightning": ...
+    "cone": ...
+    "aura": ...
+    "boomerang": ...
+```
+
+需要新增 (per evolution-expansion.md Section 7):
+
+```
+"spiral":
+    _spiral_instance = wf.update_spiral(weapon_id, data, player, dmg_bonus, _spiral_instance)
+"pulse":
+    wf.fire_pulse(weapon_id, data, player, dmg_bonus, _weapon_timers)
+"beam":
+    wf.fire_beam(data, player, dmg_bonus)
+```
+
+还需新增状态变量: `var _spiral_instance: Node2D = null`
+
+#### A.2 weapon_fire.gd 需要新增的函数
+
+文件: `/Users/ks_128/Documents/godot_demo/scripts/weapons/weapon_fire.gd` (当前 366 行, 73.2%)
+
+需要新增约 95 行代码 (per evolution-expansion.md Section 12.2):
+
+| 函数 | 参数 | 功能 | spec 参考 |
+|------|------|------|-----------|
+| update_spiral() | weapon_id, data, level, player, dmg_bonus, spiral_instance | 管理螺旋刀刃实例 (创建/更新/重置) | Section 5.1 |
+| fire_pulse() | weapon_id, data, player, dmg_bonus, weapon_timers | 周期性脉冲波伤害 + 燃烧 | Section 5.3 |
+| fire_beam() | data, player, dmg_bonus | 穿透射线 + 连锁闪电 | Section 5.4 |
+
+实现后 weapon_fire.gd 预计达到 ~461 行 (92.2%), 接近 500 行上限。如超出, 需按 CLAUDE.md 规范拆分 (建议提取为 scripts/weapons/weapon_spiral_fire.gd, weapon_pulse_fire.gd, weapon_beam_fire.gd)。
+
+#### A.3 设计规格数值对照
+
+**frostvortex (spiral)**:
+
+| 常量 | spec 值 | upgrade_pool.gd 注册值 | 一致 |
+|------|---------|----------------------|------|
+| damage | 3.0 | 3.0 | PASS |
+| spiral_blade_count | 6 | 6 | PASS |
+| spiral_min_radius | 20.0 | 20.0 | PASS |
+| spiral_max_radius | 180.0 | 180.0 | PASS |
+| spiral_expand_speed | 60.0 | 60.0 | PASS |
+| slow_pct | 0.4 | 0.4 | PASS |
+| freeze_pct | 0.08 | 0.08 | PASS |
+| color | Color(0.3, 0.7, 1.0) | Color(0.3, 0.7, 1.0) | PASS |
+
+**holyshockwave (pulse)**:
+
+| 常量 | spec 值 | upgrade_pool.gd 注册值 | 一致 |
+|------|---------|----------------------|------|
+| damage | 12.0 | 12.0 | PASS |
+| cooldown | 2.5 | 2.5 | PASS |
+| pulse_max_radius | 200.0 | 200.0 | PASS |
+| pulse_expand_time | 0.3 | 0.3 | PASS |
+| pulse_ring_width | 12.0 | 12.0 | PASS |
+| burn_dps | 2.0 | 2.0 | PASS |
+| burn_duration | 2.0 | 2.0 | PASS |
+| color | Color(1.0, 0.85, 0.3) | Color(1.0, 0.85, 0.3) | PASS |
+
+**thunderbeam (beam)**:
+
+| 常量 | spec 值 | upgrade_pool.gd 注册值 | 一致 |
+|------|---------|----------------------|------|
+| damage | 4.0 | 4.0 | PASS |
+| cooldown | 2.5 | 2.5 | PASS |
+| beam_active_duration | 1.0 | 1.0 | PASS |
+| beam_tick_interval | 0.3 | 0.3 | PASS |
+| beam_width | 12.0 | 12.0 | PASS |
+| chain_count | 2 | 2 | PASS |
+| projectile_range | 1200.0 | 1200.0 | PASS |
+| color | Color(1.0, 1.0, 0.4) | Color(1.0, 1.0, 0.4) | PASS |
+
+所有注册数值与 evolution-expansion.md 规格完全一致。数据层无问题, 仅发射逻辑层缺失。
+
+---
+
+### 任务 B: hit_feedback 审核现状
+
+#### B.1 武器粒子颜色覆盖
+
+文件: `/Users/ks_128/Documents/godot_demo/scripts/effects/hit_feedback.gd` 行 39-57
+
+WEAPON_COLORS 字典当前包含 15 种武器 ID (7 基础 + 8 进化):
+
+- 7 基础: knife, holywater, lightning, bible, firestaff, frostaura, boomerang
+- 8 进化: fireknife, frostknife, thunderang, blazerang, thunderholywater, holydomain, blizzard, flamebible, sentineltotem
+
+**3 种新进化武器缺失**:
+- `frostvortex` -- 未注册, 将使用默认白色 Color.WHITE
+- `holyshockwave` -- 未注册, 将使用默认白色 Color.WHITE
+- `thunderbeam` -- 未注册, 将使用默认白色 Color.WHITE
+
+**建议颜色** (基于 spec 视觉定义):
+- frostvortex: Color(0.3, 0.7, 1.0) -- 冰蓝色, 与武器 color 一致
+- holyshockwave: Color(1.0, 0.85, 0.3) -- 金色, 与武器 color 一致
+- thunderbeam: Color(1.0, 1.0, 0.4) -- 电黄色, 与武器 color 一致
+
+#### B.2 拖尾颜色覆盖
+
+文件: `/Users/ks_128/Documents/godot_demo/scripts/effects/projectile_trail_pool.gd` 行 10-27
+
+TRAIL_COLORS 和 TRAIL_SIZES 字典当前包含 6 种投射物武器 (knife, boomerang, fireknife, frostknife, thunderang, blazerang)。
+
+3 种新进化武器均不使用标准投射物 (spiral 使用旋转刀刃, pulse 使用脉冲环, beam 使用射线), 因此**无需添加拖尾颜色**。这是正确的 -- 拖尾系统仅服务于 projectile/boomerang 类型武器。
+
+#### B.3 hit_feedback 与拖尾颜色一致性
+
+| 武器 | hit_feedback 颜色 | 拖尾颜色 | 视觉一致性 |
+|------|-------------------|----------|------------|
+| knife | Color(0.75, 0.75, 0.8) | Color(0.75, 0.75, 0.8, 0.3) | PASS (同色系, 仅 alpha 不同) |
+| fireknife | Color(1.0, 0.84, 0.0) 金色占位 | Color(1.0, 0.4, 0.1, 0.35) 橙红 | MISMATCH -- hit_feedback 用通用金色, 拖尾用武器特定色 |
+| frostknife | Color(1.0, 0.84, 0.0) 金色占位 | Color(0.53, 0.87, 1.0, 0.3) 冰蓝 | MISMATCH -- 同上 |
+| thunderang | Color(1.0, 0.84, 0.0) 金色占位 | Color(1.0, 0.84, 0.0, 0.25) 金色 | PASS (均为金色) |
+| blazerang | Color(1.0, 0.84, 0.0) 金色占位 | Color(1.0, 0.27, 0.0, 0.35) 烈焰红 | MISMATCH |
+| sentineltotem | Color(1.0, 0.84, 0.0) 金色占位 | N/A (orbit 类型) | N/A |
+
+**发现**: hit_feedback.gd 的进化武器全部使用 `Color(1.0, 0.84, 0.0)` 金色占位符, 而拖尾系统对 fireknife/frostknife/blazerang 使用了武器特定颜色。这是已知的设计决策 (hit-feedback-design.md Section 6.3: "P3 polish 再做颜色混合"), 标记为 Low 级别不一致。
+
+---
+
+### 任务 C: 行数检查
+
+#### C.1 现有文件行数审计 (R27 基线)
+
+| 文件 | 行数 | 上限占比 | 状态 |
+|------|------|----------|------|
+| scripts/hud.gd | 437 | 87.4% | WARNING -- 接近上限 |
+| scripts/autoload/save_manager.gd | 430 | 86.0% | WARNING |
+| scripts/player.gd | 374 | 74.8% | PASS |
+| scripts/weapons/weapon_fire.gd | 366 | 73.2% | PASS |
+| scripts/enemy.gd | 359 | 71.8% | PASS |
+| scripts/autoload/game_manager.gd | 320 | 64.0% | PASS |
+| scripts/autoload/upgrade_pool.gd | 279 | 55.8% | PASS |
+| scripts/tutorial_manager.gd | 334 | 66.8% | PASS |
+| scripts/hud_mastery_panel.gd | 192 | 38.4% | PASS |
+| scripts/weapon_controller.gd | 137 | 27.4% | PASS |
+| scripts/data/weapon_data.gd | 65 | 13.0% | PASS |
+| scripts/effects/hit_feedback.gd | 245 | 49.0% | PASS |
+| scripts/effects/projectile_trail_pool.gd | 158 | 31.6% | PASS |
+
+**全部文件 < 500 行**: PASS
+
+**R28 实现后行数预估**:
+- weapon_fire.gd: 366 + ~95 = ~461 (92.2%) -- 接近上限, 可能需要拆分
+- weapon_controller.gd: 137 + ~15 = ~152 (30.4%) -- 充裕
+- 新文件 spiral_blade.gd: ~80 行预估
+- 新文件 pulse_ring.gd: ~60 行预估
+- 新文件 beam_line.gd: ~70 行预估
+
+#### C.2 新文件架构一致性
+
+per evolution-expansion.md Section 12.1, Programmer 应创建:
+
+| 文件 | 类型 | 模式参考 |
+|------|------|----------|
+| scripts/weapons/spiral_blade.gd | Node2D + Area2D | 参考 spin_blade.gd |
+| scripts/weapons/pulse_ring.gd | Node2D + Area2D | 参考 weapon_effects.gd cone effect |
+| scripts/weapons/beam_line.gd | Node2D + Area2D | 新类型, 无参考 |
+
+需确认:
+- 碰撞层: Layer3 (Projectiles)
+- extends 模式: 与 spin_blade.gd 一致 (Area2D)
+- 信号: 使用 area_entered 检测敌人
+
+---
+
+### 任务 D: BUG-290 关闭评估
+
+#### BUG-290 描述
+
+| 字段 | 内容 |
+|------|------|
+| ID | BUG-290 |
+| 严重度 | **Critical** |
+| 模块 | weapon_controller |
+| 描述 | spiral/pulse/beam 三种 weapon_type 在 `_fire_weapon()` match 中无对应分支, frostvortex/holyshockwave/thunderbeam 可获取但无法攻击 |
+| 发现者 | QA Agent (R27) |
+| 指派 | Programmer |
+
+#### 影响范围
+
+1. **玩家可获取但无法使用**: 这 3 种进化武器在升级面板中正确显示, 进化配方正确触发, weapon_data 正确注册。但获得后武器计时器到 0 时 match 落入隐式默认分支, **不产生任何攻击效果**。
+2. **玩家体验严重受损**: 进化是游戏核心机制, 获得进化武器是高光时刻。武器"进化成功"但不发射会严重破坏信任。
+3. **涉及 3 种进化路径**: knife+frostaura, holywater+firestaff, lightning+knife 均会产生无法使用的武器。
+
+#### 判定: **OPEN -- 不关闭**
+
+理由:
+- Programmer R28 未交付任何修复代码
+- weapon_controller.gd `_fire_weapon()` match 语句仍只有 6 分支
+- weapon_fire.gd 无 update_spiral/fire_pulse/fire_beam 函数
+- scripts/weapons/ 无 spiral_blade.gd / pulse_ring.gd / beam_line.gd
+- 3 种进化武器在游戏中获取后完全不生效
+
+**关闭条件**:
+1. weapon_controller.gd match 新增 "spiral", "pulse", "beam" 三个分支
+2. weapon_fire.gd 或新模块实现 update_spiral(), fire_pulse(), fire_beam()
+3. 新建 spiral_blade.gd, pulse_ring.gd, beam_line.gd 行为脚本
+4. QA 回归测试通过 (含 3 种新武器发射验证)
+
+---
+
+### R27 遗留审核: 技术债务状态
+
+| # | 债务 | 优先级 | R27 状态 | R28 状态 | 变化 |
+|---|------|--------|---------|---------|------|
+| 1 | die() 60行未重构 | P1 | 未修复 | 未修复 | -- |
+| 7 | save_manager 元数据类型不匹配 | P2 | 未修复 | 未修复 | -- |
+| 13 | chest.gd ColorRect 未迁移 | P2 | 未修复 | 未修复 | -- |
+| 14 | release-readiness.md 过时 | Low | 未修复 | 未修复 | -- |
+| 15 | **4 种进化武器发射逻辑未实现** | **P1** | 新发现 | **部分修复** | sentineltotem 已正常工作 (orbit 分支); frostvortex/holyshockwave/thunderbeam 仍缺失 |
+| 16 | upgrade_pool.gd 每次调用 load+new | P2 | 未修复 | 未修复 | -- |
+| 17 | hud.gd 行数 437 行 (87%) | P2 | 未修复 | 未修复 | -- |
+| 18 | hud_mastery_panel 武器名映射需手动同步 | Low | 未修复 | 未修复 | -- |
+| 19 | upgrade_pool.gd 被动数据未提取 | Low | 未修复 | 未修复 | -- |
+
+**修正**: R27 审核报告将 sentineltotem 列入"发射逻辑未实现", 但实际上 sentineltotem 使用 "orbit" 类型 (非新类型), 其 orbit_fire_rate=0.8 在 update_orbit() 的 _fire_orbit_projectiles() 中正确处理。sentineltotem 应该能正常工作。
+
+因此 BUG-290 实际影响范围是 3 种武器 (非 4 种): frostvortex, holyshockwave, thunderbeam。
+
+---
+
+### 给 Programmer 的 R28 实施建议
+
+基于代码审核, 建议 Programmer 按以下顺序实施:
+
+**Phase 1: weapon_controller.gd (约 15 行)**
+
+```gdscript
+# 新增状态变量 (行 6 附近)
+var _spiral_instance: Node2D = null
+
+# _fire_weapon() match 新增 (行 81 之后)
+"spiral":
+    _spiral_instance = wf.update_spiral(weapon_id, data, player, dmg_bonus, _spiral_instance)
+"pulse":
+    wf.fire_pulse(weapon_id, data, player, dmg_bonus, _weapon_timers)
+"beam":
+    wf.fire_beam(data, player, dmg_bonus)
+```
+
+**Phase 2: weapon_fire.gd 新增 3 个函数 (约 95 行)**
+
+如果 weapon_fire.gd 超过 500 行, 建议按以下优先级拆分:
+1. weapon_spiral_fire.gd (RefCounted) -- spiral 逻辑最复杂, 优先拆分
+2. weapon_beam_fire.gd (RefCounted) -- beam 需要独立的 tick 计时器
+3. weapon_pulse_fire.gd (RefCounted) -- pulse 相对简单, 最后拆分
+
+**Phase 3: hit_feedback.gd 新增 3 个颜色条目 (3 行)**
+
+```gdscript
+"frostvortex": Color(0.3, 0.7, 1.0),
+"holyshockwave": Color(1.0, 0.85, 0.3),
+"thunderbeam": Color(1.0, 1.0, 0.4),
+```
+
+---
+
+### 审核人自评: 80/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| BUG-290 状态确认 | 25 | 25 | 确认 Programmer 未交付, 3 种新武器发射逻辑完全缺失, 保持 OPEN |
+| 设计规格对照 | 20 | 25 | 完成全部数值对照 (24/24 字段一致), 标记 sentineltotem 实际可正常工作 (-5 因未运行游戏验证) |
+| hit_feedback 审核 | 15 | 20 | 确认 3 种新武器颜色缺失, 发现进化武器粒子色与拖尾色不一致 (-5 因 P3 polish 已知) |
+| 行数预估 | 15 | 20 | 完成 13 个文件审计 + R28 后预估, 标记 weapon_fire.gd 可能需要拆分 (-5 因实际行数待 Programmer 交付后确认) |
+| 技术债务追踪 | 5 | 10 | 9 项债务状态更新, 修正 R27 sentineltotem 误报 (-5 因未发现新债务) |
+
+**加分项**:
+- 修正 R27 审核误报: sentineltotem 使用 "orbit" 类型, 已有 match 分支, 非缺失
+- 提供具体实施建议: Phase 1/2/3 优先级和行数预估
+- 确认数据层完全正确, 仅发射逻辑层缺失
+
+**待改进**:
+- 无法在 Programmer 代码交付前进行实际的射击行为代码审核
+- 新增的 3 个场景文件 (spiral_blade.gd 等) 需等待 Programmer 创建后再审核

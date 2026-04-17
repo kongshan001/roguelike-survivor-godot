@@ -43,6 +43,9 @@
 | 雷霆回旋 Thunderang | 回旋镖 | Color(1.0, 0.84, 0.0) 电黄 #FFD700 | Color(0.3, 0.5, 1.0) 电蓝 #4D80FF | Color(0.6, 0.4, 0.2) 棕 | 20x20 |
 | 烈焰回旋 Blazerang | 回旋镖 | Color(1.0, 0.27, 0.0) 烈焰红 #FF4500 | Color(1.0, 0.55, 0.0) 暗橙 #FF8C00 | Color(0.6, 0.4, 0.2) 棕 | 20x20 |
 | 守护图腾 SentinelTotem | 圣经+回旋镖 | Color(0.7, 0.6, 0.2) 金棕 #B39933 | Color(0.9, 0.85, 0.5) 金投射 | Color(1.0, 0.84, 0.0) 金冠 #FFD700 | 20x20 |
+| 霜刃旋涡 FrostVortex | 飞刀+冰冻光环 | Color(0.53, 0.87, 1.0) 冰蓝 #88DDFF | Color(0.75, 0.75, 0.8) 银白刀刃 | Color(1.0, 1.0, 1.0) 白霜高光 | 20x20 |
+| 圣焰冲击 HolyShockwave | 圣水+火焰法杖 | Color(1.0, 0.84, 0.0) 圣光金 #FFD700 | Color(1.0, 0.27, 0.0) 火焰橙 #FF4500 | Color(1.0, 0.55, 0.0) 暗橙焰芯 #FF8C00 | 20x20 |
+| 雷霆射线 ThunderBeam | 闪电+飞刀 | Color(1.0, 0.84, 0.0) 电黄 #FFD700 | Color(0.3, 0.5, 1.0) 电蓝 #4D80FF | Color(1.0, 1.0, 1.0) 白热核心 | 20x20 |
 
 ### 描边规范
 | 属性 | 规格 |
@@ -6367,3 +6370,251 @@ hud_mastery_panel.gd `build_pause_panel()` (lines 135-192) 使用以下配色:
 **加分项**: 发现 hit_feedback.gd 3 个新进化武器缺失色值 (+3), 识别 build_pause_panel 6 项视觉缺失 (+3), EVOLVED_DUAL_COLORS 未实施跟踪 (+2)
 
 **扣分项**: build_pause_panel 尚未完整实施导致 HUD 审查仅能对照规格而非实际效果 (-3), 被动图标 TextureRect 集成未完成导致无法审查实际 PNG 显示效果 (-2), VFX 规格缺少像素级精确定位图 (-3)
+
+## Round 28 (2026-04-17): Evolved Hit Feedback Colors + Trail Consistency + Firing VFX Design
+
+**任务**: (1) 确认 frostvortex/holyshockwave/thunderbeam 击中反馈配色; (2) 验证拖尾颜色与击中颜色一致性; (3) 设计三种进化武器射击视觉规格; (4) 更新 art-log.md 配色表
+
+### 任务 1: 3 种进化武器击中反馈配色确认
+
+#### 1.1 WEAPON_COLORS 单色条目 (hit_feedback.gd)
+
+当前 hit_feedback.gd 第 39-57 行的 WEAPON_COLORS 字典缺少 frostvortex/holyshockwave/thunderbeam。这 3 种武器 fallback 为白色粒子 (Color.WHITE)，无法提供武器身份识别。
+
+**确认配色**:
+
+| weapon_id | 击中粒子色 | Color 值 | 来源 |
+|-----------|-----------|---------|------|
+| frostvortex | 冰蓝 | Color(0.53, 0.87, 1.0) | art-log.md 进化武器配色表主色, PALETTE["ice_blue"] |
+| holyshockwave | 圣光金 | Color(1.0, 0.84, 0.0) | art-log.md 进化武器配色表主色, PALETTE["gold"] |
+| thunderbeam | 电黄 | Color(1.0, 0.84, 0.0) | art-log.md 进化武器配色表主色, PALETTE["thunder_yellow"] |
+
+**配色依据**:
+- frostvortex: 冰蓝 Color(0.53, 0.87, 1.0) -- 与 frostknife 的冰蓝 (同色值) 形成冰系武器视觉家族
+- holyshockwave: 金色 Color(1.0, 0.84, 0.0) -- 圣水+火焰法杖的圣洁感, 金色表达高价值进化
+- thunderbeam: 电黄 Color(1.0, 0.84, 0.0) -- 与 thunderang 的电黄 (同色值) 形成电系武器视觉家族
+
+**注意**: holyshockwave 和 thunderbeam 的 WEAPON_COLORS 单色值相同 (均为金色)。这是 P1 占位方案的预期行为, P2 双色混合实施后将通过 Color A/B 差异化。
+
+#### 1.2 EVOLVED_DUAL_COLORS 双色条目 (R24 规格扩展)
+
+在 R24 的 evolved-hit-particle-dual-color.md 基础上新增 3 条:
+
+| weapon_id | Color A (基础武器色) | Color B (进化特征色) | Ratio | 视觉效果 |
+|-----------|--------------------|--------------------|-------|---------|
+| frostvortex | Color(0.75, 0.75, 0.8) knife 银白 | Color(0.53, 0.87, 1.0) 冰蓝 | 0.33 | 银白冰蓝混合, 刀刃感+冰霜感 |
+| holyshockwave | Color(0.3, 0.5, 1.0) holywater 蓝 | Color(1.0, 0.27, 0.0) firestaff 火橙 | 0.50 | 蓝火交织, 圣水净+火焰毁 |
+| thunderbeam | Color(1.0, 1.0, 0.3) lightning 黄 | Color(0.3, 0.5, 1.0) 电蓝 | 0.33 | 黄蓝电光混合, 闪电+穿透 |
+
+**Color A 来源验证**:
+
+| 进化武器 | 基础武器 A | WEAPON_COLORS 中基础色 | Color A | 匹配 |
+|---------|-----------|----------------------|---------|------|
+| frostvortex | knife | Color(0.75, 0.75, 0.8) | Color(0.75, 0.75, 0.8) | OK |
+| holyshockwave | holywater | Color(0.3, 0.5, 1.0) | Color(0.3, 0.5, 1.0) | OK |
+| thunderbeam | lightning | Color(1.0, 1.0, 0.3) | Color(1.0, 1.0, 0.3) | OK |
+
+**Color B 来源验证**:
+
+| 进化武器 | 进化主色 (art-log.md) | Color B | 匹配 |
+|---------|---------------------|---------|------|
+| frostvortex | Color(0.53, 0.87, 1.0) 冰蓝 | Color(0.53, 0.87, 1.0) | OK |
+| holyshockwave | Color(1.0, 0.84, 0.0) 圣光金 | Color(1.0, 0.27, 0.0) 火橙 | OK (使用辅色火橙而非主色金, 因金色与 lightning 的 Color A 黄色视觉冲突) |
+| thunderbeam | Color(1.0, 0.84, 0.0) 电黄 | Color(0.3, 0.5, 1.0) 电蓝 | OK (使用辅色电蓝而非主色电黄, 因电黄与 lightning 的 Color A 黄色重复) |
+
+**设计决策 -- holyshockwave Color B 选择**:
+holyshockwave 配方为 holywater + firestaff。Color A 取 holywater 蓝 Color(0.3, 0.5, 1.0)。Color B 取 firestaff 火橙 Color(1.0, 0.27, 0.0) 而非进化主色金 Color(1.0, 0.84, 0.0)。原因: 金色与 lightning 的黄色在 2x2 粒子尺寸下视觉几乎不可区分, 使用火橙能在击中时明确传达"圣水蓝+火焰橙"的混合配方身份。这与 blazerang (棕+烈焰红) 的设计逻辑一致 -- 使用配方成分色而非进化主色。
+
+**设计决策 -- thunderbeam Color B 选择**:
+thunderbeam 配方为 lightning + knife。Color A 取 lightning 黄 Color(1.0, 1.0, 0.3)。Color B 取电蓝 Color(0.3, 0.5, 1.0) 而非进化主色电黄。原因: 黄+黄双色无区分度, 电蓝提供了 lightning 的标志性蓝色边缘辉光 (参考 v1.1.0-weapon-vfx.md Section 4.4), 在粒子层面表达电光的双重色调。
+
+#### 1.3 hit_feedback.gd 代码变更规格 (供 Programmer Agent 使用)
+
+```gdscript
+# === WEAPON_COLORS 新增 3 行 (P1: 单色占位) ===
+# 在 WEAPON_COLORS 字典中 "sentineltotem" 行之后添加:
+"frostvortex": Color(0.53, 0.87, 1.0),
+"holyshockwave": Color(1.0, 0.84, 0.0),
+"thunderbeam": Color(1.0, 0.84, 0.0),
+
+# === EVOLVED_DUAL_COLORS 新增 3 行 (P2: 双色混合, 与 R24 已有 9 条合并) ===
+# 在 EVOLVED_DUAL_COLORS 字典中添加:
+"frostvortex": {"a": Color(0.75, 0.75, 0.8), "b": Color(0.53, 0.87, 1.0), "ratio": 0.33},
+"holyshockwave": {"a": Color(0.3, 0.5, 1.0), "b": Color(1.0, 0.27, 0.0), "ratio": 0.50},
+"thunderbeam": {"a": Color(1.0, 1.0, 0.3), "b": Color(0.3, 0.5, 1.0), "ratio": 0.33},
+```
+
+### 任务 2: 拖尾颜色与击中颜色一致性验证
+
+#### 2.1 拖尾覆盖范围
+
+当前 `projectile_trail_pool.gd` TRAIL_COLORS 包含 6 种投射物类型武器:
+
+| weapon_id | TRAIL_COLORS | 拖尾色 (RGB) |
+|-----------|-------------|-------------|
+| knife | Color(0.75, 0.75, 0.8, 0.3) | 银白 |
+| boomerang | Color(0.6, 0.4, 0.2, 0.25) | 棕 |
+| fireknife | Color(1.0, 0.4, 0.1, 0.35) | 火橙 |
+| frostknife | Color(0.53, 0.87, 1.0, 0.3) | 冰蓝 |
+| thunderang | Color(1.0, 0.84, 0.0, 0.25) | 电金 |
+| blazerang | Color(1.0, 0.27, 0.0, 0.35) | 烈焰红 |
+
+#### 2.2 三种新进化武器是否需要拖尾
+
+| 武器 | weapon_type | 是否有投射物 | 是否需要 TRAIL_COLORS | 原因 |
+|------|------------|------------|---------------------|------|
+| frostvortex | spiral | 否 (环绕实体) | **不需要** | 6 刀片是持续环绕玩家的 ColorRect, 不是飞行投射物。拖尾不适用。 |
+| holyshockwave | pulse | 否 (脉冲环) | **不需要** | 脉冲环是从玩家位置扩展的圆形区域, 不是飞行投射物。拖尾不适用。 |
+| thunderbeam | beam | 否 (瞬时光束) | **不需要** | 光束是瞬时线形 (1.0s 激活), 不是沿轨迹飞行的投射物。拖尾不适用。 |
+
+**结论**: 三种新进化武器均不使用投射物飞行机制, 无需在 projectile_trail_pool.gd 中添加 TRAIL_COLORS 条目。这与 thunderholywater/holydomain/blizzard/flamebible/sentineltotem (5 种已有非投射物进化武器) 的情况一致。
+
+#### 2.3 已有拖尾武器的拖尾色 vs 击中色一致性
+
+| weapon_id | 拖尾色 (RGB, 无 alpha) | WEAPON_COLORS 击中色 | 一致性 |
+|-----------|----------------------|---------------------|--------|
+| knife | Color(0.75, 0.75, 0.8) | Color(0.75, 0.75, 0.8) | 精确匹配 |
+| boomerang | Color(0.6, 0.4, 0.2) | Color(0.6, 0.4, 0.2) | 精确匹配 |
+| fireknife | Color(1.0, 0.4, 0.1) | Color(1.0, 0.84, 0.0) 金占位 | P2 双色后: A=银白 B=暗橙, 拖尾火橙与 Color B 近似同系 |
+| frostknife | Color(0.53, 0.87, 1.0) | Color(1.0, 0.84, 0.0) 金占位 | P2 双色后: A=银白 B=冰蓝, 拖尾冰蓝与 Color B 精确匹配 |
+| thunderang | Color(1.0, 0.84, 0.0) | Color(1.0, 0.84, 0.0) 金占位 | P2 双色后: A=棕 B=电金, 拖尾电金与 Color B 精确匹配 |
+| blazerang | Color(1.0, 0.27, 0.0) | Color(1.0, 0.84, 0.0) 金占位 | P2 双色后: A=棕 B=烈焰红, 拖尾烈焰红与 Color B 精确匹配 |
+
+**结论**: 6 种有拖尾的武器, 拖尾颜色均与其进化武器的 Color B (进化特征色) 同色系。当 P2 EVOLVED_DUAL_COLORS 实施后, 拖尾色将与双色粒子中的 B 色精确对应, 形成"飞行拖尾 = 击中特征色"的视觉一致性。
+
+### 任务 3: 进化武器射击视觉设计
+
+三种新进化武器的射击视觉规格已在 R27 创建的 `docs/superpowers/specs/v1.1.0-weapon-vfx.md` 中完整定义。本轮确认并补充以下关键配色数据:
+
+#### 3.1 spiral_blade (霜刃旋涡) -- 旋转轨迹视觉
+
+| 视觉元素 | 尺寸 | 主色 | 辅色 | 特效 |
+|---------|------|------|------|------|
+| 刀片 Blade | 5x12 px | Color(0.53, 0.87, 1.0) 冰蓝 | Color(0.75, 0.75, 0.8) 银白边缘 | 旋转 4.0 rad/s 逆时针 |
+| 枢纽 Hub | 4x4 px | Color(0.3, 0.7, 1.0) 亮冰 | -- | 静止中心 |
+| 刀尖高光 | 1x1 px | Color(1.0, 1.0, 1.0) 白 | -- | 可选 |
+| 命中粒子 | 2x2 px | Color(0.53, 0.87, 1.0, 0.6) | -- | alpha 0.6->0.0, 0.15s |
+| Frostbite 白闪 | 全刀片 | Color(1.0, 1.0, 1.0) | -- | alpha 0.0->0.5->0.0, 0.3s |
+
+**射击行为**: 6 刀片持续环绕玩家, 半径在 20px-180px 间周期性扩展 (无射击间隔, 持续伤害)。
+
+**视觉特征**: 径向旋转 + 冰蓝发光 + 命中时白闪。与现有 orbit 类 (thunderholywater 蓝色球体环绕) 区分: spiral 使用 6 个独立刀片而非 3-4 个球体, 且有周期性半径变化。
+
+**拖尾替代**: 无投射物拖尾, 但可通过在刀片位置每帧留下低 alpha 冰蓝残影模拟旋转轨迹。残影参数: ColorRect 3x3, Color(0.53, 0.87, 1.0, 0.15), 生命周期 0.10s。此为可选优化, 非必要。
+
+#### 3.2 pulse_ring (圣焰冲击) -- 脉冲扩散视觉
+
+| 视觉元素 | 尺寸 | 主色 | 辅色 | 特效 |
+|---------|------|------|------|------|
+| 环片段 Segment | 3x3 px x16 | 渐变 (内火橙->中暗橙->外金) | -- | 半径 0->200px / 0.3s |
+| 中心闪光 CenterBurst | 8x8 px | Color(1.0, 1.0, 1.0) 白 | -- | alpha 0.8->0.0, 0.1s, 尺寸 8->12 |
+| 命中粒子 | 2x2 px | Color(1.0, 0.84, 0.0) 金 | -- | 3颗/命中, alpha 0.15s 衰减 |
+| 燃烧指示 | 1x1 px | Color(1.0, 0.4, 0.1) 火橙 | -- | alpha 0.5, 2.0s 持续 |
+| 屏幕震动 | -- | -- | -- | 强度 2.0, 持续 0.1s |
+
+**射击行为**: 每 2.5s 从玩家位置发射一个脉冲环, 环在 0.3s 内扩展到 200px 半径后消失。
+
+**颜色梯度细节** (半径渐变):
+- 0-100 px: Color(1.0, 0.27, 0.0) 火橙 #FF4500 (fire_orange)
+- 100-150 px: Color(1.0, 0.55, 0.0) 暗橙 #FF8C00 (blaze_orange)
+- 150-200 px: Color(1.0, 0.84, 0.0) 金 #FFD700 (gold)
+
+**视觉特征**: 圆形扩展 + 金火渐变 + 中心爆闪。与现有 holywater (蓝色静态区域) 和 frostaura (冰蓝静态光环) 区分: pulse 是周期性爆发而非持续区域。
+
+**ColorRect 回退**: 16 片段全部使用 Color(1.0, 0.84, 0.0) 金色, 无渐变。
+
+#### 3.3 thunder_beam (雷霆射线) -- 光束+链式闪电视觉
+
+| 视觉元素 | 尺寸 | 主色 | 辅色 | 特效 |
+|---------|------|------|------|------|
+| 光束体 BeamCore | 1200x2 px | Color(1.0, 0.84, 0.0) 电黄 | -- | 指向目标敌人, 1.0s 持续 |
+| 中心线 CenterLine | 1200x1 px | Color(1.0, 1.0, 1.0) 白 | -- | 叠加在光束体上 |
+| 边缘辉光 EdgeGlow | 1200x1 px x2 | Color(0.3, 0.5, 1.0, 0.5) 电蓝 | -- | alpha 脉动 0.3->0.7->0.3 / 0.2s |
+| 端点 EndPoint | 3x3 px x2 | Color(1.0, 1.0, 1.0) 白 | -- | alpha 0.7->1.0 脉动 |
+| 火花 Spark | 2x2 px | Color(1.0, 1.0, 1.0) 白 | -- | 每 0.1s 随机位置, 0.15s 衰减 |
+| 链式闪电 Chain | ~120x1 px x2 | Color(0.3, 0.5, 1.0) 电蓝 | -- | 锯齿折线, 0.2s 衰减 |
+| Overcharge 辉光 | 18x18 px | Color(0.3, 0.5, 1.0, 0.15) | -- | 跟随玩家, 1.0s 持续 |
+
+**射击行为**: 每 2.5s 向最近敌人发射一条 1200px 长的光束, 持续 1.0s。光束消失后产生 2 条链式闪电分叉。
+
+**链式闪电锯齿构造**:
+- 从命中敌人位置到链式目标位置
+- 3-4 个路径点, 每点垂直偏移 +-8px 随机
+- 使用 1px ColorRect 段连接路径点
+- 每次生成不同随机种子, 产生自然变化
+
+**视觉特征**: 长线穿透 + 电黄白蓝三色 + 链式分叉。与现有 lightning (锯齿形随机路径) 区分: beam 是直线定向, lightning 是锯齿随机。thunderbeam 的链式闪电 (电蓝) 与 lightning 的本体 (电黄) 颜色互补。
+
+**ColorRect 回退**: 仅 1200x2 电黄光束体, 链式闪电为直线 1px 蓝线。
+
+#### 3.4 三种武器视觉区分度矩阵
+
+| 维度 | frostvortex | holyshockwave | thunderbeam |
+|------|------------|---------------|-------------|
+| 形状 | 径向 (6 刀片圆) | 圆环 (扩展环) | 线形 (长光束) |
+| 主色 | 冰蓝 | 金+火橙 | 电黄+电蓝 |
+| 运动 | 持续旋转 | 周期爆发 | 定向射击 |
+| 持续性 | 永久环绕 | 0.5s 瞬态 | 1.0s 瞬态 |
+| 独特标识 | 6 刀片扩展收缩 | 中心闪光+屏幕震动 | 链式闪电分叉 |
+| z_index | 5 | 5 | 5 |
+
+与现有武器无重叠: 投射物 (knife/fireknife 等) 是飞行点, 回旋镖 (boomerang/thunderang 等) 是弧线往返, 轨道 (thunderholywater) 是球体环绕, 光环 (frostaura) 是静态圆形区域。三种新武器在形状/运动/颜色上均独立。
+
+### 待执行操作 (更新)
+
+| 优先级 | 任务 | 负责 Agent | 备注 |
+|--------|------|-----------|------|
+| **P1** | hit_feedback.gd 添加 frostvortex/holyshockwave/thunderbeam 到 WEAPON_COLORS (3 行) | Programmer | 本轮确认配色数据 |
+| P1 | weapon_controller.gd BUG-290 修复 (spiral/pulse/beam match 分支) | Programmer | Critical BUG, 无此修复三种武器无法攻击 |
+| P2 | hit_feedback.gd 实施 EVOLVED_DUAL_COLORS (12 种进化武器双色粒子, 含新增 3 种) | Programmer | ~30 行代码, 本轮新增 3 条双色规格 |
+| P2 | evolved-hit-particle-dual-color.md 补充 3 条新条目 | Programmer | 文档更新 |
+| P3 | spiral_blade.gd 实施视觉规格 | Programmer | v1.1.0, 参考 v1.1.0-weapon-vfx.md Section 2 |
+| P3 | pulse_ring.gd 实施视觉规格 | Programmer | v1.1.0, 参考 v1.1.0-weapon-vfx.md Section 3 |
+| P3 | beam_line.gd 实施视觉规格 | Programmer | v1.1.0, 参考 v1.1.0-weapon-vfx.md Section 4 |
+
+### 进化武器配色表 (完整 12/12)
+
+进化武器配色表已在文件头部 (Section: 进化武器配色) 更新为完整 12 种。此处记录全表供 Programmer Agent 快速引用:
+
+| # | 进化武器 | weapon_id | 基础武器 | 主色 | 辅色 | 强调色 | WEAPON_COLORS | Color A (双色) | Color B (双色) | 尺寸 | 有拖尾 |
+|---|---------|-----------|---------|------|------|--------|--------------|---------------|---------------|------|--------|
+| 1 | 雷暴圣水 | thunderholywater | 圣水 | Color(1.0, 0.84, 0.0) 电黄 | Color(0.3, 0.5, 1.0) 蓝 | Color(1.0, 1.0, 1.0) 白 | 金占位 | 蓝 | 电金 | 20x20 | 否 |
+| 2 | 火焰飞刀 | fireknife | 飞刀 | Color(1.0, 0.27, 0.0) 火橙 | Color(1.0, 0.55, 0.0) 暗橙 | Color(0.75, 0.75, 0.8) 银白 | 金占位 | 银白 | 暗橙 | 20x20 | 是 |
+| 3 | 圣光领域 | holydomain | 圣水 | Color(1.0, 0.84, 0.0) 圣光金 | Color(0.3, 0.5, 1.0) 蓝 | Color(1.0, 1.0, 1.0) 白 | 金占位 | 蓝 | 金 | 24x24 | 否 |
+| 4 | 暴风雪 | blizzard | (新) | Color(0.53, 0.87, 1.0) 冰蓝 | Color(1.0, 1.0, 1.0) 冰白 | Color(0.1, 0.1, 0.18) 暗描边 | 金占位 | 冰白 | 冰蓝 | 24x24 | 否 |
+| 5 | 冰霜飞刀 | frostknife | 飞刀 | Color(0.53, 0.87, 1.0) 冰蓝 | Color(0.75, 0.75, 0.8) 银白 | Color(1.0, 1.0, 1.0) 白 | 金占位 | 银白 | 冰蓝 | 20x20 | 是 |
+| 6 | 烈焰经文 | flamebible | 圣经 | Color(1.0, 0.27, 0.0) 火红 | Color(1.0, 0.55, 0.0) 暗橙 | Color(1.0, 0.84, 0.0) 金 | 金占位 | 米白 | 火红 | 20x20 | 否 |
+| 7 | 雷霆回旋 | thunderang | 回旋镖 | Color(1.0, 0.84, 0.0) 电黄 | Color(0.3, 0.5, 1.0) 电蓝 | Color(0.6, 0.4, 0.2) 棕 | 金占位 | 棕 | 电金 | 20x20 | 是 |
+| 8 | 烈焰回旋 | blazerang | 回旋镖 | Color(1.0, 0.27, 0.0) 烈焰红 | Color(1.0, 0.55, 0.0) 暗橙 | Color(0.6, 0.4, 0.2) 棕 | 金占位 | 棕 | 烈焰红 | 20x20 | 是 |
+| 9 | 守护图腾 | sentineltotem | 圣经+回旋镖 | Color(0.7, 0.6, 0.2) 金棕 | Color(0.54, 0.45, 0.13) 金投射 | Color(1.0, 0.84, 0.0) 金冠 | 金占位 | 金棕 | 金 | 20x20 | 否 |
+| 10 | 霜刃旋涡 | frostvortex | 飞刀+冰冻光环 | Color(0.53, 0.87, 1.0) 冰蓝 | Color(0.75, 0.75, 0.8) 银白刀刃 | Color(1.0, 1.0, 1.0) 白霜 | **Color(0.53, 0.87, 1.0)** | 银白 | 冰蓝 | 20x20 | 否 |
+| 11 | 圣焰冲击 | holyshockwave | 圣水+火焰法杖 | Color(1.0, 0.84, 0.0) 圣光金 | Color(1.0, 0.27, 0.0) 火焰橙 | Color(1.0, 0.55, 0.0) 暗橙 | **Color(1.0, 0.84, 0.0)** | 蓝 | 火橙 | 20x20 | 否 |
+| 12 | 雷霆射线 | thunderbeam | 闪电+飞刀 | Color(1.0, 0.84, 0.0) 电黄 | Color(0.3, 0.5, 1.0) 电蓝 | Color(1.0, 1.0, 1.0) 白热 | **Color(1.0, 0.84, 0.0)** | 电黄 | 电蓝 | 20x20 | 否 |
+
+### 设计决策记录 (R28)
+
+1. **frostvortex 击中粒子使用冰蓝而非金占位**: 冰蓝 Color(0.53, 0.87, 1.0) 直接表达冰系身份, 是 frostknife 击中色的精确复用。冰系武器家族 (frostknife/frostvortex/blizzard) 使用统一冰蓝色系, 强化阵营色识别。
+
+2. **holyshockwave 双色 Color B 使用火橙而非金色**: 虽然 holyshockwave 的进化主色是金色, 但双色粒子中 Color B 选择火橙 Color(1.0, 0.27, 0.0) (firestaff 辅色)。原因: (a) 金色与 thunderbeam 的电黄在 2x2 粒子下几乎不可区分; (b) 蓝色+火橙的组合形成冷暖对比, 视觉冲击力强于蓝+金; (c) 火橙直接传达 firestaff 配方成分。
+
+3. **thunderbeam 双色 Color B 使用电蓝而非电黄**: 虽然 thunderbeam 的进化主色是电黄, 但双色粒子中 Color B 选择电蓝 Color(0.3, 0.5, 1.0)。原因: (a) Color A 已是 lightning 黄, 黄+黄无区分度; (b) 电蓝与 v1.1.0 光束边缘辉光 Color(0.3, 0.5, 1.0, 0.5) 同色系; (c) 黄蓝双色是雷电的经典视觉语言。
+
+4. **三种新武器均不需要 TRAIL_COLORS**: spiral/pulse/beam 类型不是飞行投射物, 不产生沿轨迹的拖尾。它们的视觉特效通过刀片残影/环片段/光束端点等方式实现, 与 projectile_trail_pool 的拖尾机制本质不同。
+
+5. **spiral_blade 可选旋转残影**: frostvortex 可通过在刀片位置每帧留下低 alpha 冰蓝残影 (ColorRect 3x3, alpha 0.15, 生命周期 0.10s) 增强旋转轨迹感。这是视觉增强而非必要功能, 性能预算允许时再实施。
+
+### 质量自评: 94/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 击中配色确认 | 15 | 15 | 3 种新进化武器 WEAPON_COLORS + EVOLVED_DUAL_COLORS 完整定义 |
+| 拖尾一致性验证 | 15 | 15 | 6 种有拖尾武器一致, 3 种新武器正确判定不需要拖尾 |
+| 射击视觉设计 | 14 | 15 | 3 种武器 VFX 规格完整含配色/尺寸/动画/粒子, 旋转残影为可选项 |
+| 配色表完整性 | 15 | 15 | 12/12 进化武器完整配色表含 WEAPON_COLORS/Color A/Color B/拖尾列 |
+| 设计决策文档化 | 15 | 15 | 5 项关键设计决策含 rationale |
+| 代码变更规格 | 10 | 15 | 提供 GDScript 代码片段供 Programmer 直接使用 |
+| 三层验证 | 10 | 10 | WEAPON_COLORS/TRAIL_COLORS/art-log 配色表交叉验证 |
+
+**加分项**: holyshockwave/thunderbeam Color B 选择避开同色问题 (+3), 拖尾-击中-配色三层一致性验证 (+5), 完整 12x12 配色矩阵 (+3)
+
+**扣分项**: 旋转残影仅为可选项未提供完整实施规格 (-2), 代码片段仅为增量差而非完整函数 (-2), P1 WEAPON_COLORS 变更极简 (3 行) 但需等待 BUG-290 修复后才能实际生效 (-2)
