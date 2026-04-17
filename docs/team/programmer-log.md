@@ -2766,3 +2766,86 @@ Failures: 0
 | save_manager.gd 拆分 | 30 | 30 | 成就检查提取到 achievement_checker.gd, 解决 autoload 交叉引用 |
 | 向后兼容 | 15 | 15 | 所有 1719 测试零失败, 测试文件无需修改 |
 | 行数合规 | 15 | 15 | 所有 .gd <= 500 行, 信号连接正确 |
+
+---
+
+## R26: 进化武器注册 + 暂停精通面板
+
+**日期**: 2026-04-17
+**状态**: 完成
+
+### 任务概述
+
+1. **任务A**: 注册 3 个缺失进化武器 (frostvortex, holyshockwave, thunderbeam)
+2. **任务B**: 实现暂停菜单精通面板 (Esc 键触发)
+3. **BUG-280 修复**: 解决 frostknife 与 frostvortex 的 knife+frostaura 配方冲突
+
+### 技术决策
+
+#### BUG-280: 配方冲突解决方案
+
+**问题**: frostknife 和 frostvortex 均使用 knife+frostaura 作为进化配方。`check_evolution_available()` 返回第一个匹配配方，frostknife 在数组中靠前，会导致 frostvortex 永远无法触发。
+
+**解决方案**: 将 frostknife 的配方从 `knife+frostaura` 改为 `frostaura+boomerang`。理由:
+- frostvortex 是 evolution-expansion.md 明确指定的 knife+frostaura 进化产物
+- frostaura+boomerang 主题上合理: 冰霜光环 + 回旋镖 = 返回式冰霜飞刀
+- knife 现有 3 条进化路径 (fireknife, frostvortex, thunderbeam) 而非 4 条
+
+#### WeaponData Phase B 字段
+
+新增 10 个字段支持 3 种新武器类型:
+- Spiral (frostvortex): spiral_blade_count, spiral_min_radius, spiral_max_radius, spiral_expand_speed
+- Pulse (holyshockwave): pulse_max_radius, pulse_expand_time, pulse_ring_width
+- Beam (thunderbeam): beam_active_duration, beam_tick_interval, beam_width
+
+#### 暂停面板架构
+
+- `build_pause_panel()` 方法放在 hud_mastery_panel.gd (RefCounted 模块)
+- hud.gd 添加 `_on_pause_toggled()` 处理 Esc 键
+- 面板显示所有 7 种基础武器的精通 Tier / 名称 / 击杀数
+- 使用现有 MASTERY_TIER_COLORS 和 MASTERY_TIER_NAMES
+
+### 行数审计
+
+| 文件 | 修改前 | 修改后 | 变化 |
+|------|--------|--------|------|
+| scripts/weapons/weapon_registry.gd | 30 | 30 | 配方 9->11 (移除 frostknife 旧配方, +3 新) |
+| scripts/autoload/upgrade_pool.gd | 255 | 279 | +24 (3 新进化武器注册) |
+| scripts/data/weapon_data.gd | 49 | 64 | +15 (10 新字段 + 注释) |
+| scripts/autoload/achievement_checker.gd | 177 | 178 | +1 (ALL_EVO_IDS 12 项) |
+| scripts/hud_mastery_panel.gd | 123 | 192 | +69 (build_pause_panel) |
+| scripts/hud.gd | 412 | 436 | +24 (_pause_panel, _on_pause_toggled, Esc 处理) |
+
+### 测试结果
+
+```
+Scripts: 64, Tests: 1887, Passing: 1885, Risky: 2, Failing: 0
+Time: 20.79s
+```
+
+### 修改文件清单
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `scripts/weapons/weapon_registry.gd` | MODIFY | 11 配方 (移除 frostknife 旧配方, +3 新进化) |
+| `scripts/autoload/upgrade_pool.gd` | MODIFY | 注册 frostvortex/holyshockwave/thunderbeam 数据 |
+| `scripts/data/weapon_data.gd` | MODIFY | 新增 spiral/pulse/beam 字段 (Phase B) |
+| `scripts/autoload/achievement_checker.gd` | MODIFY | ALL_EVO_IDS 9->12 |
+| `scripts/hud_mastery_panel.gd` | MODIFY | 新增 build_pause_panel() 方法 |
+| `scripts/hud.gd` | MODIFY | _pause_panel, _on_pause_toggled, Esc 键处理 |
+| `test/unit/test_weapon_registry.gd` | MODIFY | 配方计数 9->11 |
+| `test/unit/test_weapon_evolution.gd` | MODIFY | 进化计数 9->12, 已注册列表更新 |
+| `test/unit/test_boundary_stress.gd` | MODIFY | 进化计数 9->11 |
+| `test/unit/test_weapon_balance.gd` | MODIFY | 进化计数 9->12 |
+| `test/unit/test_integration.gd` | MODIFY | 已注册列表更新 |
+| `test/unit/test_weapon_mastery.gd` | MODIFY | frostknife 父配方更新 |
+| `test/unit/test_achievement_checker.gd` | MODIFY | ALL_EVO_IDS 计数 9->12 |
+
+### R26 自评分: 95/100
+
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| 进化武器注册 | 40 | 40 | 3 新武器完整注册, 数值严格按规格 |
+| 暂停精通面板 | 30 | 30 | build_pause_panel() 实现, Esc 键暂停/恢复 |
+| BUG-280 修复 | 15 | 15 | frostknife 重分配到 frostaura+boomerang, 无重复配方 |
+| 行数合规 | 10 | 15 | 所有 .gd <= 500 行; 2 个 Risky 测试未断言 (面板子节点检查) |

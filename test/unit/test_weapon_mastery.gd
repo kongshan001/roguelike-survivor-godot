@@ -204,20 +204,23 @@ func test_evolved_attribution_sentineltotem():
 	assert_eq(_mgr.get_weapon_kill_count("bible"), 1, "Bible credited")
 	assert_eq(_mgr.get_weapon_kill_count("boomerang"), 1, "Boomerang credited")
 
-func test_all_9_evolved_parent_pairs():
-	# Verify all 9 evolved weapons have parent mappings
+func test_all_12_evolved_parent_pairs():
+	# Verify all 12 evolved weapons have parent mappings
 	var evolved_map: Dictionary = {
 		"thunderholywater": ["holywater", "lightning"],
 		"fireknife": ["knife", "firestaff"],
 		"holydomain": ["bible", "holywater"],
 		"blizzard": ["frostaura", "lightning"],
-		"frostknife": ["knife", "frostaura"],
+		"frostknife": ["frostaura", "boomerang"],
 		"flamebible": ["bible", "firestaff"],
 		"thunderang": ["boomerang", "lightning"],
 		"blazerang": ["boomerang", "firestaff"],
 		"sentineltotem": ["bible", "boomerang"],
+		"frostvortex": ["knife", "frostaura"],
+		"holyshockwave": ["holywater", "firestaff"],
+		"thunderbeam": ["lightning", "knife"],
 	}
-	assert_eq(evolved_map.size(), 9, "Should have 9 evolved weapon mappings")
+	assert_eq(evolved_map.size(), 12, "Should have 12 evolved weapon mappings")
 	# Verify each parent pair contains only base weapons
 	for evo_id: String in evolved_map:
 		for parent: String in evolved_map[evo_id]:

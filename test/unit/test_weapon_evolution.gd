@@ -18,7 +18,7 @@ func before_each():
 # --- Evolution Recipes ---
 
 func test_evolution_recipes_count():
-	assert_eq(_registry.EVOLUTION_RECIPES.size(), 9, "Should have 9 evolution recipes")
+	assert_eq(_registry.EVOLUTION_RECIPES.size(), 12, "Should have 12 evolution recipes")
 
 
 func _register_all_weapons():
@@ -166,8 +166,8 @@ func test_all_8_base_weapons_registered():
 		assert_ne(UpgradePool._weapons.get(id), null, "%s should be registered" % id)
 
 
-func test_all_9_evolved_weapons_registered():
+func test_all_12_evolved_weapons_registered():
 	_register_all_weapons()
-	var expected := ["thunderholywater", "fireknife", "holydomain", "blizzard", "frostknife", "flamebible", "thunderang", "blazerang", "sentineltotem"]
+	var expected := ["thunderholywater", "fireknife", "holydomain", "blizzard", "frostknife", "flamebible", "thunderang", "blazerang", "sentineltotem", "frostvortex", "holyshockwave", "thunderbeam"]
 	for id in expected:
 		assert_ne(UpgradePool._weapons.get(id), null, "%s should be registered" % id)

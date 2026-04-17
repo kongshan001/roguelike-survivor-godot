@@ -2718,6 +2718,360 @@ def gen_blazerang():
     save(img, "weapons", "blazerang.png")
 
 
+def gen_frostvortex():
+    """Frost Vortex (20x20) -- spiral ice blades expanding outward.
+    Evolution of knife + frostaura. Visual: 6 ice blades in a pinwheel/spiral
+    arrangement radiating from center, ice_blue #88DDFF + white highlights.
+    Represents the spiral weapon_type with 6 blades at 60-degree separation.
+    """
+    img, d = draw_img(20, 20)
+    outline = rgba("dark_outline")
+    ice = rgba("ice_blue")       # #88DDFF
+    ice_w = rgba("ice_white")    # #FFFFFF
+    silver = rgba("knife")       # #C0C0CC blade edge
+
+    # Center hub (3x3 filled square with outline)
+    for y in range(8, 12):
+        for x in range(8, 12):
+            d.point((x, y), fill=ice)
+    # Center outline
+    center_outline = [
+        (7, 8), (7, 9), (7, 10), (7, 11),
+        (12, 8), (12, 9), (12, 10), (12, 11),
+        (8, 7), (9, 7), (10, 7), (11, 7),
+        (8, 12), (9, 12), (10, 12), (11, 12),
+    ]
+    for pt in center_outline:
+        d.point(pt, fill=outline)
+    # Center highlight
+    d.point((9, 9), fill=ice_w)
+    d.point((10, 9), fill=ice_w)
+
+    # 6 ice blades at ~60-degree intervals (pinwheel arrangement)
+    # Each blade is a small elongated rectangle pointing outward from center
+    # Blade 0: pointing up (12 o'clock)
+    blade0 = [
+        (9, 1), (10, 1), (9, 2), (10, 2), (9, 3), (10, 3),
+        (9, 4), (10, 4), (9, 5), (10, 5), (9, 6), (10, 6),
+    ]
+    blade0_outline = [(8, 1), (11, 1), (8, 2), (11, 2), (8, 3), (11, 3),
+                       (8, 4), (11, 4), (8, 5), (11, 5), (8, 6), (11, 6),
+                       (9, 0), (10, 0)]
+
+    # Blade 1: pointing upper-right (~2 o'clock)
+    blade1 = [(14, 2), (15, 3), (16, 4), (16, 5), (15, 6)]
+    blade1_outline = [(13, 2), (17, 3), (17, 5), (14, 7), (14, 6)]
+
+    # Blade 2: pointing lower-right (~4 o'clock)
+    blade2 = [(16, 12), (15, 13), (16, 14), (15, 15), (14, 16)]
+    blade2_outline = [(17, 11), (17, 13), (16, 15), (17, 15), (13, 17)]
+
+    # Blade 3: pointing down (6 o'clock)
+    blade3 = [
+        (9, 13), (10, 13), (9, 14), (10, 14), (9, 15), (10, 15),
+        (9, 16), (10, 16), (9, 17), (10, 17), (9, 18), (10, 18),
+    ]
+    blade3_outline = [(8, 13), (11, 13), (8, 14), (11, 14), (8, 15), (11, 15),
+                       (8, 16), (11, 16), (8, 17), (11, 17), (8, 18), (11, 18),
+                       (9, 19), (10, 19)]
+
+    # Blade 4: pointing lower-left (~8 o'clock)
+    blade4 = [(3, 14), (4, 13), (3, 12), (4, 11), (5, 10)]
+    blade4_outline = [(2, 15), (2, 13), (3, 11), (2, 9), (6, 9)]
+
+    # Blade 5: pointing upper-left (~10 o'clock)
+    blade5 = [(5, 4), (4, 5), (3, 4), (4, 3), (5, 2)]
+    blade5_outline = [(6, 3), (6, 5), (3, 3), (3, 7), (4, 7)]
+
+    # Draw all blade outlines first
+    all_outlines = (blade0_outline + blade1_outline + blade2_outline
+                    + blade3_outline + blade4_outline + blade5_outline)
+    for pt in all_outlines:
+        d.point(pt, fill=outline)
+
+    # Draw all blade fills
+    all_blades = (blade0 + blade1 + blade2 + blade3 + blade4 + blade5)
+    for pt in all_blades:
+        d.point(pt, fill=ice)
+
+    # Blade edge highlights (silver on outer edges)
+    d.point((9, 1), fill=silver)
+    d.point((10, 1), fill=silver)
+    d.point((15, 3), fill=silver)
+    d.point((16, 5), fill=silver)
+    d.point((16, 13), fill=silver)
+    d.point((15, 15), fill=silver)
+    d.point((9, 18), fill=silver)
+    d.point((10, 18), fill=silver)
+    d.point((3, 14), fill=silver)
+    d.point((4, 10), fill=silver)
+    d.point((5, 2), fill=silver)
+    d.point((3, 4), fill=silver)
+
+    # White sparkle tips (outermost pixel of each blade)
+    d.point((9, 0), fill=ice_w)
+    d.point((10, 0), fill=ice_w)
+    d.point((16, 4), fill=ice_w)
+    d.point((16, 14), fill=ice_w)
+    d.point((9, 19), fill=ice_w)
+    d.point((10, 19), fill=ice_w)
+    d.point((3, 15), fill=ice_w)
+    d.point((5, 1), fill=ice_w)
+
+    # Frost particles (tiny scattered dots around blades)
+    frost_particles = [
+        (6, 2), (13, 1), (17, 8), (17, 11),
+        (13, 17), (6, 17), (2, 11), (2, 8),
+    ]
+    for pt in frost_particles:
+        d.point(pt, fill=(*PALETTE["ice_blue"][:3], 160))
+
+    save(img, "weapons", "frostvortex.png")
+
+
+def gen_holyshockwave():
+    """Holy Shockwave (20x20) -- expanding holy fire pulse ring.
+    Evolution of holywater + firestaff. Visual: central golden ring with
+    fire-orange edge, representing periodic pulse damage + burn.
+    Gold #FFD700 + fire_orange #FF4500 + white core flash.
+    """
+    img, d = draw_img(20, 20)
+    outline = rgba("dark_outline")
+    gold_c = rgba("gold")           # #FFD700 golden pulse
+    fire = rgba("fire_orange")      # #FF4500 fire edge
+    blaze = rgba("blaze_orange")    # #FF8C00 inner fire
+    white = rgba("white")
+
+    # Outer ring (r=8, gold outline ring)
+    outer_ring_outline = [
+        # Top
+        (7, 1), (8, 1), (9, 1), (10, 1), (11, 1), (12, 1),
+        # Upper sides
+        (4, 2), (5, 2), (14, 2), (15, 2),
+        (3, 3), (16, 3),
+        (2, 4), (17, 4),
+        (1, 5), (18, 5),
+        # Middle sides
+        (1, 6), (18, 6),
+        (0, 7), (19, 7),
+        (0, 8), (19, 8),
+        (0, 9), (19, 9),
+        (0, 10), (19, 10),
+        (0, 11), (19, 11),
+        # Lower sides
+        (1, 12), (18, 12),
+        (1, 13), (18, 13),
+        (2, 14), (17, 14),
+        (3, 15), (16, 15),
+        (4, 16), (15, 16),
+        # Bottom
+        (7, 17), (8, 17), (9, 17), (10, 17), (11, 17), (12, 17),
+        (5, 16), (14, 16),
+        (6, 17), (13, 17),
+    ]
+    for pt in outer_ring_outline:
+        d.point(pt, fill=outline)
+
+    # Gold ring body (between r=6 and r=7)
+    gold_ring = [
+        # Top arc
+        (7, 2), (8, 2), (9, 2), (10, 2), (11, 2), (12, 2),
+        # Upper sides
+        (5, 3), (14, 3),
+        (4, 4), (15, 4),
+        (3, 5), (16, 5),
+        (2, 6), (17, 6),
+        # Middle
+        (1, 7), (18, 7),
+        (1, 8), (18, 8),
+        (1, 9), (18, 9),
+        (1, 10), (18, 10),
+        (1, 11), (18, 11),
+        # Lower sides
+        (2, 12), (17, 12),
+        (3, 13), (16, 13),
+        (4, 14), (15, 14),
+        (5, 15), (14, 15),
+        # Bottom arc
+        (7, 16), (8, 16), (9, 16), (10, 16), (11, 16), (12, 16),
+        (6, 15), (13, 15),
+        (6, 16), (13, 16),
+    ]
+    for pt in gold_ring:
+        d.point(pt, fill=gold_c)
+
+    # Fire edge accents (4 cardinal points, fire_orange)
+    fire_pts = [
+        # Top
+        (9, 1), (10, 1),
+        # Right
+        (19, 9), (19, 10),
+        # Bottom
+        (9, 18), (10, 18),
+        # Left
+        (0, 9), (0, 10),
+    ]
+    for pt in fire_pts:
+        d.point(pt, fill=fire)
+
+    # Inner ring (fire_orange, r~4-5)
+    inner_fire = [
+        # Top
+        (8, 5), (9, 5), (10, 5), (11, 5),
+        # Sides
+        (6, 6), (7, 6), (12, 6), (13, 6),
+        (5, 7), (6, 7), (13, 7), (14, 7),
+        (5, 8), (6, 8), (13, 8), (14, 8),
+        (5, 9), (6, 9), (13, 9), (14, 9),
+        (5, 10), (6, 10), (13, 10), (14, 10),
+        (5, 11), (6, 11), (13, 11), (14, 11),
+        (5, 12), (6, 12), (13, 12), (14, 12),
+        (6, 13), (7, 13), (12, 13), (13, 13),
+        (8, 14), (9, 14), (10, 14), (11, 14),
+    ]
+    for pt in inner_fire:
+        d.point(pt, fill=fire)
+
+    # Inner fill (blaze_orange, r~3)
+    inner_fill = [
+        (8, 6), (9, 6), (10, 6), (11, 6),
+        (7, 7), (8, 7), (9, 7), (10, 7), (11, 7), (12, 7),
+        (7, 8), (8, 8), (9, 8), (10, 8), (11, 8), (12, 8),
+        (7, 9), (8, 9), (9, 9), (10, 9), (11, 9), (12, 9),
+        (7, 10), (8, 10), (9, 10), (10, 10), (11, 10), (12, 10),
+        (7, 11), (8, 11), (9, 11), (10, 11), (11, 11), (12, 11),
+        (7, 12), (8, 12), (9, 12), (10, 12), (11, 12), (12, 12),
+        (8, 13), (9, 13), (10, 13), (11, 13),
+    ]
+    for pt in inner_fill:
+        d.point(pt, fill=blaze)
+
+    # Central white flash (4x4)
+    for y in range(8, 12):
+        for x in range(8, 12):
+            d.point((x, y), fill=white)
+
+    # Hot core (2x2 bright white center)
+    d.point((9, 9), fill=(0xFF, 0xFF, 0xFF, 255))
+    d.point((10, 9), fill=(0xFF, 0xFF, 0xFF, 255))
+    d.point((9, 10), fill=(0xFF, 0xFF, 0xFF, 255))
+    d.point((10, 10), fill=(0xFF, 0xFF, 0xFF, 255))
+
+    # Radiating spikes (8 directions, gold + fire)
+    # These represent the expanding pulse wavefront
+    spike_dirs = [
+        # Up
+        (9, 0), (10, 0),
+        # Down
+        (9, 19), (10, 19),
+        # Left
+        (0, 9), (0, 10),
+        # Right
+        (19, 9), (19, 10),
+    ]
+    for pt in spike_dirs:
+        d.point(pt, fill=gold_c)
+
+    save(img, "weapons", "holyshockwave.png")
+
+
+def gen_thunderbeam():
+    """Thunder Beam (20x20) -- penetrating lightning beam with chain sparks.
+    Evolution of lightning + knife. Visual: thick diagonal beam line from
+    top-left to bottom-right with electric sparks, representing the beam
+    weapon_type that penetrates all enemies in a line.
+    Thunder_yellow #FFD700 + elec_blue #4D80FF + white core sparks.
+    """
+    img, d = draw_img(20, 20)
+    outline = rgba("dark_outline")
+    yellow = rgba("thunder_yellow")  # #FFD700 beam body
+    elec = rgba("elec_blue")         # #4D80FF electric edge
+    white = rgba("white")
+
+    # Main beam: thick diagonal line from (1,1) to (18,18), 3px wide
+    # Central core (yellow)
+    beam_core = [
+        # Thick diagonal: (x, y) where x approx = y
+        (2, 1), (3, 2), (4, 3), (5, 3), (6, 4), (7, 5),
+        (8, 6), (9, 7), (10, 7), (11, 8), (12, 9),
+        (13, 10), (14, 11), (15, 11), (16, 12), (17, 13),
+        (18, 14), (18, 15),
+        # Parallel offset +1
+        (3, 1), (4, 2), (5, 2), (6, 3), (7, 4),
+        (8, 5), (9, 6), (10, 6), (11, 7), (12, 8),
+        (13, 9), (14, 10), (15, 10), (16, 11), (17, 12),
+        (18, 13), (19, 14),
+        # Parallel offset +2 (brightest center)
+        (3, 3), (4, 4), (5, 4), (6, 5), (7, 6),
+        (8, 7), (9, 8), (10, 8), (11, 9), (12, 10),
+        (13, 11), (14, 12), (15, 12), (16, 13), (17, 14),
+    ]
+    for pt in beam_core:
+        d.point(pt, fill=yellow)
+
+    # Beam bright center (white pixels along core)
+    beam_white = [
+        (3, 2), (6, 4), (9, 6), (12, 8), (15, 10), (18, 13),
+        (4, 3), (7, 5), (10, 7), (13, 9), (16, 11),
+    ]
+    for pt in beam_white:
+        d.point(pt, fill=white)
+
+    # Beam outline (dark, both edges)
+    beam_outline_pts = [
+        (1, 0), (2, 0), (3, 0), (4, 1), (5, 1), (6, 2), (7, 3),
+        (8, 4), (9, 5), (10, 5), (11, 6), (12, 7), (13, 8),
+        (14, 9), (15, 9), (16, 10), (17, 11), (18, 12), (19, 13),
+        # Bottom edge
+        (4, 5), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 9),
+        (11, 10), (12, 11), (13, 12), (14, 13), (15, 13), (16, 14),
+        (17, 15), (18, 16), (19, 16),
+        # Entry/exit tips
+        (1, 1), (19, 15),
+    ]
+    for pt in beam_outline_pts:
+        d.point(pt, fill=outline)
+
+    # Electric blue sparks along beam edges (6 sparks)
+    blue_sparks = [
+        (1, 2), (5, 1), (11, 5), (14, 8), (17, 10), (19, 12),
+        (3, 6), (8, 9), (12, 12), (16, 15),
+    ]
+    for pt in blue_sparks:
+        d.point(pt, fill=elec)
+
+    # Chain lightning indicators (2 small zigzag lines branching off)
+    # Chain 1: from midpoint of beam branching upward-right
+    chain1 = [
+        (13, 8), (14, 7), (15, 7), (16, 6),
+    ]
+    for pt in chain1:
+        d.point(pt, fill=elec)
+    d.point((16, 6), fill=white)  # chain tip spark
+
+    # Chain 2: from midpoint of beam branching downward-left
+    chain2 = [
+        (7, 11), (6, 12), (5, 12), (4, 13),
+    ]
+    for pt in chain2:
+        d.point(pt, fill=elec)
+    d.point((4, 13), fill=white)  # chain tip spark
+
+    # Entry/exit bright points
+    d.point((2, 1), fill=white)
+    d.point((18, 15), fill=white)
+
+    # Scattered micro-sparks around beam
+    micro_sparks = [
+        (0, 3), (7, 0), (16, 5), (19, 8),
+        (0, 10), (3, 14), (13, 17), (17, 18),
+    ]
+    for pt in micro_sparks:
+        d.point(pt, fill=(*PALETTE["elec_blue"][:3], 180))
+
+    save(img, "weapons", "thunderbeam.png")
+
+
 # ── UI Sprites (wave system) ──────────────────────────────────────────────
 
 def gen_wave_progress():
@@ -5293,6 +5647,9 @@ def main():
     gen_thunderang()
     gen_blazerang()
     gen_sentineltotem()
+    gen_frostvortex()
+    gen_holyshockwave()
+    gen_thunderbeam()
 
     # Pickups
     print("\nPickups:")

@@ -20,6 +20,7 @@ var _skill_btn: RefCounted = null
 var _mastery_panel: RefCounted = null
 var _run_quests: Array[String] = []
 var _run_achievements: Array[String] = []
+var _pause_panel: Control = null
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -162,6 +163,9 @@ func _input(event: InputEvent):
 			KEY_R: _reroll_upgrades()
 	if event is InputEventKey and event.pressed and event.keycode == KEY_Q:
 		_on_retreat_pressed()
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		if not $UpgradePanel.visible:
+			_on_pause_toggled()
 
 func _select_upgrade(index: int):
 	if index >= _upgrade_options.size():
@@ -235,6 +239,26 @@ func _on_retreat_pressed() -> void:
 		return
 	retreat_pressed.emit()
 	GameManager.retreat_requested.emit()
+
+# --- Pause Menu (Esc) ---
+
+func _on_pause_toggled() -> void:
+	if get_tree().paused and _pause_panel != null:
+		# Already paused with panel showing -- unpause
+		if is_instance_valid(_pause_panel):
+			_pause_panel.queue_free()
+		_pause_panel = null
+		get_tree().paused = false
+		return
+	# Pause and show mastery panel
+	get_tree().paused = true
+	if _mastery_panel and _mastery_panel.has_method("build_pause_panel"):
+		_pause_panel = _mastery_panel.build_pause_panel()
+		_pause_panel.set_anchors_preset(Control.PRESET_CENTER)
+		_pause_panel.position = Vector2(
+			(1280.0 - _pause_panel.custom_minimum_size.x) * 0.5,
+			(720.0 - 200.0) * 0.5)
+		add_child(_pause_panel)
 
 func _on_quest_completed(quest_id: String) -> void:
 	_run_quests.append(quest_id)

@@ -29,8 +29,8 @@ func test_checker_extends_refcounted():
 
 
 func test_all_evo_ids_constant():
-	assert_eq(_checker.ALL_EVO_IDS.size(), 9,
-		"Should have 9 evolution weapon IDs")
+	assert_eq(_checker.ALL_EVO_IDS.size(), 12,
+		"Should have 12 evolution weapon IDs")
 	assert_true("thunderholywater" in _checker.ALL_EVO_IDS,
 		"Should contain thunderholywater")
 	assert_true("fireknife" in _checker.ALL_EVO_IDS,
@@ -298,7 +298,7 @@ func test_all_evolved_achievement():
 	for eid: String in _checker.ALL_EVO_IDS:
 		all_evos[eid] = true
 	_checker._check_history_achievements(all_evos, {}, [])
-	assert_true(captured["all_evolved"], "all_evolved should be true with all 9 evolutions")
+	assert_true(captured["all_evolved"], "all_evolved should be true with all 12 evolutions")
 
 
 func test_all_evolved_partial():

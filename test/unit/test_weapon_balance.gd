@@ -96,7 +96,7 @@ func test_all_evolved_weapons_registered():
 		var data: WeaponData = UpgradePool._weapons[weapon_id]
 		if data.is_evolved:
 			evolved_count += 1
-	assert_eq(evolved_count, 9, "Should have 9 evolved weapons (including sentineltotem)")
+	assert_eq(evolved_count, 12, "Should have 12 evolved weapons")
 
 
 func test_thunderang_is_evolved():

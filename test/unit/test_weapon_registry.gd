@@ -11,7 +11,7 @@ func before_each():
 # --- Recipe count ---
 
 func test_recipe_count():
-	assert_eq(_registry.EVOLUTION_RECIPES.size(), 9, "9 evolution recipes")
+	assert_eq(_registry.EVOLUTION_RECIPES.size(), 12, "12 evolution recipes")
 
 
 # --- Recipe structure ---

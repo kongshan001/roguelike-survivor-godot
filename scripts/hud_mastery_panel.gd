@@ -120,3 +120,73 @@ func _start_badge_pulse(badge: ColorRect) -> void:
 	pulse.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	pulse.tween_property(badge, "modulate:a", 0.70, 0.75).set_ease(Tween.EASE_IN_OUT)
 	pulse.tween_property(badge, "modulate:a", 1.00, 0.75).set_ease(Tween.EASE_IN_OUT)
+
+
+# --- Pause Mastery Panel ---
+
+const PAUSE_PANEL_WIDTH: float = 300.0
+const PAUSE_PANEL_ROW_HEIGHT: float = 24.0
+const PAUSE_PANEL_PADDING: float = 8.0
+const PAUSE_BG_COLOR: Color = Color(0.08, 0.08, 0.10, 0.92)
+
+
+## Build the pause mastery info panel showing all base weapon tiers/progress.
+## Returns a Control (PanelContainer) with weapon mastery rows.
+func build_pause_panel() -> Control:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.name = "PauseMasteryPanel"
+	panel.custom_minimum_size = Vector2(PAUSE_PANEL_WIDTH, 0.0)
+
+	# Dark semi-transparent background
+	var bg: ColorRect = ColorRect.new()
+	bg.color = PAUSE_BG_COLOR
+	bg.size = Vector2(PAUSE_PANEL_WIDTH, 0.0)
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.name = "MasteryVBox"
+	vbox.add_theme_constant_override("separation", 2)
+
+	# Title
+	var title: Label = Label.new()
+	title.text = "-- Mastery --"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
+	vbox.add_child(title)
+
+	# One row per base weapon
+	var base_weapons: Array = SaveManager.BASE_WEAPONS if SaveManager else []
+	for weapon_id: String in base_weapons:
+		var row: HBoxContainer = HBoxContainer.new()
+		row.name = "MasteryRow_%s" % weapon_id
+
+		var tier: int = SaveManager.get_weapon_mastery_tier(weapon_id) if SaveManager else 0
+		var kills: int = SaveManager.get_weapon_kill_count(weapon_id) if SaveManager else 0
+		var tier_color: Color = MASTERY_TIER_COLORS[tier] if tier < MASTERY_TIER_COLORS.size() else Color.WHITE
+
+		# Tier badge (small colored square)
+		var badge: ColorRect = ColorRect.new()
+		badge.custom_minimum_size = Vector2(12.0, 12.0)
+		badge.size = Vector2(12.0, 12.0)
+		badge.color = tier_color
+		row.add_child(badge)
+
+		# Weapon name
+		var name_label: Label = Label.new()
+		name_label.text = get_weapon_display_name(weapon_id)
+		name_label.add_theme_font_size_override("font_size", 11)
+		name_label.add_theme_color_override("font_color", tier_color)
+		name_label.custom_minimum_size = Vector2(100.0, 0.0)
+		row.add_child(name_label)
+
+		# Tier name + kills progress
+		var progress_label: Label = Label.new()
+		progress_label.text = "%s (%d)" % [MASTERY_TIER_NAMES[tier], kills]
+		progress_label.add_theme_font_size_override("font_size", 11)
+		progress_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+		row.add_child(progress_label)
+
+		vbox.add_child(row)
+
+	panel.add_child(vbox)
+	return panel

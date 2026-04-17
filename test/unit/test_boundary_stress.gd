@@ -284,11 +284,11 @@ func test_aura_no_enemies_no_crash():
 	assert_true(true, "update_aura with no enemies should not crash")
 
 
-# --- 2b. All 9 evolution weapons upgrade path completeness ---
+# --- 2b. All 12 evolution weapons upgrade path completeness ---
 
-func test_all_9_evolution_recipes_complete():
+func test_all_12_evolution_recipes_complete():
 	var registry: RefCounted = load("res://scripts/weapons/weapon_registry.gd").new()
-	assert_eq(registry.EVOLUTION_RECIPES.size(), 9, "Should have exactly 9 evolution recipes")
+	assert_eq(registry.EVOLUTION_RECIPES.size(), 12, "Should have exactly 12 evolution recipes")
 	var all_results: Array = []
 	for recipe: Dictionary in registry.EVOLUTION_RECIPES:
 		assert_true(recipe.has("a"), "Recipe should have ingredient a")
@@ -304,7 +304,7 @@ func test_all_9_evolution_recipes_complete():
 
 func test_evolution_requires_both_weapons_level_3():
 	var registry: RefCounted = load("res://scripts/weapons/weapon_registry.gd").new()
-	# Test all 9 recipes require level 3
+	# Test all 12 recipes require level 3
 	for recipe: Dictionary in registry.EVOLUTION_RECIPES:
 		# Level 2 on both should not evolve
 		var owned := {recipe["a"]: 2, recipe["b"]: 2}

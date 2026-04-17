@@ -88,9 +88,10 @@ func test_all_base_weapons_registered_and_valid():
 func test_all_evolved_weapons_registered_and_valid():
 	var evolved_ids := [
 		"thunderholywater", "fireknife", "holydomain", "blizzard",
-		"frostknife", "flamebible", "thunderang", "blazerang", "sentineltotem"
+		"frostknife", "flamebible", "thunderang", "blazerang", "sentineltotem",
+		"frostvortex", "holyshockwave", "thunderbeam"
 	]
-	assert_eq(evolved_ids.size(), 9, "Should have 9 evolved weapons")
+	assert_eq(evolved_ids.size(), 12, "Should have 12 evolved weapons")
 	for wid in evolved_ids:
 		assert_has(UpgradePool._weapons, wid, "%s registered" % wid)
 		var data: WeaponData = UpgradePool._weapons[wid]
@@ -410,7 +411,7 @@ func test_all_weapon_passive_synergies_detectable():
 
 func test_evolution_recipes_reference_valid_weapons():
 	var registry: RefCounted = load("res://scripts/weapons/weapon_registry.gd").new()
-	assert_eq(registry.EVOLUTION_RECIPES.size(), 9, "Should have 9 recipes")
+	assert_eq(registry.EVOLUTION_RECIPES.size(), 12, "Should have 12 recipes")
 	for recipe: Dictionary in registry.EVOLUTION_RECIPES:
 		assert_has(UpgradePool._weapons, recipe["a"], "Ingredient '%s' registered" % recipe["a"])
 		assert_has(UpgradePool._weapons, recipe["b"], "Ingredient '%s' registered" % recipe["b"])

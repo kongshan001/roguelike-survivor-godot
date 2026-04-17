@@ -146,6 +146,31 @@ func _register_evolved_weapons() -> void:
 	st.projectile_speed = 280.0; st.projectile_size = 6.0; st.color = Color(0.7, 0.6, 0.2)
 	st.is_evolved = true; st.description = "环绕图腾+定向射击"
 	register_weapon("sentineltotem", st)
+	# 10. Frost Vortex (knife + frostaura) -- spiral type
+	var fv := WeaponData.new()
+	fv.weapon_name = "霜刃旋涡"; fv.weapon_id = "frostvortex"; fv.weapon_type = "spiral"
+	fv.damage = 3.0; fv.cooldown = 999.0; fv.spiral_blade_count = 6
+	fv.spiral_min_radius = 20.0; fv.spiral_max_radius = 180.0; fv.spiral_expand_speed = 60.0
+	fv.slow_pct = 0.4; fv.freeze_pct = 0.08; fv.color = Color(0.3, 0.7, 1.0)
+	fv.projectile_size = 5.0; fv.is_evolved = true
+	fv.description = "螺旋冰刃扩散+减速"
+	register_weapon("frostvortex", fv)
+	# 11. Holy Shockwave (holywater + firestaff) -- pulse type
+	var hs := WeaponData.new()
+	hs.weapon_name = "圣焰冲击"; hs.weapon_id = "holyshockwave"; hs.weapon_type = "pulse"
+	hs.damage = 12.0; hs.cooldown = 2.5; hs.pulse_max_radius = 200.0
+	hs.pulse_expand_time = 0.3; hs.pulse_ring_width = 12.0
+	hs.burn_dps = 2.0; hs.burn_duration = 2.0; hs.color = Color(1.0, 0.85, 0.3)
+	hs.is_evolved = true; hs.description = "周期性圣焰脉冲+燃烧"
+	register_weapon("holyshockwave", hs)
+	# 12. Thunder Beam (lightning + knife) -- beam type
+	var tb := WeaponData.new()
+	tb.weapon_name = "雷霆射线"; tb.weapon_id = "thunderbeam"; tb.weapon_type = "beam"
+	tb.damage = 4.0; tb.cooldown = 2.5; tb.beam_active_duration = 1.0
+	tb.beam_tick_interval = 0.3; tb.beam_width = 12.0; tb.chain_count = 2
+	tb.projectile_range = 1200.0; tb.color = Color(1.0, 1.0, 0.4)
+	tb.is_evolved = true; tb.description = "穿透闪电射线+连锁电击"
+	register_weapon("thunderbeam", tb)
 
 
 func register_weapon(weapon_id: String, data: Resource):

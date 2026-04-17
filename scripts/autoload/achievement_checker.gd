@@ -13,6 +13,7 @@ signal state_update_requested(key: String, value: Variant)
 const ALL_EVO_IDS: Array[String] = [
 	"thunderholywater", "fireknife", "holydomain", "blizzard",
 	"frostknife", "flamebible", "thunderang", "blazerang", "sentineltotem",
+	"frostvortex", "holyshockwave", "thunderbeam",
 ]
 
 

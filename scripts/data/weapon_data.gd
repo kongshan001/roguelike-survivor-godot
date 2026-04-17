@@ -44,5 +44,21 @@ extends Resource
 @export var boomerang_curvature: float = 0.3
 @export var boomerang_track_angle: float = 0.52
 
+# Spiral (frostvortex)
+@export var spiral_blade_count: int = 6
+@export var spiral_min_radius: float = 20.0
+@export var spiral_max_radius: float = 180.0
+@export var spiral_expand_speed: float = 60.0
+
+# Pulse (holyshockwave)
+@export var pulse_max_radius: float = 200.0
+@export var pulse_expand_time: float = 0.3
+@export var pulse_ring_width: float = 12.0
+
+# Beam (thunderbeam)
+@export var beam_active_duration: float = 1.0
+@export var beam_tick_interval: float = 0.3
+@export var beam_width: float = 12.0
+
 # Evolution
 @export var is_evolved: bool = false
