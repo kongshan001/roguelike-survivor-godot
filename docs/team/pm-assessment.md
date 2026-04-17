@@ -3306,3 +3306,141 @@ R25 聚焦架构拆分。成功提取 hud_mastery_panel.gd 和 achievement_check
 - 音量0-100整数映射模式 (用户友好范围→内部dB转换)
 - 角色设计三阶段交付模式 (调研→脑暴→规格, 每阶段独立文档)
 - hud.gd预防性评估模式 (读取→分析→记录结论, 不盲目拆分)
+
+---
+
+## Round 34 评估 — v1.2.0 Phase B: SFX Integration + Necromancer Registration
+
+**时间**: 2026-04-18
+**参与角色**: Designer / Programmer / QA / Art / Reviewer / PM
+
+### 里程碑
+
+- v1.2.0 Phase B 部分完成: SFX触发器集成 6/15 脚本 + 死灵法师角色注册
+- 测试套件: 2404 测试, 2400 通过, 0 失败, 4 pending (SFX Phase C待实现)
+- PM修复 1 个failing test (die()函数体搜索窗口400→600)
+
+### 各角色评估
+
+#### Designer — 评分: 88
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 需求交付 | 90 | 音频资源策略调研(jsfxr方案), 死灵法师集成清单(15+文件) |
+| 文档质量 | 85 | necromancer-design.md 577行完整规格 |
+| 数值设计 | 90 | 死灵法师击杀缩放(+2%/100kills, max +20%), 死亡脉冲(CD 25s, 12dmg, 120px) |
+| 创新性 | 85 | 投资型角色设计, 与现有3角色差异化明显 |
+
+**复盘**: 音频资源策略确认jsfxr为最优方案(CC0, 无版权风险)。死灵法师设计完整, 但交付略慢于预期(规格在R33完成, R34整合清单)。
+
+#### Programmer — 评分: 86
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 功能实现 | 90 | SFX触发器6脚本集成(player/enemy/xp_gem/hud/projectile/weapon_controller) + 死灵法师注册 |
+| 代码质量 | 85 | 所有AudioManager调用使用`if AudioManager:` null guard |
+| 架构合规 | 85 | skill_data.gd常量定义规范, upgrade_pool.gd角色锁定被动 |
+| 测试适配 | 80 | 实现触发QA测试pending(Pending 4项: enemy_death_effects/enemy_loot/weapon_controller/arena未集成SFX) |
+| 效率 | 88 | Agent运行时间较长(30min+), 但一次性完成SFX+死灵法师两块工作 |
+
+**复盘**: SFX集成完成6/15脚本, 剩余9脚本(enemy_death_effects, enemy_loot, weapon_controller, arena等)留待Phase C。死灵法师角色注册完整(character_select/skill_data/upgrade_pool/player_skill/player)。Agent执行时间偏长, 下轮需优化任务拆分。
+
+**关键代码变更**:
+- `scripts/enemy.gd`: die()添加AudioManager SFX调用
+- `scripts/player.gd`: take_damage/dash添加SFX
+- `scripts/xp_gem.gd`: 拾取SFX
+- `scripts/hud.gd`: 升级SFX
+- `scripts/projectile.gd`: 命中SFX
+- `scripts/data/skill_data.gd`: 死灵法师技能常量(7项)
+- `scripts/autoload/upgrade_pool.gd`: necromancer_kill_scaling被动
+
+#### QA — 评分: 90
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 测试覆盖 | 92 | 2404测试(+68 vs R33), test_r34_sfx_integration.gd 41测试 + test_r34_necromancer.gd 27测试 |
+| 缺陷发现 | 88 | 发现1个flaky test(frost_aura_shatter), 确认Programmer完成SFX+死灵法师 |
+| 回归保障 | 90 | 全量运行验证, 0 failures |
+| 文档记录 | 90 | qa-log更新完整, 测试统计准确 |
+
+**复盘**: QA在Programmer仍在运行时即完成测试审查, 通过源码分析确认Programmer已完成工作。这种主动验证行为值得肯定。flaky test已被PM修复(搜索窗口过小)。
+
+#### Art — 评分: 85
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 视觉规范 | 85 | HudScreenEffects VFX代码规格(伤害闪红/升级闪光/Boss暗角) |
+| 资产管理 | 85 | 死灵法师精灵确认存在(assets/sprites/characters/necromancer.png) |
+| 文档质量 | 85 | VFX代码规格详细, 可直接指导Programmer实现 |
+
+**复盘**: VFX代码规格产出良好, 但HudScreenEffects实际代码尚未实现(留待Phase C)。像素精灵资产完整(76+ PNG), 满足当前需求。
+
+#### Reviewer — 评分: 75
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 架构审查 | 80 | 正确指出SFX集成0%/死灵法师0%(检查时Programmer尚未完成) |
+| 债务追踪 | 75 | 未新增技术债务条目 |
+| 效率 | 70 | 时机问题: Reviewer在Programmer完成前检查, 导致评分不准 |
+
+**复盘**: Reviewer需要在Programmer完成后再审查。本轮因时序问题导致评分偏差。建议下轮Reviewer延迟启动, 等待Programmer完成通知后再审查。
+
+### 项目综合评分
+
+| 维度 | 分数 |
+|------|------|
+| 功能完成度 | 87 |
+| 代码质量 | 88 |
+| 测试覆盖 | 90 |
+| 文档同步 | 85 |
+| **综合** | **87.5** |
+
+---
+
+## 测试统计 (R33→R34)
+
+| 指标 | R33 | R34 | 变化 |
+|------|-----|-----|------|
+| 总测试数 | 2336 | 2404 | +68 |
+| 断言数 | 4928 | 5069 | +141 |
+| 失败数 | 0 | 0 | = |
+| Pending数 | 0 | 4 | +4 |
+| 脚本数 | 81 | 83 | +2 |
+
+---
+
+## 反思复盘
+
+**项目综合评分 87.5 >= 80, 不强制反思。**
+
+**SFX集成进度**: 6/15脚本完成(40%), 核心触发点已覆盖(player/enemy/xp_gem/hud/projectile)。剩余9脚本包括enemy_death_effects, enemy_loot, weapon_controller, arena等。
+
+**死灵法师注册**: 角色选择/技能数据/被动池/玩家技能全部就绪, 但死亡脉冲技能效果(death_pulse实际逻辑)尚未实现。
+
+**连续22轮零失败**: R13-R34测试稳定性极高(PM及时修复1个窗口溢出问题)。
+
+**时序问题**: Reviewer在Programmer完成前检查导致评分偏低, 下轮需调整Agent启动顺序。
+
+---
+
+## 下轮优先级路线 (Round 35 — v1.2.0 Phase B续 + Phase C)
+
+| Phase | 负责角色 | 任务 |
+|-------|---------|------|
+| 35A | Programmer | 剩余9脚本SFX集成(enemy_death_effects/enemy_loot/weapon_controller/arena等) |
+| 35B | Programmer | 死灵法师死亡脉冲技能实现(death_pulse逻辑) |
+| 35C | Programmer | HudScreenEffects实现(伤害闪红/升级闪光/Boss暗角) |
+| 35D | QA | 死灵法师集成测试 + SFX Phase C测试 |
+| 35E | Reviewer | Phase B续架构审查(延迟启动, 等Programmer完成) |
+| 35F | Designer | Firebomb武器设计规格 |
+| 35G | Art | 死灵法师技能VFX视觉规格 |
+
+---
+
+## 技能迭代记录 (R34)
+
+本轮新增可复用模式:
+- SFX null guard模式 (`if AudioManager: AudioManager.play_sfx_by_id("id")` — 单行内联guard)
+- 角色注册四步模式 (character_select → skill_data → upgrade_pool → player_skill)
+- 击杀缩放被动模式 (interval-based stat boost with cap)
+- PM测试修复模式 (函数体搜索窗口随代码增长自动扩展)

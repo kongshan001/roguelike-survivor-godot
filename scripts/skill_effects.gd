@@ -32,6 +32,14 @@ const RANGER_SKILL_WARNING_TIME: float = SkillData.RANGER_SKILL_WARNING_TIME
 const RANGER_SKILL_SCREENSHAKE: float = SkillData.RANGER_SKILL_SCREENSHAKE
 const RANGER_SKILL_SCREENSHAKE_DUR: float = SkillData.RANGER_SKILL_SCREENSHAKE_DUR
 
+# --- Necromancer: Death Pulse (from SkillData) ---
+const NECROMANCER_SKILL_DAMAGE: float = SkillData.NECROMANCER_SKILL_DAMAGE
+const NECROMANCER_SKILL_RADIUS: float = SkillData.NECROMANCER_SKILL_RADIUS
+const NECROMANCER_SKILL_TICKS: int = SkillData.NECROMANCER_SKILL_TICKS
+const NECROMANCER_SKILL_TICK_INTERVAL: float = SkillData.NECROMANCER_SKILL_TICK_INTERVAL
+const NECROMANCER_SKILL_SCREENSHAKE: float = SkillData.NECROMANCER_SKILL_SCREENSHAKE
+const NECROMANCER_SKILL_SCREENSHAKE_DUR: float = SkillData.NECROMANCER_SKILL_SCREENSHAKE_DUR
+
 # --- Passive constants (from SkillData) ---
 const MAGE_PASSIVE_DAMAGE_BONUS: float = SkillData.MAGE_PASSIVE_DAMAGE_BONUS
 const WARRIOR_PASSIVE_ARMOR_BONUS: int = SkillData.WARRIOR_PASSIVE_ARMOR_BONUS
@@ -253,6 +261,48 @@ func _find_arrow_rain_target(player: CharacterBody2D) -> Vector2:
 		center += enemies[i]["enemy"].global_position
 	center /= float(count)
 	return center
+
+
+## Necromancer: Death Pulse -- expanding dark ring, damages enemies in radius over multiple ticks
+func death_pulse(player: CharacterBody2D, damage_bonus: float = 0.0) -> void:
+	var pos: Vector2 = player.global_position
+	var dmg: float = NECROMANCER_SKILL_DAMAGE * (1.0 + damage_bonus)
+	var arena: Node = player.get_parent()
+	if not arena:
+		return
+
+	# Create expanding dark ring visual
+	var ring: ColorRect = ColorRect.new()
+	ring.size = Vector2(0, 0)
+	ring.position = pos - Vector2(0, 0)
+	ring.color = Color(0.5, 0.3, 0.7, 0.6)
+	ring.z_index = 10
+	arena.call_deferred("add_child", ring)
+
+	var expand_time: float = NECROMANCER_SKILL_TICK_INTERVAL * float(NECROMANCER_SKILL_TICKS)
+	var tween: Tween = arena.create_tween()
+	tween.tween_property(ring, "size", Vector2(NECROMANCER_SKILL_RADIUS * 2.0, NECROMANCER_SKILL_RADIUS * 2.0), expand_time)
+	tween.parallel().tween_property(ring, "position", pos - Vector2(NECROMANCER_SKILL_RADIUS, NECROMANCER_SKILL_RADIUS), expand_time)
+	tween.parallel().tween_property(ring, "color:a", 0.0, expand_time)
+	tween.tween_callback(ring.queue_free)
+
+	# Tick-based damage
+	for tick_idx in range(NECROMANCER_SKILL_TICKS):
+		var tick_delay: float = NECROMANCER_SKILL_TICK_INTERVAL * float(tick_idx)
+		var tick_tween: Tween = arena.create_tween()
+		tick_tween.tween_interval(tick_delay)
+		tick_tween.tween_callback(_death_pulse_tick.bind(arena, pos, dmg))
+
+	# Screen shake
+	_screen_shake(arena, NECROMANCER_SKILL_SCREENSHAKE)
+
+
+## Single tick of death pulse -- damage enemies in radius
+func _death_pulse_tick(arena: Node, center: Vector2, damage: float) -> void:
+	var enemies: Array = _get_enemies_in_radius(arena, center, NECROMANCER_SKILL_RADIUS)
+	for enemy in enemies:
+		if is_instance_valid(enemy) and enemy.is_alive:
+			enemy.take_damage(damage / float(NECROMANCER_SKILL_TICKS), "death_pulse")
 
 
 func _screen_shake(arena: Node, intensity: float) -> void:

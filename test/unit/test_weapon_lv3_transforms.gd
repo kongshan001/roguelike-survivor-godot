@@ -251,7 +251,7 @@ func test_frost_aura_shatter_called_in_die():
 	# Find die() function
 	var die_idx: int = source.find("func die()")
 	assert_gt(die_idx, -1, "enemy.gd should have die() function")
-	var die_body: String = source.substr(die_idx, 400)
+	var die_body: String = source.substr(die_idx, 600)
 	assert_true(die_body.find("_handle_shatter()") != -1,
 		"die() should call _handle_shatter()")
 

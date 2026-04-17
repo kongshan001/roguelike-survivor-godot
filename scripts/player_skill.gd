@@ -10,6 +10,7 @@ const DASH_INVINCIBILITY_TIME: float = 0.15
 const MAGE_SKILL_COOLDOWN: float = SkillData.MAGE_SKILL_COOLDOWN
 const WARRIOR_SKILL_COOLDOWN: float = SkillData.WARRIOR_SKILL_COOLDOWN
 const RANGER_SKILL_COOLDOWN: float = SkillData.RANGER_SKILL_COOLDOWN
+const NECROMANCER_SKILL_COOLDOWN: float = SkillData.NECROMANCER_SKILL_COOLDOWN
 
 # --- Passive constants (canonical source: SkillData) ---
 const MAGE_PASSIVE_DAMAGE_BONUS: float = SkillData.MAGE_PASSIVE_DAMAGE_BONUS
@@ -77,6 +78,8 @@ func _activate_skill() -> void:
 			_player.skill_effects_node.shield_charge(_player, dir, _player.damage_bonus)
 		"arrow_rain":
 			_player.skill_effects_node.arrow_rain(_player, _player.damage_bonus)
+		"death_pulse":
+			_player.skill_effects_node.death_pulse(_player, _player.damage_bonus)
 
 
 ## Update Iron Will passive (Warrior only).

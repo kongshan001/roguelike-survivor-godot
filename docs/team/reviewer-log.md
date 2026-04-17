@@ -9603,6 +9603,208 @@ var _spiral_instance: Node2D = null
 
 ---
 
+## R34 审核报告 -- v1.2.0 Phase B
+
+**日期**: 2026-04-18
+**审核人**: Reviewer Agent
+**触发**: R34 Phase B 审核任务
+**测试基线**: 2336 测试全通过
+
+---
+
+### 1. AudioManager SFX 集成审查
+
+**结论**: **SFX 触发点尚未集成 -- Phase B 核心工作未执行。**
+
+| 检查项 | 状态 | 详情 |
+|--------|------|------|
+| SFX 调用点存在性 | **FAIL** | 在整个 `scripts/` 目录搜索 `AudioManager.play_sfx`、`AudioManager.play_ui_sfx`、`AudioManager.play_bgm_by_id`，结果为零。没有任何脚本调用 AudioManager 的播放方法 |
+| SFX ID 一致性 | N/A | 无调用点，无法检查 ID 匹配 |
+| Autoload 交叉引用 | **PASS** | `scripts/autoload/` 目录内无文件引用 `AudioManager`。game_manager.gd、upgrade_pool.gd、synergy_manager.gd、save_manager.gd 均未交叉引用 AudioManager |
+| 高频事件节流 | **FAIL** | 无节流机制代码。设计规格要求 `enemy_hurt` 最大 5 次/秒、`weapon_hit` 需节流，但 `enemy.gd` 和 `weapon_fire.gd` 中无相关实现 |
+
+**详细发现**:
+
+1. **player.gd (385行)** -- R33 为 323 行，R34 仍为 385 行 (未变)。`take_damage()` (行 283)、`die()` (行 314)、dash 路径 (行 203-209) 均未添加 SFX 调用。按规格需要添加:
+   - `take_damage()` 中添加 `if AudioManager: AudioManager.play_sfx_by_id("player_hurt", 0.05)`
+   - `die()` 开头添加 `if AudioManager: AudioManager.play_sfx_by_id("player_death")`
+   - dash 路径添加 `if AudioManager: AudioManager.play_sfx_by_id("player_dash", 0.05)`
+
+2. **enemy.gd (367行)** -- `take_damage()` (行 212) 和 `die()` (行 247) 均未添加 SFX 调用。按规格需要添加:
+   - `take_damage()` 中添加 `weapon_hit` / `weapon_crit` SFX (需节流)
+   - `die()` 开头添加 `enemy_death` 或 `elite_death` SFX
+   - `enemy_hurt` SFX 需要节流机制 (max 5/秒)
+
+3. **xp_gem.gd (77行)** -- `_collect()` (行 43) 未添加 `xp_pickup` SFX。按规格需要 pitch 随 xp_value 变化。
+
+4. **hud.gd (436行)** -- 升级面板相关函数未添加 `ui_select`、`ui_click` SFX。
+
+5. **audio_manager.gd (338行)** -- AudioManager 自身架构完整 (Phase A 成果)，提供了 `play_sfx_by_id()`、`play_ui_sfx()`、`play_bgm_by_id()` 等完整 API。但无任何消费者调用这些 API。
+
+**严重度**: **Critical** -- Phase B 的核心目标是 SFX 集成，但零调用点意味着 Phase B 实质上未开始。这不是"缺失"而是"未执行"。
+
+---
+
+### 2. 死灵法师注册审查
+
+**结论**: **死灵法师未注册 -- Phase B 第二项工作也未执行。**
+
+| 检查项 | 状态 | 详情 |
+|--------|------|------|
+| character_data.gd 字段 | **PASS** | Resource 定义通用，无硬编码角色列表，字段结构完整 (character_id, character_name, max_hp, move_speed, description, start_weapon, passive_ability, color) |
+| character_select.gd 更新 | **FAIL** | `_characters` 数组仍只有 3 项 (mage/warrior/ranger)，无 necromancer |
+| upgrade_pool.gd 适配 | **FAIL** | `_character_passives` 只有 mage/warrior/ranger，无 `"kill_bonus"` 被动。无 firebomb/thunderbomb 武器注册 |
+| skill_data.gd 常量 | **FAIL** | 无 NECRO 相关常量 (无 NECRO_SKILL_ID、NECRO_SKILL_COOLDOWN 等) |
+| player.gd 角色分支 | **FAIL** | `_setup_character_animation()` match 仍只有 mage/warrior/ranger 三分支 |
+| arena.gd 角色初始化 | **FAIL** | match 仍只有 mage/warrior/ranger，无 necromancer 分支 |
+| 角色精灵 | **PASS** | `assets/sprites/characters/necromancer.png` 已存在 |
+| skill_effects.gd | **FAIL** | 无 `death_pulse` 函数 |
+| weapon_data.gd 投掷字段 | **FAIL** | 无 `throw_height`、`pool_duration` 等 throwing 类型字段 |
+
+**详细文件路径**:
+- `/Users/ks_128/Documents/godot_demo/scripts/character_select.gd` -- 行 3-34, `_characters` 数组仅 3 项
+- `/Users/ks_128/Documents/godot_demo/scripts/autoload/upgrade_pool.gd` -- 行 32-76, `_register_base_weapons()` 无 firebomb; 行 181-186, `_character_passives` 无 kill_bonus
+- `/Users/ks_128/Documents/godot_demo/scripts/data/skill_data.gd` -- 63 行, 无 NECRO 常量
+- `/Users/ks_128/Documents/godot_demo/scripts/player.gd` -- 行 142-162, `_setup_character_animation()` 无 necromancer 分支
+- `/Users/ks_128/Documents/godot_demo/scripts/arena.gd` -- 行 27-45, match 无 necromancer
+- `/Users/ks_128/Documents/godot_demo/scripts/skill_effects.gd` -- 无 death_pulse
+- `/Users/ks_128/Documents/godot_demo/scripts/data/weapon_data.gd` -- 无 throwing 类型字段
+
+**严重度**: **Critical** -- 死灵法师是 Phase B 的第二核心交付物，完整未实现。
+
+---
+
+### 3. 全局行数检查
+
+| 文件 | R33 行数 | R34 行数 | 变化 | 状态 |
+|------|---------|---------|------|------|
+| audio_manager.gd | 338 | 338 | 0 | 无变化 (Phase A 成果, 预期不变) |
+| player.gd | ~380 | 385 | +5 | 无 SFX 添加, 可能是微小调整 |
+| enemy.gd | -- | 367 | -- | 无 SFX 添加 |
+| hud.gd | -- | 436 | -- | 无 SFX 添加 |
+| game_manager.gd | -- | 390 | -- | 无 wave SFX 添加 |
+| save_manager.gd | -- | 430 | -- | 无音量持久化 |
+| upgrade_pool.gd | -- | 279 | -- | 无 firebomb 注册 |
+| weapon_fire.gd | 447 | 447 | 0 | 无变化, 仍接近 500 行上限 (89.4%) |
+| tutorial_manager.gd | -- | 414 | -- | 已超 400 行 |
+| enemy_spawner.gd | -- | 276 | -- | 正常 |
+| skill_effects.gd | -- | 260 | -- | 正常 |
+
+**>= 400 行的文件 (需要关注)**:
+
+| 文件 | 行数 | 占 500 行上限 | 风险 |
+|------|------|--------------|------|
+| weapon_fire.gd | 447 | 89.4% | **高** -- 添加 firebomb throwing 类型将超限 |
+| hud.gd | 436 | 87.2% | **高** -- 添加 SFX 触发将接近上限 |
+| save_manager.gd | 430 | 86.0% | **中** -- 添加音量持久化将接近上限 |
+| tutorial_manager.gd | 414 | 82.8% | **中** -- 无计划修改, 但已过 400 |
+| game_manager.gd | 390 | 78.0% | 低 |
+
+**关键发现**: 当 Programmer 开始 Phase B 实现时，weapon_fire.gd 和 hud.gd 将同时面临行数压力。weapon_fire.gd 需要 firebomb 投掷逻辑 (~30 行), hud.gd 需要 SFX 触发 (~10 行)。**建议 Programmer 在添加 firebomb 前先拆分 weapon_fire.gd**。
+
+---
+
+### 4. 技术债务评估
+
+#### 4.1 现有债务状态更新
+
+| # | 债务 | 严重度 | R33 状态 | R34 状态 | 备注 |
+|---|------|--------|---------|---------|------|
+| 1 | die() 60行未重构 | P1 | 未修复 | 未修复 | enemy.gd die() 仍为 20 行 (重构后), 持续追踪 |
+| 7 | save_manager 元数据类型不匹配 | P2 | 未修复 | 未修复 | -- |
+| 16 | upgrade_pool.gd 每次调用 load+new | P2 | 未修复 | 未修复 | -- |
+| 17 | hud.gd 行数接近上限 | P2 | 437行 | **436行** | 微降 1 行, 实质未变 |
+| 20 | **weapon_fire.gd 447行 (89.4%)** | **P2** | 447行 | **447行** | 添加 firebomb 前必须拆分 |
+| 22 | "获取范围内敌人" 15处重复代码 | Low | 存在 | 存在 | -- |
+
+#### 4.2 新增技术债务评估
+
+**SFX 集成相关**:
+
+| 新债务 ID | 描述 | 严重度 | 说明 |
+|-----------|------|--------|------|
+| 24 | **SFX ID 硬编码风险** | Medium | 当前 SFX_IDS 在 audio_manager.gd 中集中定义 (良好)。但触发点添加后，各文件将使用 `AudioManager.play_sfx_by_id("player_hurt")` 形式的字符串字面量。如果 SFX ID 改名，需跨 15+ 文件修改。建议: 提供 `AudioManager.SFX_IDS.player_hurt` 常量引用而非硬编码字符串 |
+| 25 | **AudioManager preload 缓存** | Low | `preload_sfx()` 方法存在但未被调用。建议在 arena.gd _ready() 中调用 `AudioManager.preload_sfx(["player_hurt", "weapon_hit", "enemy_death", "enemy_hurt", "xp_pickup"])` 预热常用音效 |
+| 26 | **audio_manager.gd 行数增长风险** | Low | 当前 338 行，低于预估的 ~150 行 (实际实现更完整)。如果添加节流逻辑、mixer group 等功能可能增长。当前安全 |
+| 27 | **assets/audio/ 目录不存在** | **Medium** | `assets/audio/` 目录不存在 (含 bgm/ 和 sfx/ 子目录)。无音频资源文件。AudioManager 的 `play_sfx_by_id` 会走 ResourceLoader.exists -> false 路径静默返回。功能上安全但 Phase B 实现后需创建目录结构 |
+
+**死灵法师相关**:
+
+| 新债务 ID | 描述 | 严重度 | 说明 |
+|-----------|------|--------|------|
+| 28 | **SkillData 缺少 NECRO 常量** | P1 | 无 NECRO_SKILL_ID、NECRO_SKILL_COOLDOWN 等常量。设计规格定义了 17 个常量，需 Programmer 在 skill_data.gd 中添加 |
+| 29 | **weapon_data.gd 缺少 throwing 字段** | P1 | 无 throw_height、pool_duration、pool_tick_interval 等 firebomb 所需字段。需新增约 10 个 @export 字段 |
+
+---
+
+### 5. 审核总结
+
+**整体评级**: **BLOCKED** -- Phase B 核心交付物均未执行
+
+| 维度 | 状态 | 说明 |
+|------|------|------|
+| SFX 触发点集成 | **0%** | 零调用点添加。player.gd、enemy.gd、xp_gem.gd、hud.gd 等关键文件无任何 AudioManager 调用 |
+| 死灵法师注册 | **0%** | character_select 无第 4 角色、SkillData 无常量、upgrade_pool 无注册、无 death_pulse 技能 |
+| 音频资源目录 | **缺失** | assets/audio/ 不存在。AudioManager 架构完整但无资源可播放 |
+| 角色精灵 | **已就绪** | necromancer.png 已存在 |
+| 设计规格 | **完整** | necromancer-design.md 和 v1.2.0-audio-system.md 均完整，可直接交付 Programmer |
+| 测试稳定性 | **稳定** | 2336 测试全通过，Phase A 无回归 |
+
+### 6. 给各角色的建议
+
+**Programmer** (最高优先级):
+
+1. **[Critical-SFX-1]** 在 player.gd 添加 3 个 SFX 调用点:
+   - `take_damage()` -> `if AudioManager: AudioManager.play_sfx_by_id("player_hurt", 0.05)`
+   - `die()` -> `if AudioManager: AudioManager.play_sfx_by_id("player_death")`
+   - dash 路径 -> `if AudioManager: AudioManager.play_sfx_by_id("player_dash", 0.05)`
+
+2. **[Critical-SFX-2]** 在 enemy.gd 添加 SFX + 节流机制:
+   - `take_damage()` 添加 `weapon_hit` / `weapon_crit` SFX (节流: max 5/秒)
+   - `die()` 添加 `enemy_death` (elite 检测添加 `elite_death`)
+   - 在 `_physics_process` 中递减 `_hurt_sfx_cooldown`
+
+3. **[Critical-SFX-3]** 其余触发点按规格 Phase B 表格逐一添加 (xp_gem.gd, hud.gd, shop.gd, weapon_fire.gd 等)
+
+4. **[Critical-NECRO-1]** 注册死灵法师:
+   - character_select.gd 添加第 4 项
+   - skill_data.gd 添加 NECRO 常量 (17 个)
+   - player.gd `_setup_character_animation()` 添加 necromancer 分支
+   - arena.gd 添加 necromancer 初始化
+   - upgrade_pool.gd 注册 kill_bonus 被动
+
+5. **[P1-DEBT]** 在添加 firebomb 前，先拆分 weapon_fire.gd (当前 447 行，添加 firebomb 后必超 500 行)
+
+6. **[P2]** 创建 `assets/audio/bgm/` 和 `assets/audio/sfx/` 目录结构
+
+**策划**:
+- 设计规格完整无缺，无需修改。necromancer-design.md 的 17 个 SkillData 常量、19 个文件变更点均已明确
+- 建议: 当 Programmer 实现后，验证 kill_bonus 在 Endless 模式的数值手感 (规格预估 1000 kill = +20%，需实机验证)
+
+**QA**:
+- 当前 2336 测试全通过，Phase A 无回归
+- 待 Phase B 实现后需要新增: ~20 个死灵法师测试 + ~10 个 SFX 集成测试 (按规格 Section 7)
+- 注意: test_audio_manager.gd 已有 461 行 / ~35 个测试 (Phase A 成果)，Phase B 需新增集成测试
+
+**美术**:
+- necromancer.png 已存在 (32x32)，状态良好
+- 待提供: action 动作帧 (necromancer_cast.png)，用于技能释放动画
+
+---
+
+### 审核人自评: 75/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| SFX 集成审查 | 25 | 30 | 完整扫描所有脚本确认零调用点，识别规格要求的 15+ 触发点 (-5 因无法验证节流设计的运行时效果) |
+| 死灵法师注册审查 | 20 | 25 | 检查 8 个集成点，全部确认为未实现 (-5 因未验证 sprite 渲染效果) |
+| 行数审计 | 15 | 20 | 完成 10 个关键文件行数检查，标记 2 个高风险文件 (-5 因未提供拆分建议的具体行数) |
+| 技术债务评估 | 15 | 25 | 更新 6 项现有债务状态，新增 6 项债务 (-10 因未深入分析 SFX 集成对现有测试的影响) |
+
+**待改进**:
+- 未能在 Programmer 开始前提供更具体的 SFX 触发点逐行插入指南 (仅提供了方向性建议)
+- 未分析添加 SFX 后对 GUT 测试的 mock 需求 (AudioManager 在测试环境中不可用时的处理)
+
 ## R30 审核报告 (2026-04-18) -- 遗留跟进 + 全局健康检查
 
 ### 审核环境

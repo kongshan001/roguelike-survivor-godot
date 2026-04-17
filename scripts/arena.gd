@@ -40,6 +40,11 @@ func _ready():
 			player.max_health = 6.0
 			player.move_speed = 190.0
 			player.add_weapon("holywater")
+		"necromancer":
+			player.max_health = 7.0
+			player.move_speed = 150.0
+			player.pickup_range = 45.0
+			player.add_weapon("frostaura")
 		_:
 			# Default for testing
 			player.add_weapon("holywater")

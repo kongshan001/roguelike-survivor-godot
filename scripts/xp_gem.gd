@@ -55,6 +55,7 @@ func _collect():
 		if randf() < heal_chance:
 			if _player and is_instance_valid(_player) and _player.is_alive:
 				_player.heal(1.0)
+	if AudioManager: AudioManager.play_sfx_by_id("xp_pickup")
 	queue_free()
 
 

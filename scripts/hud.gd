@@ -118,8 +118,9 @@ func _on_xp_changed(current: float, needed: float) -> void:
 
 func _on_level_up(_new_level: int) -> void:
 	_pending_level_ups += 1
-	_show_upgrade_panel()
+	if AudioManager: AudioManager.play_sfx_by_id("player_levelup")
 
+	_show_upgrade_panel()
 func _on_player_died() -> void:
 	GameManager.set_meta("run_quests", _run_quests)
 	GameManager.set_meta("run_achievements", _run_achievements)

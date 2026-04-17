@@ -248,6 +248,7 @@ func die() -> void:
 	if not is_alive:
 		return
 	is_alive = false
+	if AudioManager: AudioManager.play_sfx_by_id("enemy_death")
 	remove_from_group("enemies")
 	if GameManager:
 		GameManager.unregister_enemy(self)

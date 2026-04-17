@@ -36,6 +36,7 @@ const AFTERIMAGE_FADE_DURATION: float = 0.2
 const MAGE_SKILL_COOLDOWN: float = SkillData.MAGE_SKILL_COOLDOWN
 const WARRIOR_SKILL_COOLDOWN: float = SkillData.WARRIOR_SKILL_COOLDOWN
 const RANGER_SKILL_COOLDOWN: float = SkillData.RANGER_SKILL_COOLDOWN
+const NECROMANCER_SKILL_COOLDOWN: float = SkillData.NECROMANCER_SKILL_COOLDOWN
 
 # Passive constants (canonical source: SkillData)
 const MAGE_PASSIVE_DAMAGE_BONUS: float = SkillData.MAGE_PASSIVE_DAMAGE_BONUS
@@ -158,6 +159,12 @@ func _setup_character_animation() -> void:
 			_idle_texture = preload("res://assets/sprites/characters/mage.png")
 			_action_texture = _load_texture_safe("res://assets/sprites/characters/mage_cast.png")
 			_init_skill("elemental_burst", MAGE_SKILL_COOLDOWN)
+		"necromancer":
+			damage_bonus += 0.0  # Necromancer passive is kill-based, applied at runtime
+			_char_color = Color(0.5, 0.3, 0.7)
+			_idle_texture = _load_texture_safe("res://assets/sprites/characters/necromancer.png")
+			_action_texture = _load_texture_safe("res://assets/sprites/characters/necromancer_cast.png")
+			_init_skill("death_pulse", NECROMANCER_SKILL_COOLDOWN)
 	if _idle_texture:
 		sprite.texture = _idle_texture
 
@@ -205,6 +212,7 @@ func _physics_process(delta):
 		if direction.length_squared() > 0.01:
 			dash_direction = direction.normalized()
 			is_dashing = true
+			if AudioManager: AudioManager.play_sfx_by_id("player_dash")
 			_spawn_afterimages()
 			return
 
@@ -296,6 +304,7 @@ func take_damage(amount: float):
 	current_health -= actual_damage
 	GameManager.damage_taken = true
 	GameManager.health_changed.emit(current_health, max_health)
+	if AudioManager: AudioManager.play_sfx_by_id("player_hurt")
 
 	if current_health <= 0:
 		current_health = 0

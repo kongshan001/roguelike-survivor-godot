@@ -38,6 +38,16 @@ const RANGER_SKILL_WARNING_TIME: float = 0.3
 const RANGER_SKILL_SCREENSHAKE: float = 2.0
 const RANGER_SKILL_SCREENSHAKE_DUR: float = 0.08
 
+
+# Necromancer: Death Pulse
+const NECROMANCER_SKILL_ID: String = "death_pulse"
+const NECROMANCER_SKILL_COOLDOWN: float = 25.0
+const NECROMANCER_SKILL_DAMAGE: float = 12.0
+const NECROMANCER_SKILL_RADIUS: float = 120.0
+const NECROMANCER_SKILL_TICKS: int = 3
+const NECROMANCER_SKILL_TICK_INTERVAL: float = 0.3
+const NECROMANCER_SKILL_SCREENSHAKE: float = 3.0
+const NECROMANCER_SKILL_SCREENSHAKE_DUR: float = 0.12
 # Passive constants
 const MAGE_PASSIVE_DAMAGE_BONUS: float = 0.10
 const WARRIOR_PASSIVE_ARMOR_BONUS: int = 3
@@ -50,6 +60,11 @@ const RANGER_PASSIVE_HIT_COUNT: int = 5
 const MAGE_DAMAGE_SCALE_BONUS: float = 0.08       # +8% all weapon damage
 const WARRIOR_ARMOR_MASTERY_BONUS: int = 2          # +2 armor
 const RANGER_CRIT_BOOST_BONUS: float = 0.12         # +12% crit chance
+
+# Necromancer passive: Kill Scaling Damage
+const NECROMANCER_KILL_SCALING_INTERVAL: int = 100
+const NECROMANCER_KILL_SCALING_BONUS: float = 0.02
+const NECROMANCER_KILL_SCALING_MAX: float = 0.20
 
 # --- Resource fields ---
 @export var skill_id: String = ""

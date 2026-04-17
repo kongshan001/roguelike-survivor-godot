@@ -183,6 +183,7 @@ func _register_character_passives() -> void:
 		"mage_damage_scale": {"name": "Elemental Mastery", "description": "All weapon damage +8%", "icon_color": Color(0.3, 0.5, 1.0), "max_stack": 1, "character": "mage"},
 		"warrior_armor_mastery": {"name": "Iron Skin", "description": "Gain +2 armor", "icon_color": Color(0.6, 0.6, 0.6), "max_stack": 1, "character": "warrior"},
 		"ranger_crit_boost": {"name": "Eagle Eye", "description": "+12% crit chance", "icon_color": Color(1.0, 0.8, 0.2), "max_stack": 1, "character": "ranger"},
+		"necromancer_kill_scaling": {"name": "Death Attunement", "description": "Every 100 kills +2% damage (max +20%)", "icon_color": Color(0.5, 0.3, 0.7), "max_stack": 1, "character": "necromancer"},
 	}
 
 

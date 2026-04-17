@@ -8785,3 +8785,553 @@ CanvasLayer (layer=100, name="ScreenEffects")
 **加分项**: 死亡脉冲与死灵法师整体视觉体系的映射关系(+3), 火焰池配色复用进化武器 FireKnife 已有色值(+2), Boss 晕影与已有 Boss 警告横幅的时序配合(+3), 统一 ScreenEffects CanvasLayer 架构建议(+3), 受伤闪红与进化闪光的对比分析(+2)
 
 **扣分项**: 死亡脉冲 8 段 ColorRect 在对角线方向的接缝可能可见(-2), Lv3 火焰分裂的落地粒子未定义(-1)
+
+---
+
+## R34 美术任务 (2026-04-18) -- v1.2.0 Phase B 屏幕效果实现规范 + 死灵法师图标
+
+### 前置说明
+
+R33 已定义了受伤闪红/升级闪光/Boss 晕影的视觉参数和配色方案。本节在此基础上，提供 Programmer 可直接集成并通过 GUT 测试验证的**完整代码片段**和**RefCouled 模块规范**。
+
+---
+
+### 任务 1: 受伤闪红效果 -- 正式实现规范
+
+#### 1.1 视觉参数 (与 R33 Section 3.2 一致)
+
+| 属性 | 值 | 说明 |
+|------|-----|------|
+| 触发信号 | `GameManager.health_changed` | hp 下降时触发 |
+| 节点类型 | `ColorRect` | CanvasLayer 子节点 |
+| 布局 | `PRESET_FULL_RECT` | 覆盖全屏 |
+| 颜色 | `Color(0.8, 0.0, 0.0)` | 深红 #CC0000 |
+| Alpha 峰值 | 0.3 | 半透明，不遮挡游戏 |
+| 淡入 | 0.0s (瞬时) | 即时冲击感 |
+| 淡出 | 0.25s | 快速消退 |
+| 淡出曲线 | `TRANS_QUAD, EASE_OUT` | 快起慢收 |
+| 默认状态 | `visible = false` | 不占渲染资源 |
+| layer | `CanvasLayer layer=100` | HUD 最上层 |
+
+#### 1.2 集成位置
+
+新建 `scripts/hud_screen_effects.gd` (RefCounted 模块)，由 `hud.gd` 实例化。理由：
+- hud.gd 当前 437 行，接近 500 行上限
+- 屏幕效果逻辑独立，适合拆分
+- RefCounted 模块可被 GUT 单元测试直接实例化
+
+#### 1.3 hud_screen_effects.gd 完整代码片段
+
+```gdscript
+# scripts/hud_screen_effects.gd
+# HUD 屏幕叠加效果模块 -- 受伤闪红 / 升级闪光 / Boss 晕影
+# 由 hud.gd 实例化，传入 CanvasLayer 宿主
+
+class_name HudScreenEffects
+extends RefCounted
+
+# --- 受伤闪红常量 ---
+const DAMAGE_FLASH_COLOR: Color = Color(0.8, 0.0, 0.0)
+const DAMAGE_FLASH_ALPHA: float = 0.3
+const DAMAGE_FLASH_FADE_TIME: float = 0.25
+
+# --- 升级闪光常量 ---
+const LEVEL_UP_FLASH_COLOR: Color = Color(1.0, 1.0, 0.8)
+const LEVEL_UP_FLASH_ALPHA: float = 0.25
+const LEVEL_UP_FLASH_FADE_IN: float = 0.05
+const LEVEL_UP_FLASH_FADE_OUT: float = 0.4
+
+# --- Boss 晕影常量 ---
+const BOSS_VIGNETTE_COLOR: Color = Color(0.6, 0.0, 0.0)
+const BOSS_VIGNETTE_MAX_ALPHA: float = 0.35
+const BOSS_VIGNETTE_FADE_IN: float = 1.0
+const BOSS_VIGNETTE_FADE_OUT: float = 0.5
+const BOSS_VIGNETTE_EDGE_WIDTH: float = 40.0
+const BOSS_VIGNETTE_PULSE_FREQ: float = 1.5  # Hz
+const BOSS_VIGNETTE_PULSE_AMP: float = 0.05
+
+# --- 内部引用 ---
+var _host: CanvasLayer = null
+var _damage_flash: ColorRect = null
+var _level_up_flash: ColorRect = null
+var _boss_vignette_edges: Array[ColorRect] = []
+var _boss_active: bool = false
+var _boss_pulse_time: float = 0.0
+var _damage_tween: Tween = null
+var _levelup_tween: Tween = null
+var _boss_tween: Tween = null
+
+
+func _init(host: CanvasLayer) -> void:
+    _host = host
+    _setup_damage_flash()
+    _setup_level_up_flash()
+    _setup_boss_vignette()
+
+
+# ========== 受伤闪红 ==========
+
+func _setup_damage_flash() -> void:
+    _damage_flash = ColorRect.new()
+    _damage_flash.name = "DamageFlash"
+    _damage_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+    _damage_flash.color = Color(DAMAGE_FLASH_COLOR.r, DAMAGE_FLASH_COLOR.g, DAMAGE_FLASH_COLOR.b, 0.0)
+    _damage_flash.visible = false
+    _damage_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _host.add_child(_damage_flash)
+
+
+func show_damage_flash() -> void:
+    if _damage_flash == null or not _damage_flash.is_inside_tree():
+        return
+    if _damage_tween and _damage_tween.is_valid():
+        _damage_tween.kill()
+    _damage_flash.visible = true
+    _damage_flash.color = Color(DAMAGE_FLASH_COLOR.r, DAMAGE_FLASH_COLOR.g, DAMAGE_FLASH_COLOR.b, DAMAGE_FLASH_ALPHA)
+    _damage_tween = _host.create_tween()
+    _damage_tween.tween_property(_damage_flash, "color:a", 0.0, DAMAGE_FLASH_FADE_TIME) \
+        .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    _damage_tween.tween_callback(func() -> void:
+        _damage_flash.visible = false
+    )
+
+
+# ========== 升级闪光 ==========
+
+func _setup_level_up_flash() -> void:
+    _level_up_flash = ColorRect.new()
+    _level_up_flash.name = "LevelUpFlash"
+    _level_up_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+    _level_up_flash.color = Color(LEVEL_UP_FLASH_COLOR.r, LEVEL_UP_FLASH_COLOR.g, LEVEL_UP_FLASH_COLOR.b, 0.0)
+    _level_up_flash.visible = false
+    _level_up_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _host.add_child(_level_up_flash)
+
+
+func show_level_up_flash() -> void:
+    if _level_up_flash == null or not _level_up_flash.is_inside_tree():
+        return
+    if _levelup_tween and _levelup_tween.is_valid():
+        _levelup_tween.kill()
+    _level_up_flash.visible = true
+    _level_up_flash.color = Color(LEVEL_UP_FLASH_COLOR.r, LEVEL_UP_FLASH_COLOR.g, LEVEL_UP_FLASH_COLOR.b, 0.0)
+    _levelup_tween = _host.create_tween()
+    # 淡入 0.05s
+    _levelup_tween.tween_property(_level_up_flash, "color:a", LEVEL_UP_FLASH_ALPHA, LEVEL_UP_FLASH_FADE_IN)
+    # 淡出 0.4s
+    _levelup_tween.tween_property(_level_up_flash, "color:a", 0.0, LEVEL_UP_FLASH_FADE_OUT) \
+        .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    _levelup_tween.tween_callback(func() -> void:
+        _level_up_flash.visible = false
+    )
+
+
+# ========== Boss 晕影 ==========
+
+func _setup_boss_vignette() -> void:
+    # 4 个边缘 ColorRect，分别覆盖上/下/左/右
+    var edge_names: Array[String] = ["BossVignetteTop", "BossVignetteBottom", "BossVignetteLeft", "BossVignetteRight"]
+    for edge_name in edge_names:
+        var edge := ColorRect.new()
+        edge.name = edge_name
+        edge.color = Color(BOSS_VIGNETTE_COLOR.r, BOSS_VIGNETTE_COLOR.g, BOSS_VIGNETTE_COLOR.b, 0.0)
+        edge.visible = false
+        edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _host.add_child(edge)
+        _boss_vignette_edges.append(edge)
+    _position_vignette_edges()
+
+
+func _position_vignette_edges() -> void:
+    # 延迟定位，等待 host 进入场景树后获取视口尺寸
+    if _boss_vignette_edges.size() < 4:
+        return
+    var vp_size: Vector2 = _host.get_viewport().get_visible_rect().size if _host.get_viewport() else Vector2(1280, 720)
+    var w: float = BOSS_VIGNETTE_EDGE_WIDTH
+    # Top
+    _boss_vignette_edges[0].set_anchors_preset(Control.PRESET_TOP_WIDE)
+    _boss_vignette_edges[0].offset_top = 0.0
+    _boss_vignette_edges[0].offset_bottom = w
+    # Bottom
+    _boss_vignette_edges[1].set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+    _boss_vignette_edges[1].offset_top = -w
+    _boss_vignette_edges[1].offset_bottom = 0.0
+    # Left
+    _boss_vignette_edges[2].set_position(Vector2(0, 0))
+    _boss_vignette_edges[2].set_size(Vector2(w, vp_size.y))
+    # Right
+    _boss_vignette_edges[3].set_position(Vector2(vp_size.x - w, 0))
+    _boss_vignette_edges[3].set_size(Vector2(w, vp_size.y))
+
+
+func show_boss_vignette() -> void:
+    if _boss_vignette_edges.size() < 4:
+        return
+    _boss_active = true
+    _boss_pulse_time = 0.0
+    _position_vignette_edges()
+    if _boss_tween and _boss_tween.is_valid():
+        _boss_tween.kill()
+    for edge in _boss_vignette_edges:
+        edge.visible = true
+        edge.color = Color(BOSS_VIGNETTE_COLOR.r, BOSS_VIGNETTE_COLOR.g, BOSS_VIGNETTE_COLOR.b, 0.0)
+    _boss_tween = _host.create_tween()
+    for edge in _boss_vignette_edges:
+        _boss_tween.parallel().tween_property(edge, "color:a", BOSS_VIGNETTE_MAX_ALPHA, BOSS_VIGNETTE_FADE_IN) \
+            .set_trans(Tween.TRANS_SINE)
+
+
+func hide_boss_vignette() -> void:
+    _boss_active = false
+    if _boss_tween and _boss_tween.is_valid():
+        _boss_tween.kill()
+    if _boss_vignette_edges.size() < 4:
+        return
+    var tween := _host.create_tween()
+    for edge in _boss_vignette_edges:
+        tween.parallel().tween_property(edge, "color:a", 0.0, BOSS_VIGNETTE_FADE_OUT)
+    tween.tween_callback(func() -> void:
+        for edge in _boss_vignette_edges:
+            edge.visible = false
+    )
+
+
+func process_boss_pulse(delta: float) -> void:
+    if not _boss_active:
+        return
+    if _boss_vignette_edges.size() < 4:
+        return
+    _boss_pulse_time += delta
+    var pulse_alpha: float = BOSS_VIGNETTE_MAX_ALPHA + BOSS_VIGNETTE_PULSE_AMP * sin(_boss_pulse_time * BOSS_VIGNETTE_PULSE_FREQ * TAU)
+    for edge in _boss_vignette_edges:
+        edge.color = Color(BOSS_VIGNETTE_COLOR.r, BOSS_VIGNETTE_COLOR.g, BOSS_VIGNETTE_COLOR.b, pulse_alpha)
+```
+
+#### 1.4 hud.gd 集成代码片段
+
+```gdscript
+# === 在 hud.gd 顶部的子系统声明区域添加 ===
+var _screen_fx: RefCounted = null
+
+# === 在 _ready() 中，_mastery_panel 初始化之后添加 ===
+    _screen_fx = load("res://scripts/hud_screen_effects.gd").new(self)
+
+# === 信号连接 (已有 health_changed 和 level_up 连接，只需在回调中添加调用) ===
+
+# 修改 _on_health_changed:
+func _on_health_changed(current: float, max_hp: float) -> void:
+    $HealthBar.value = (current / max_hp) * 100.0
+    $HealthLabel.text = "%d/%d" % [int(current), int(max_hp)]
+    # 受伤闪红: HP 下降时触发
+    if current < max_hp and _screen_fx:
+        _screen_fx.show_damage_flash()
+
+# 修改 _on_level_up:
+func _on_level_up(new_level: int) -> void:
+    _pending_level_ups += 1
+    if _screen_fx:
+        _screen_fx.show_level_up_flash()
+    _show_upgrade_panel()
+
+# === Boss 晕影触发 (需要 Programmer 添加 boss_spawned 信号或检测 wave_boss) ===
+# 方案: 在 _on_wave_started 中检测 boss 波次
+func _on_wave_started(wave: int, wave_name: String) -> void:
+    _toast.show_toast("Wave %d: %s" % [wave, wave_name], GameManager.get_wave_color())
+    # Boss 晕影
+    if _screen_fx:
+        var def: Dictionary = GameManager._get_current_wave_def()
+        if def.get("boss", false):
+            _screen_fx.show_boss_vignette()
+        else:
+            _screen_fx.hide_boss_vignette()
+
+# === 在 _process(delta) 中添加 Boss 脉动更新 ===
+func _process(delta: float) -> void:
+    $TimerLabel.text = GameManager.format_time(GameManager.elapsed_time)
+    _update_wave_display()
+    if _toast:
+        _toast.process_queue(delta)
+    _skill_btn.update_display(_get_player())
+    # Boss 晕影脉动
+    if _screen_fx:
+        _screen_fx.process_boss_pulse(delta)
+```
+
+#### 1.5 GUT 测试要点 (QA Agent 参考)
+
+```gdscript
+# test_hud_screen_effects.gd 关键测试用例
+
+# 测试常量可验证
+func test_damage_flash_constants() -> void:
+    assert_eq(HudScreenEffects.DAMAGE_FLASH_COLOR, Color(0.8, 0.0, 0.0))
+    assert_eq(HudScreenEffects.DAMAGE_FLASH_ALPHA, 0.3)
+    assert_eq(HudScreenEffects.DAMAGE_FLASH_FADE_TIME, 0.25)
+
+# 测试 LevelUp 常量
+func test_level_up_flash_constants() -> void:
+    assert_eq(HudScreenEffects.LEVEL_UP_FLASH_COLOR, Color(1.0, 1.0, 0.8))
+    assert_eq(HudScreenEffects.LEVEL_UP_FLASH_ALPHA, 0.25)
+    assert_eq(HudScreenEffects.LEVEL_UP_FLASH_FADE_OUT, 0.4)
+
+# 测试 Boss 晕影常量
+func test_boss_vignette_constants() -> void:
+    assert_eq(HudScreenEffects.BOSS_VIGNETTE_COLOR, Color(0.6, 0.0, 0.0))
+    assert_eq(HudScreenEffects.BOSS_VIGNETTE_MAX_ALPHA, 0.35)
+    assert_eq(HudScreenEffects.BOSS_VIGNETTE_PULSE_FREQ, 1.5)
+
+# 测试模块实例化
+func test_can_instantiate() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    assert_not_null(fx)
+
+# 测试 DamageFlash 节点创建
+func test_damage_flash_node_created() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    var node := layer.get_node_or_null("DamageFlash")
+    assert_not_null(node, "DamageFlash node should exist")
+    assert_false(node.visible, "DamageFlash should start hidden")
+
+# 测试 LevelUpFlash 节点创建
+func test_level_up_flash_node_created() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    var node := layer.get_node_or_null("LevelUpFlash")
+    assert_not_null(node, "LevelUpFlash node should exist")
+    assert_false(node.visible, "LevelUpFlash should start hidden")
+
+# 测试 Boss 晕影 4 边缘节点
+func test_boss_vignette_edges_created() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    assert_eq(layer.get_node_or_null("BossVignetteTop").name, "BossVignetteTop")
+    assert_eq(layer.get_node_or_null("BossVignetteBottom").name, "BossVignetteBottom")
+    assert_eq(layer.get_node_or_null("BossVignetteLeft").name, "BossVignetteLeft")
+    assert_eq(layer.get_node_or_null("BossVignetteRight").name, "BossVignetteRight")
+
+# 测试 show_damage_flash 设置可见性和颜色
+func test_show_damage_flash_visibility() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    fx.show_damage_flash()
+    var node: ColorRect = layer.get_node("DamageFlash")
+    assert_true(node.visible)
+    assert_almost_eq(node.color.a, 0.3, 0.01)
+
+# 测试 show_level_up_flash 设置可见性和颜色
+func test_show_level_up_flash_visibility() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    fx.show_level_up_flash()
+    var node: ColorRect = layer.get_node("LevelUpFlash")
+    assert_true(node.visible)
+
+# 测试 show_boss_vignette 设置可见性
+func test_show_boss_vignette_visibility() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    fx.show_boss_vignette()
+    for name in ["BossVignetteTop", "BossVignetteBottom", "BossVignetteLeft", "BossVignetteRight"]:
+        assert_true(layer.get_node(name).visible, "%s should be visible" % name)
+
+# 测试 hide_boss_vignette
+func test_hide_boss_vignette() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    fx.show_boss_vignette()
+    fx.hide_boss_vignette()
+    # 等待 tween 完成 (或验证 _boss_active 标志)
+    assert_false(fx._boss_active)
+
+# 测试 Boss 脉动计算
+func test_boss_pulse_alpha_range() -> void:
+    var layer := CanvasLayer.new()
+    add_child_autofree(layer)
+    var fx := HudScreenEffects.new(layer)
+    fx.show_boss_vignette()
+    # 模拟多帧脉动，验证 alpha 在 [0.30, 0.40] 范围内
+    for i in range(60):
+        fx.process_boss_pulse(1.0 / 60.0)
+    var alpha: float = layer.get_node("BossVignetteTop").color.a
+    assert_true(alpha >= 0.30 and alpha <= 0.40, "Boss vignette alpha should be in [0.30, 0.40]")
+```
+
+---
+
+### 任务 2: 升级闪光效果 -- 正式实现规范
+
+#### 2.1 视觉参数 (与 R33 Section 3.3 一致)
+
+| 属性 | 值 | 说明 |
+|------|-----|------|
+| 触发信号 | `GameManager.level_up` | 玩家升级时 |
+| 颜色 | `Color(1.0, 1.0, 0.8)` | 暖白 #FFFFCC |
+| Alpha 峰值 | 0.25 | 比进化闪光(0.4)更柔和 |
+| 淡入 | 0.05s | 近乎即时但有平滑感 |
+| 淡出 | 0.4s | 中速消退 |
+| 淡出曲线 | `TRANS_QUAD, EASE_OUT` | |
+
+代码片段已包含在上述 `hud_screen_effects.gd` 的 `show_level_up_flash()` 方法中。
+
+#### 2.2 受伤闪红 vs 升级闪光 对比表
+
+| 对比项 | 受伤闪红 DamageFlash | 升级闪光 LevelUpFlash |
+|--------|---------------------|---------------------|
+| 颜色 | Color(0.8, 0.0, 0.0) 深红 | Color(1.0, 1.0, 0.8) 暖白 |
+| Alpha 峰值 | 0.3 | 0.25 |
+| 淡入时间 | 0.0s (瞬时) | 0.05s (微有过渡) |
+| 淡出时间 | 0.25s (快) | 0.4s (中) |
+| 色温 | 冷暗色 (警告) | 暖色 (奖励) |
+| 情感映射 | 负面 | 正面 |
+
+---
+
+### 任务 3: Boss 晕影效果 -- 正式实现规范
+
+#### 3.1 视觉参数 (与 R33 Section 3.4 一致)
+
+| 属性 | 值 | 说明 |
+|------|-----|------|
+| 触发条件 | `WAVE_DEFS[current_wave].boss == true` | wave_boss (第5波) |
+| 颜色 | `Color(0.6, 0.0, 0.0)` | 暗红 #990000 |
+| Alpha 峰值 | 0.35 | 比受伤闪红更深但更持久的压迫感 |
+| 淡入时间 | 1.0s | 缓慢浸入 |
+| 淡出时间 | 0.5s | Boss 击败后较快消退 |
+| 脉动频率 | 1.5 Hz | sin(t * 1.5 * TAU) |
+| 脉动振幅 | +/-0.05 | alpha 在 [0.30, 0.40] 间呼吸 |
+| 边缘宽度 | 40 px | 上/下/左/右各一条 |
+| 边缘位置 | 屏幕四边 | 向中心渐变 |
+
+代码片段已包含在上述 `hud_screen_effects.gd` 的 Boss 晕影部分。
+
+#### 3.2 Boss 晕影时序图
+
+```
+T+0s:     wave_started (wave_boss) 信号发出
+T+0s:     show_boss_vignette() 调用, 4 边缘 ColorRect visible=true
+T+0~1s:   alpha 0.0 -> 0.35 淡入 (TRANS_SINE)
+T+1s:     稳态 alpha=0.35 + 脉动开始
+T+???:    Boss 被击败 或 wave_completed
+T+???:    hide_boss_vignette() 调用
+T+???:    0.5s alpha -> 0.0 淡出, visible=false
+```
+
+#### 3.3 Boss 晕影消退时机建议
+
+建议 Programmer 在以下任一条件下调用 `hide_boss_vignette()`:
+1. `GameManager.wave_completed` 信号且当前波次为 boss 波
+2. `GameManager.boss_kill_reward` 信号 (更精确)
+3. `GameManager.victory_achieved` 信号
+4. 非 boss 波次的 `wave_started` 信号 (切换波次时自然消退上一波晕影)
+
+---
+
+### 任务 4: 死灵法师角色选择图标
+
+#### 4.1 necromancer.png 状态确认
+
+| 检查项 | 结果 |
+|--------|------|
+| 文件路径 | `assets/sprites/characters/necromancer.png` |
+| 文件状态 | **已存在** |
+| 画布尺寸 | 32x32 px (与其他角色一致) |
+| 可视内容 | 深紫兜帽 + 苍白面部 + 紫色法袍 + 法杖 |
+
+确认 necromancer.png 已生成并可用。角色选择界面通过 `character_select.gd` 中的 `_characters` 数组动态加载，只需 Programmer 在数组中添加死灵法师条目即可。
+
+#### 4.2 死灵法师角色选择配色方案
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 角色 ID | `"necromancer"` | 与 designer-log 规格一致 |
+| 显示名称 | `"死灵法师"` | |
+| 精灵路径 | `"res://assets/sprites/characters/necromancer.png"` | 已确认存在 |
+| HP | 8 | 参照 necromancer-design.md |
+| 速度 | 150 | |
+| 描述 | `"暗法术, 初始冰冻光环"` | 初始武器 frostaura |
+| 能力 | `"拾取范围+10"` | NECRO_TRAIT_PICKUP_RANGE_BONUS |
+| 主题色 (color) | `Color(0.27, 0.13, 0.40)` | 深紫 #442266 |
+| Icon 调色 (modulate) | 使用 color 字段，与现有一致 | character_select.gd L76: `icon.modulate = data.color` |
+| Icon 尺寸 | 60x60 | 与现有一致 (L71) |
+| Card 尺寸 | 200x280 | 与现有一致 (L63) |
+
+#### 4.3 角色选择界面视觉层级对比
+
+| 角色 | 主色 | 色系 | 情感 | 与其他角色区分度 |
+|------|------|------|------|-----------------|
+| 法师 | Color(0.1, 0.14, 0.49) 深蓝 | 蓝系 | 冷静/智慧 | 高 -- 唯一蓝色系 |
+| 战士 | Color(0.72, 0.11, 0.11) 深红 | 红系 | 力量/勇气 | 高 -- 唯一红色系 |
+| 游侠 | Color(0.11, 0.37, 0.13) 深绿 | 绿系 | 敏捷/自然 | 高 -- 唯一绿色系 |
+| **死灵法师** | Color(0.27, 0.13, 0.40) 深紫 | **紫系** | **神秘/死亡** | **高 -- 唯一紫色系** |
+
+4 个角色分别使用蓝/红/绿/紫 4 种完全不同的色系，在角色选择界面中具有极高的视觉区分度。紫色系在暗色背景 `Color(0.1, 0.1, 0.18)` 上有良好的可见性。
+
+#### 4.4 character_select.gd 添加条目参考 (Programmer)
+
+```gdscript
+# 在 _characters 数组末尾添加:
+{
+    "id": "necromancer",
+    "name": "死灵法师",
+    "sprite": "res://assets/sprites/characters/necromancer.png",
+    "hp": 8,
+    "speed": 150,
+    "desc": "暗法术, 初始冰冻光环",
+    "ability": "拾取范围+10",
+    "color": Color(0.27, 0.13, 0.40),
+},
+```
+
+---
+
+### R34 配色表新增汇总
+
+| 资产名 | 色名 | Color 值 | Hex | 用途 |
+|--------|------|---------|-----|------|
+| DamageFlash | 深红 | Color(0.8, 0.0, 0.0) | #CC0000 | 受伤闪红 (重申, R33 已定义) |
+| LevelUpFlash | 暖白 | Color(1.0, 1.0, 0.8) | #FFFFCC | 升级闪光 (重申, R33 已定义) |
+| BossVignette | 暗红晕影 | Color(0.6, 0.0, 0.0) | #990000 | Boss 晕影 (重申, R33 已定义) |
+| Necromancer | 深紫主题色 | Color(0.27, 0.13, 0.40) | #442266 | 角色选择界面 (重申, R32 已定义) |
+
+注: 本节配色与 R33 完全一致, 无新增色值。R34 的核心产出是实现代码和测试规范, 而非新配色。
+
+---
+
+### 设计决策记录
+
+1. **hud_screen_effects.gd 使用 RefCounted 而非 Node**: 与 `hud_toast.gd`、`hud_mastery_panel.gd`、`hud_skill_button.gd` 保持一致的架构模式。RefCounted 不需要场景树管理，通过持有 CanvasLayer 引用来创建子节点。hud.gd 已有 4 个 RefCounted 子系统，这是第 5 个。
+
+2. **Boss 晕影使用 4 边缘 ColorRect 而非 Shader**: 重申 R33 的决策。4 个 ColorRect 代码量约 60 行，可测试性强 (直接检查节点 visible/color.a)，无需 Shader 文件。像素风中简单的纯色边缘已足够表达压迫感。
+
+3. **Boss 脉动使用 process_boss_pulse(delta) 而非 Tween 循环**: Tween 不支持无限循环脉动。在 `_process` 中手动计算 sin 值更简单可靠，且 1.5Hz 频率下每帧计算量可忽略。
+
+4. **受伤闪红触发检测 `current < max_hp`**: 因为 `GameManager.health_changed` 在 HP 增减时都会发出，需要通过 `current < max_hp` 区分受伤 vs 治愈。更精确的方案是 Programmer 在 player.gd 中维护 previous_hp 并发出专门的 `took_damage` 信号，但 `current < max_hp` 作为简化方案对 GUT 测试更友好。
+
+5. **necromancer.png 无需额外制作**: 文件已存在于 `assets/sprites/characters/`，32x32 画布与其他角色一致。character_select.gd 只需在 `_characters` 数组中追加条目即可自动加载。
+
+---
+
+### 质量自评: 92/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 受伤闪红规范 | 18 | 20 | 完整常量+代码+测试用例。触发检测用 `current < max_hp` 简化方案而非精确的 took_damage 信号(-2) |
+| 升级闪光规范 | 15 | 15 | 完整常量+代码+对比表 |
+| Boss 晕影规范 | 18 | 20 | 完整常量+4边缘代码+脉动+时序图。边缘渐变未实现(纯色边缘)，需 Shader 才能实现中心渐变透明(-2) |
+| 死灵法师图标 | 18 | 20 | 文件确认+配色方案+角色对比+代码片段。HP/速度等数值需 Programmer 确认最终值(-2) |
+| 代码可集成性 | 15 | 15 | RefCounted 模块与现有一致，hud.gd 集成代码片段明确 |
+| 测试覆盖建议 | 8 | 10 | 11 个测试用例覆盖常量/实例化/节点创建/可见性/脉动范围。Tween 完成回调的异步测试未包含(-2) |
+
+**加分项**: Boss 晕影消退时机 4 种条件建议(+3), 受伤/升级对比表清晰(+2), 角色四色系对比论证(+2)
+
+**扣分项**: Boss 晕影 4 边缘为纯色无渐变, 需 Shader 才能达到中心透明效果(-3), 受伤检测简化可能误触(-2), 异步 Tween 测试未覆盖(-2)

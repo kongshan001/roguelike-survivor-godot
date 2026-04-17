@@ -31,6 +31,16 @@ var _characters: Array[Dictionary] = [
 		"ability": "暴击+10%",
 		"color": Color(0.11, 0.37, 0.13),
 	},
+	,{
+		"id": "necromancer",
+		"name": "死灵法师",
+		"sprite": "res://assets/sprites/characters/necromancer.png",
+		"hp": 7,
+		"speed": 150,
+		"desc": "低血量法师，初始冰冻光环",
+		"ability": "每100击杀+2%伤害",
+		"color": Color(0.5, 0.3, 0.7),
+	},
 ]
 
 
