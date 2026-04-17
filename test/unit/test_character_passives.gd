@@ -109,8 +109,7 @@ func test_player_constants_reference_skill_data():
 # =====================================================================
 
 func test_mage_sees_mage_passive():
-	GameManager.selected_character = "mage"
-	var options := UpgradePool.get_random_upgrades({}, {}, 20)
+	var options := UpgradePool.get_random_upgrades({}, {}, 20, "mage")
 	var found := false
 	for opt in options:
 		if opt.get("id") == "mage_damage_scale":
@@ -120,15 +119,13 @@ func test_mage_sees_mage_passive():
 
 
 func test_mage_does_not_see_warrior_passive():
-	GameManager.selected_character = "mage"
-	var options := UpgradePool.get_random_upgrades({}, {}, 20)
+	var options := UpgradePool.get_random_upgrades({}, {}, 20, "mage")
 	for opt in options:
 		assert_ne(opt.get("id"), "warrior_armor_mastery", "Mage should NOT see warrior passive")
 
 
 func test_warrior_sees_warrior_passive():
-	GameManager.selected_character = "warrior"
-	var options := UpgradePool.get_random_upgrades({}, {}, 20)
+	var options := UpgradePool.get_random_upgrades({}, {}, 20, "warrior")
 	var found := false
 	for opt in options:
 		if opt.get("id") == "warrior_armor_mastery":
@@ -137,8 +134,7 @@ func test_warrior_sees_warrior_passive():
 
 
 func test_ranger_sees_ranger_passive():
-	GameManager.selected_character = "ranger"
-	var options := UpgradePool.get_random_upgrades({}, {}, 20)
+	var options := UpgradePool.get_random_upgrades({}, {}, 20, "ranger")
 	var found := false
 	for opt in options:
 		if opt.get("id") == "ranger_crit_boost":
@@ -147,16 +143,14 @@ func test_ranger_sees_ranger_passive():
 
 
 func test_no_character_sees_no_character_passives():
-	GameManager.selected_character = ""
-	var options := UpgradePool.get_random_upgrades({}, {}, 20)
+	var options := UpgradePool.get_random_upgrades({}, {}, 20, "")
 	for opt in options:
 		assert_ne(opt.get("type"), "character_passive", "No character passives without character")
 
 
 func test_character_passive_not_offered_at_max_stack():
-	GameManager.selected_character = "mage"
 	var owned_passives := {"mage_damage_scale": 1}
-	var options := UpgradePool.get_random_upgrades({}, owned_passives, 20)
+	var options := UpgradePool.get_random_upgrades({}, owned_passives, 20, "mage")
 	for opt in options:
 		assert_ne(opt.get("id"), "mage_damage_scale", "Should not offer maxed character passive")
 

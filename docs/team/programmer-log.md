@@ -18,6 +18,24 @@
 
 ## 技术决策
 
+### 2026-04-17: R27 Risky测试修复 + Autoload交叉引用修复 + 代码清理
+- **决策**: 修复R26遗留的架构问题和代码质量
+- **为什么**:
+  - upgrade_pool.gd 直接引用 `GameManager.selected_character`，违反 autoload 单例间禁止互相引用的架构约束
+  - hud.gd 多个函数缺少返回值类型注解 (`-> void`)
+  - 2个risky测试 (test_new_evolved_weapons_not_offered_as_new, test_build_pause_panel_background_color) 已在前序轮次被修复
+- **变更内容**:
+  - upgrade_pool.gd: `get_random_upgrades()` 新增 `selected_character: String = ""` 参数，移除 `GameManager.selected_character` 直接引用
+  - hud.gd: 调用 `get_random_upgrades()` 时传入 `GameManager.selected_character` 作为参数
+  - test_character_passives.gd: 6个测试从设置 `GameManager.selected_character` 改为直接传参给 `get_random_upgrades()`
+  - hud.gd: 12个函数补全 `-> void` 返回值类型注解，2个局部变量添加类型声明 (`var player: Node2D`, `var option: Dictionary`)
+- **CARD_HOVER_Y_OFFSET**: 保留而非删除 -- 虽然生产代码中未使用，但 test_ui_polish.gd 中2个测试引用该常量，删除会导致测试失败
+- **修改文件**:
+  - `scripts/autoload/upgrade_pool.gd` (279行): 移除 GameManager 引用，新增参数
+  - `scripts/hud.gd` (437行): 传参 + 类型注解补全
+  - `test/unit/test_character_passives.gd`: 6个测试改用参数传递
+- **测试**: 2023测试全部通过，0失败，0 risky，6 orphans (CanvasItem RID leak, 非程序代码引起)
+
 ### 2026-04-17: R20 XP曲线微调 + 商店T4扩展 + 武器精通系统
 - **决策**: 实现v1.0.2三项系统级功能，按designer-log spec编码
 - **为什么**:

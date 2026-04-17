@@ -459,11 +459,18 @@ func test_new_evolved_weapons_not_offered_as_new():
 	UpgradePool._register_base_weapons()
 	UpgradePool._register_evolved_weapons()
 	var options: Array[Dictionary] = UpgradePool.get_random_upgrades({}, {}, 20)
+	# Verify that get_random_upgrades actually returned options
+	assert_gt(options.size(), 0, "Should get at least some upgrade options")
 	var evolved_ids: Array = ["frostvortex", "holyshockwave", "thunderbeam"]
+	var new_weapon_ids: Array = []
 	for opt: Dictionary in options:
 		if opt.type == "new_weapon":
-			assert_not_in(opt.id, evolved_ids,
-				"New evolved weapons should not be offered as new_weapon")
+			new_weapon_ids.append(opt.id)
+	# Assert that none of the new_weapon options are evolved weapon IDs
+	assert_gt(new_weapon_ids.size(), 0, "Should have at least one new_weapon option to validate")
+	for wid: String in new_weapon_ids:
+		assert_not_in(wid, evolved_ids,
+			"New evolved weapon '%s' should not be offered as new_weapon" % wid)
 
 
 func assert_not_in(value, array: Array, message: String):

@@ -2279,4 +2279,87 @@ Time: 22.626s
 |------|----------|------|
 | test/unit/test_r26_evolved_weapons.gd | 新建 | 52 项测试: 3 新进化武器注册验证 + WeaponData 新字段 + 回归 |
 | test/unit/test_r26_pause_mastery_panel.gd | 新建 | 22 项测试: 暂停精通面板 + HUD 集成 + 回归 |
+
+---
+
+## R27 -- QA 测试回归 & 覆盖率提升 (2026-04-17)
+
+### 概要
+
+| 指标 | R26 | R27 | 变化 |
+|------|-----|-----|------|
+| 测试总数 | 1887 | 2023 | +136 |
+| 通过数 | 1885 | 2023 | +138 |
+| Risky | 2 | 0 | -2 (已修复) |
+| 失败 | 0 | 0 | 0 |
+| 断言数 | 4169 | 4379 | +210 |
+| 脚本数 | 64 | 68 | +4 |
+| 孤儿节点 | 6 | 6 | 0 |
+
+### 任务A: Risky 测试修复 (2/2)
+
+| 测试名 | 文件 | 原因 | 修复方案 |
+|--------|------|------|----------|
+| test_new_evolved_weapons_not_offered_as_new | test_r26_evolved_weapons.gd:458 | 自定义 assert_not_in 仅在发现违规时调用, 若所有选项合规则无断言被触发 | 改为先收集所有 new_weapon ID, 对列表做 assert_gt 确保有选项, 再逐一断言 |
+| test_build_pause_panel_background_color | test_r26_pause_mastery_panel.gd:125 | build_pause_panel() 返回 PanelContainer 而非 ColorRect, `result is ColorRect` 判断为假导致跳过所有断言 | 改为直接读取 _panel.PAUSE_BG_COLOR 常量并断言其 RGB 值 |
+
+### 任务B: 覆盖率分析 & 新增测试
+
+#### 未覆盖模块清单 (R27 新增)
+
+| 脚本模块 | R27 前覆盖 | 新增测试文件 | 新增测试数 |
+|-----------|------------|-------------|-----------|
+| enemy_loot.gd | 0 (无直接测试) | test_r27_enemy_loot.gd | 27 |
+| enemy_death_effects.gd | 0 (无直接测试) | test_r27_enemy_death_effects.gd | 28 |
+| skill_effects.gd | 0 (无直接测试) | test_r27_skill_effects.gd | 30 |
+| weapon_controller.gd (spiral/pulse/beam) | 无分支覆盖 | test_r27_weapon_type_coverage.gd | 29 |
+
+#### 仍为纯容器/UI的模块 (未新增测试, 风险低)
+
+- pickup_manager.gd -- 仅作为容器节点, 无逻辑
+- title_screen.gd, difficulty_select.gd, character_select.gd, weapon_select.gd, game_over_screen.gd -- UI 场景脚本
+
+#### weapon_controller.gd spiral/pulse/beam 分支分析
+
+**发现**: weapon_controller.gd `_fire_weapon()` 的 match 语句仅覆盖 6 种 weapon_type:
+- projectile, orbit, lightning, cone, aura, boomerang
+
+3 种新进化武器类型 (spiral/pulse/beam) 已在 upgrade_pool.gd 注册但**缺少 match 分支**, 导致:
+- 这些武器被玩家持有时, 计时器正常创建并消耗, 但 `_fire_weapon` 调用时 match 落入隐式默认分支, **不产生任何攻击效果**
+- 这是一个功能性 BUG: frostvortex/holyshockwave/thunderbeam 可获取但无法生效
+
+### 新增测试文件 (4 files, 136 tests)
+
+| 文件 | 测试数 | 覆盖内容 |
+|------|--------|----------|
+| test_r27_enemy_loot.gd | 27 | 常量(10), 击杀奖励(4), 武器击杀追踪(6), 进化武器父武器(1), Boss死亡(4), 金币计算(3) |
+| test_r27_enemy_death_effects.gd | 28 | 命中反馈常量(5), 精英命中常量(4), 死亡时长(11), 死亡动画分派(11), 命中反馈(5), null边界(2) |
+| test_r27_skill_effects.gd | 30 | 法师技能常量(6), 战士技能常量(6), 游侠技能常量(8), 被动常量(6), 视觉常量(2), 方法存在(7), SkillData一致性(3), 辅助函数(4) |
+| test_r27_weapon_type_coverage.gd | 29 | 武器类型注册审计(1), 基础武器分派(6), 进化武器分派-spiral/pulse/beam(6), 数据字段(3), 进化orbit分派(4), 进化projectile分派(2), 进化boomerang分派(2), 进化aura分派(1), weapon_effects覆盖(4) |
+
+### 修改文件清单
+
+| 文件 | 修改类型 | 说明 |
+|------|----------|------|
+| test/unit/test_r26_evolved_weapons.gd | 修改 | 修复 risky: test_new_evolved_weapons_not_offered_as_new 添加前置断言 |
+| test/unit/test_r26_pause_mastery_panel.gd | 修改 | 修复 risky: test_build_pause_panel_background_color 使用 PAUSE_BG_COLOR 常量断言 |
+| test/unit/test_r27_enemy_loot.gd | 新建 | 27 项测试: enemy_loot 常量/击杀奖励/金币/Boss/追踪 |
+| test/unit/test_r27_enemy_death_effects.gd | 新建 | 28 项测试: 死亡动画常量/分派/命中反馈 |
+| test/unit/test_r27_skill_effects.gd | 新建 | 30 项测试: 技能常量/被动/方法存在/辅助函数 |
+| test/unit/test_r27_weapon_type_coverage.gd | 新建 | 29 项测试: 武器类型审计/spiral/pulse/beam 分派覆盖 |
+| docs/team/qa-log.md | 修改 | R27 测试报告 |
+
+### BUG 报告
+
+| ID | 严重度 | 模块 | 描述 | 状态 | 指派 |
+|------|--------|------|------|------|------|
+| BUG-290 | Critical | weapon_controller | spiral/pulse/beam 三种 weapon_type 在 `_fire_weapon()` match 中无对应分支, frostvortex/holyshockwave/thunderbeam 可获取但无法攻击 | 待处理 | Programmer |
+
+### 发现
+
+1. **2 个 risky 测试已修复**: R26 遗留的 2 个 risky 测试在 R27 全部消除, 方法是将隐式 guard 模式改为显式断言
+2. **spiral/pulse/beam 武器类型缺失**: weapon_controller.gd `_fire_weapon()` 的 match 语句缺少对 "spiral"/"pulse"/"beam" 类型的处理, 这 3 种进化武器 (frostvortex/holyshockwave/thunderbeam) 注册正确但实际无法生效
+3. **enemy_loot.gd 武器击杀追踪完整**: 9 种进化武器的父武器映射全部正确, 每种进化武器击杀同时为 2 个父武器计数
+4. **enemy_death_effects.gd 全敌人覆盖**: 10 种敌人的死亡动画时长和分派全部有对应 match 分支, 包含 unknown 默认处理
+5. **skill_effects.gd 常量与 SkillData 一致**: 法师/战士/游侠技能常量全部从 SkillData 引用, 无硬编码偏差
 | docs/team/qa-log.md | 更新 | 追加 R26 测试报告 + BUG-280 |

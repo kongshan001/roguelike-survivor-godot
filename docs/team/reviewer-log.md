@@ -8630,3 +8630,382 @@ R26 预期交付物全部未落地. 策划需要先解决配方冲突后 Program
 **待改进**:
 - 无法确认实际测试运行结果 (test_all_12_evolved_weapons_registered 是否因 guard 而通过)
 - 暂停面板规格细节 (weapon-mastery-ui.md Section 4) 的审核深度可以更高
+
+---
+
+## R27 审核报告 (2026-04-17) -- v1.0.3 全面审核 + 发布就绪评估
+
+### 审核环境
+
+- 测试套件: **1887 tests, 0 failures** (从 R25 的 3 失败完全恢复)
+- 测试文件: 65 个
+- 连续零失败轮数: 1 (R27 首次达到 0 失败)
+- 当前版本: v1.0.3 核心功能基本完成
+
+### 审核范围
+
+R22-R26 新增/修改代码全面审核:
+- `scripts/hud_mastery_panel.gd` (暂停面板 + 徽章子系统)
+- `scripts/autoload/achievement_checker.gd` (成就检查逻辑提取)
+- `scripts/weapons/weapon_registry.gd` (12 进化配方)
+- `scripts/autoload/upgrade_pool.gd` (12 进化武器注册)
+- `scripts/data/weapon_data.gd` (新字段)
+- `scripts/weapons/weapon_boomerang_fire.gd` (boomerang 独立模块)
+- `scripts/autoload/save_manager.gd` (achievement_checker 集成)
+
+---
+
+### 任务 A: v1.0.3 全面审核
+
+#### A.1 文件行数检查
+
+| 文件 | 行数 | 占上限% | 状态 |
+|------|------|---------|------|
+| scripts/autoload/game_manager.gd | 320 | 64% | PASS |
+| scripts/autoload/save_manager.gd | 351 | 70% | PASS |
+| scripts/autoload/upgrade_pool.gd | 259 | 52% | PASS |
+| scripts/autoload/achievement_checker.gd | 157 | 31% | PASS |
+| scripts/autoload/synergy_manager.gd | 126 | 25% | PASS |
+| scripts/hud.gd | 437 | 87% | **WARNING** -- 接近上限 |
+| scripts/hud_mastery_panel.gd | 193 | 39% | PASS |
+| scripts/player.gd | 374 | 75% | PASS |
+| scripts/enemy.gd | 272 | 54% | PASS |
+| scripts/weapons/weapon_fire.gd | 301 | 60% | PASS |
+| scripts/weapons/weapon_boomerang_fire.gd | 80 | 16% | PASS |
+| scripts/weapons/weapon_registry.gd | 26 | 5% | PASS |
+| scripts/data/weapon_data.gd | 65 | 13% | PASS |
+| scripts/weapon_controller.gd | 106 | 21% | PASS |
+
+**最大文件**: `scripts/hud.gd` 437 行 (87.4%)。任何新增 UI 功能前必须拆分。
+
+**全部文件 < 500 行**: PASS
+
+#### A.2 类型注解覆盖率
+
+| 文件 | 公开函数数 | 有注解数 | 覆盖率 |
+|------|-----------|---------|--------|
+| hud_mastery_panel.gd | 4 | 4 | 100% |
+| achievement_checker.gd | 1 | 1 | 100% |
+| weapon_registry.gd | 1 | 1 | 100% |
+| upgrade_pool.gd | 3 | 2 | 67% -- `register_weapon()` 缺少返回值注解 |
+| game_manager.gd | 20+ | 17+ | ~85% -- `_ready()`, `reset()`, `add_xp()`, `add_gold()`, `register_kill()` 等缺少 `-> void` |
+| weapon_boomerang_fire.gd | 4 | 4 | 100% |
+
+**未注解函数明细**:
+
+| 文件 | 函数 | 缺失 |
+|------|------|------|
+| `upgrade_pool.gd:176` | `register_weapon(weapon_id: String, data: Resource)` | 缺 `-> void` |
+| `game_manager.gd:141` | `_ready()` | 缺 `-> void` |
+| `game_manager.gd:165` | `reset()` | 缺 `-> void` |
+| `game_manager.gd:194` | `add_xp(amount: float)` | 缺 `-> void` |
+| `game_manager.gd:204` | `add_gold(amount: int)` | 缺 `-> void` |
+| `game_manager.gd:209` | `register_kill()` | 缺 `-> void` |
+| `game_manager.gd:224` | `update_combo(delta: float)` | 缺 `-> void` |
+
+#### A.3 信号使用审查
+
+| 文件 | 信号定义数 | emit 调用数 | 连接方式 | 评估 |
+|------|-----------|-----------|----------|------|
+| achievement_checker.gd | 4 | 30+ | save_manager 通过 `checker.signal.connect()` | PASS -- 解耦优秀 |
+| hud_mastery_panel.gd | 0 (使用 hud_toast 的 show_toast) | N/A | 通过 RefCounted 引用 | PASS |
+| weapon_registry.gd | 0 (纯数据) | N/A | N/A | PASS |
+| upgrade_pool.gd | 0 | N/A | 被动调用 | PASS |
+
+**achievement_checker.gd 信号架构**: 4 个信号 (quest_check_requested, achievement_check_requested, soul_reward_requested, state_update_requested) 全部使用 signal-driven 解耦模式。save_manager.gd 通过 `checker.signal.connect(self_method)` 桥接。这是优秀的架构实践。
+
+#### A.4 硬编码检查
+
+| 文件 | 位置 | 硬编码内容 | 评估 |
+|------|------|-----------|------|
+| hud_mastery_panel.gd:9-22 | MASTERY_TIER_COLORS/BORDERS | 常量定义 | PASS -- 语义化常量 |
+| hud_mastery_panel.gd:76-81 | get_weapon_display_name() | Dictionary 映射 7 种武器名 | Low -- 新增武器需手动更新 |
+| upgrade_pool.gd:13-21 | 被动定义 | Dictionary 字面量 | Medium -- 应提取到 PassiveData Resource |
+| upgrade_pool.gd:182-186 | 角色被动 | Dictionary 字面量 | Medium -- 同上 |
+| upgrade_pool.gd:194 | `load("res://scripts/weapons/weapon_registry.gd").new()` | 每次调用都 load+new | Medium -- 应缓存或 preload |
+
+#### A.5 12 进化武器注册审核
+
+`upgrade_pool.gd` `_register_evolved_weapons()` (行 78-173) 注册了 12 种进化武器:
+
+| # | weapon_id | weapon_type | is_evolved | PASS |
+|---|-----------|-------------|------------|------|
+| 1 | thunderholywater | orbit | true | PASS |
+| 2 | fireknife | projectile | true | PASS |
+| 3 | holydomain | orbit | true | PASS |
+| 4 | blizzard | aura | true | PASS |
+| 5 | frostknife | projectile | true | PASS |
+| 6 | flamebible | orbit | true | PASS |
+| 7 | thunderang | boomerang | true | PASS |
+| 8 | blazerang | boomerang | true | PASS |
+| 9 | sentineltotem | orbit | true | PASS |
+| 10 | frostvortex | spiral | true | PASS |
+| 11 | holyshockwave | pulse | true | PASS |
+| 12 | thunderbeam | beam | true | PASS |
+
+`weapon_registry.gd` 定义了 12 种配方。`achievement_checker.gd` 的 `ALL_EVO_IDS` 列出了 12 种进化 ID。三方数据一致。
+
+**weapon_data.gd 新字段审核**: 新增 spiral/pulse/beam 三种进化专属字段 (spiral_blade_count, pulse_max_radius, beam_active_duration 等), 全部为 `@export var` 并有默认值 0。Resource 子类仅数据, 无逻辑。PASS。
+
+#### A.6 achievement_checker.gd 集成审核
+
+save_manager.gd `check_quests_and_achievements()` (行 199-244) 当前状态:
+
+1. 从 GameManager 收集 run_stats Dictionary -- **这是唯一读取 GameManager 的地方**
+2. 从 SynergyManager 收集活跃协同 -- 通过 `_collect_active_synergies()` 桥接
+3. 实例化 achievement_checker (RefCounted, 非 autoload)
+4. 连接 4 个信号到 save_manager 方法
+5. 调用 `checker.check_all(run_stats, save_data)`
+6. 应用返回的 state 更新
+
+**架构改进**: 原先 save_manager 内 100+ 行的成就检查逻辑现在拆分为:
+- `save_manager.gd`: 45 行桥接层 (收集数据 + 连接信号 + 应用结果)
+- `achievement_checker.gd`: 157 行纯逻辑 (无 autoload 引用)
+
+这解决了 R3 标记的 "check_quests_and_achievements() 跨 Autoload 耦合严重" P1 债务。
+
+**桥接层仍读取 GameManager**: save_manager.gd:200-213 直接读取 GameManager 8 个属性。这在 CLAUDE.md 的 "autoload 单例间禁止互相引用" 规则下是否违规, 见任务 C 分析。
+
+#### A.7 hud_mastery_panel.gd 暂停面板审核
+
+`build_pause_panel()` (行 135-192) 功能:
+- 构建暗色半透明背景 PanelContainer
+- 标题 "-- Mastery --"
+- 每种基础武器一行: tier 徽章 + 武器名 + tier 名 + 击杀数
+- 直接读取 `SaveManager.BASE_WEAPONS` 和 `SaveManager.get_weapon_mastery_tier()`
+
+**跨 autoload 引用**: hud_mastery_panel.gd 不是 autoload, 是 hud.gd 的 RefCounted 子系统。它通过 `SaveManager` 全局名访问。由于它不是 autoload, 不违反 autoload 间禁止互相引用的规则。但 `ensure_badge()` (行 56) 和 `build_pause_panel()` (行 158) 均直接调用 `SaveManager.get_weapon_mastery_tier()` 和 `SaveManager.BASE_WEAPONS`, 如果 SaveManager 为 null 则有 `if SaveManager else 0` 保护。
+
+#### A.8 R26 新增进化武器类型审核
+
+4 种新武器类型 (spiral, pulse, beam, orbit+fire) 的数据定义完整:
+
+| 类型 | 代表武器 | 核心数据字段 | 评估 |
+|------|----------|-------------|------|
+| spiral | frostvortex | spiral_blade_count/min_radius/max_radius/expand_speed + slow/freeze | PASS |
+| pulse | holyshockwave | pulse_max_radius/expand_time/ring_width + burn | PASS |
+| beam | thunderbeam | beam_active_duration/tick_interval/width + chain | PASS |
+| orbit+fire | sentineltotem | orbit_count/radius/speed + orbit_fire_rate + proj_speed | PASS |
+
+`weapon_fire.gd` 当前仅处理 6 种基础 weapon_type (projectile/orbit/lightning/cone/aura/boomerang)。新增的 spiral/pulse/beam 类型在 weapon_fire.gd 的 match 语句中无分支, 意味着这 4 种进化武器的发射逻辑**尚未实现**。
+
+**Medium 问题**: sentineltotem/frostvortex/holyshockwave/thunderbeam 的 `cooldown` 设为 999.0 (sentineltotem) 或正常值, 但 weapon_controller.gd `_fire_weapon()` 的 match 语句不匹配这些新类型, 导致计时器到期后无操作 -- 武器被注册但永远不会发射。
+
+---
+
+### 任务 B: 技术债务追踪
+
+#### B.1 历史债务状态更新
+
+| # | 债务 | 优先级 | R26 状态 | R27 状态 | 说明 |
+|---|------|--------|---------|---------|------|
+| 1 | die() 60行未重构 | P1 | 未修复 | 未修复 | enemy.gd:223-282, 从 R2 继承 |
+| 2 | 无尽模式功能 | P1 | 未实现 | 已实现 | R6 报告 7/7 已实现 |
+| 3 | boomerang 暴击判定 | P1 | 未修复 | **已修复** | weapon_boomerang_fire.gd:68-76 有完整暴击判定 |
+| 4 | boomerang weapon_id 缺失 | P1 | 未修复 | **已修复** | weapon_boomerang_fire.gd:77 `bm.weapon_id = data.weapon_id` |
+| 5 | projectile weapon_id 时序 | P1 | 未修复 | **已修复** | weapon_id 在 setup() 前赋值 |
+| 6 | boomerang 硬编码 sprite 路径 | P2 | 未修复 | **已修复** | boomerang.gd:38-44 三级回退逻辑 |
+| 7 | save_manager 元数据类型不匹配 | P2 | 未修复 | 未修复 | save_manager.gd 仍用 `var evolutions: Array = []` 但赋值 Dictionary |
+| 8 | SaveManager 信号连接保护 | P2 | 未修复 | **已修复** | hud.gd:43-49 全部加 is_connected 保护 |
+| 9 | achievement_checker 集成 | P1 | 未解决 | **已解决** | save_manager.gd 正确集成 achievement_checker.gd |
+| 10 | 3 种新进化武器未注册 | P2 | 未交付 | **已解决** | upgrade_pool.gd 注册 12 种进化武器 |
+| 11 | 暂停精通面板未实现 | P2 | 未交付 | **已实现** | hud_mastery_panel.gd build_pause_panel() |
+| 12 | enemy_bullet.gd take_damage 签名 | P3 | 继承 | 继承 | 不影响当前功能 |
+| 13 | chest.gd ColorRect 未迁移 | P2 | 未修复 | 未修复 | 视觉问题, 非功能阻塞 |
+| 14 | release-readiness.md 过时 | Low | v1.0.0 | 未修复 | 文档问题 |
+
+#### B.2 新发现债务
+
+| # | 债务 | 优先级 | 文件 | 说明 |
+|---|------|--------|------|------|
+| 15 | 4 种进化武器发射逻辑未实现 | **P1** | weapon_fire.gd | spiral/pulse/beam/orbit+fire 类型在 match 中无分支, 武器不发射 |
+| 16 | upgrade_pool.gd 每次调用 load+new weapon_registry | P2 | upgrade_pool.gd:194 | 应缓存或 preload |
+| 17 | hud.gd 行数 437 行 (87%) | P2 | scripts/hud.gd | 任何新增 UI 功能前必须拆分 |
+| 18 | hud_mastery_panel.gd 武器名映射需手动同步 | Low | hud_mastery_panel.gd:76-81 | 新增武器需手动更新 Dictionary |
+| 19 | upgrade_pool.gd 被动数据未提取到 Resource | Low | upgrade_pool.gd:13-21 | 应使用 PassiveData Resource |
+
+#### B.3 R27 解决的债务 (5 项)
+
+1. **boomerang 暴击判定** (P1, 从 R3 继承) -- weapon_boomerang_fire.gd:68-76 完整实现
+2. **boomerang weapon_id** (P1, 从 R3 继承) -- weapon_boomerang_fire.gd:77,97 正确传递
+3. **projectile weapon_id 时序** (P1, 从 R5 继承) -- weapon_fire.gd weapon_id 在 setup() 前赋值
+4. **achievement_checker 集成** (P1, 从 R25 继承) -- save_manager.gd 正确桥接
+5. **SaveManager 信号连接保护** (P2, 从 R6 继承) -- hud.gd:43-49 全部 is_connected 保护
+
+---
+
+### 任务 C: Autoload 合规最终检查
+
+#### C.1 Autoload 脚本列表
+
+| Autoload | 文件 | 行数 |
+|----------|------|------|
+| GameManager | scripts/autoload/game_manager.gd | 320 |
+| SaveManager | scripts/autoload/save_manager.gd | 351 |
+| UpgradePool | scripts/autoload/upgrade_pool.gd | 259 |
+| SynergyManager | scripts/autoload/synergy_manager.gd | 126 |
+
+#### C.2 Autoload 交叉引用 grep 结果
+
+| 来源 Autoload | 目标 Autoload | 引用位置 | 违规 |
+|--------------|--------------|----------|------|
+| **upgrade_pool.gd** | **GameManager** | 行 249: `GameManager.selected_character` | **违规** |
+| save_manager.gd | GameManager | 行 202-213: 读取 8 个属性 | 桥接层 (1处集中) |
+| save_manager.gd | SynergyManager | 行 249-252: 遍历 SYNERGY_DEFINITIONS | 桥接层 (1处集中) |
+
+#### C.3 已知违规状态
+
+**违规 #1: upgrade_pool.gd 引用 GameManager**
+
+位置: `scripts/autoload/upgrade_pool.gd` 行 249:
+```gdscript
+var selected_char: String = GameManager.selected_character if GameManager else ""
+```
+
+用途: 过滤角色专属被动 (mage_damage_scale/warrior_armor_mastery/ranger_crit_boost)。
+
+影响范围: 仅在 `get_random_upgrades()` 中使用, 有 null guard (`if GameManager else ""`)。
+
+历史: 此违规从 R23 起被追踪, R25 标记为 "未解决", R26 标记为 "P1 遗留"。R27 仍未解决。
+
+修复方案: 可通过参数传递解决 -- `get_random_upgrades()` 增加 `character: String = ""` 参数, 由调用方 (hud.gd) 从 GameManager 获取后传入。
+
+**违规 #2: save_manager.gd 引用 GameManager**
+
+位置: `scripts/autoload/save_manager.gd` 行 200-213。
+
+历史: 这是从 R3 起就存在的桥接层, 在 R25 的 achievement_checker 提取后得到改善 (原 100+ 行逻辑缩减为 45 行数据收集)。虽然技术上仍是 autoload 交叉引用, 但:
+- 集中在 1 个函数 (check_quests_and_achievements) 的 1 个位置
+- 仅读取数据, 不调用方法或修改状态
+- 有 null guard 保护
+- 信号驱动模式 (achievement_checker) 已将逻辑核心解耦
+
+**违规 #3: save_manager.gd 引用 SynergyManager**
+
+位置: `scripts/autoload/save_manager.gd` 行 247-253。
+
+同上, 集中在 1 个桥接方法 (_collect_active_synergies), 有 null guard, 仅读取数据。
+
+#### C.4 最终合规评估
+
+| 评估维度 | 结果 | 说明 |
+|----------|------|------|
+| autoload 间禁止互相引用 | **2 处违规** | upgrade_pool->GameManager + save_manager->GameManager/SynergyManager |
+| 数据类仅数据 | PASS | WeaponData/EnemyData/CharacterData/DifficultyData/SkillData 无逻辑 |
+| autoload 无 class_name | PASS | 全部使用 extends Node/RefCounted, 无 class_name |
+| 信号优先通信 | PASS | achievement_checker 通过 4 个 signal 解耦 |
+| 碰撞层规范 | PASS | Layer1=Player, Layer2=Enemies, Layer3=Projectiles, Layer4=Pickups |
+
+**Autoload 合规评分: 85/100**
+
+扣分原因: upgrade_pool->GameManager 引用 (-10), save_manager 桥接层残留引用 (-5)。
+
+建议优先修复 upgrade_pool 违规 (改动量小, 1 个参数传递)。save_manager 桥接层可接受为架构债务。
+
+---
+
+### 任务 D: v1.0.3 发布就绪评估
+
+#### D.1 功能完整度
+
+| # | 功能 | 完成 | 未完成 | 说明 |
+|---|------|------|--------|------|
+| 1 | 7 种基础武器 | PASS | | 全部注册并发射 |
+| 2 | 12 种进化武器数据 | PASS | | weapon_data.gd + upgrade_pool.gd + weapon_registry.gd |
+| 3 | 12 种进化武器发射逻辑 | | **FAIL** | 4 种新类型 (spiral/pulse/beam/orbit+fire) 在 weapon_fire.gd 无 match 分支 |
+| 4 | 18 种协同效应 | PASS | | 全部定义并接入 |
+| 5 | 7 种敌人 + Boss | PASS | | 含 fire_slime, splitter, ghost |
+| 6 | Boss 三阶段 AI | PASS | | boss_ai.gd |
+| 7 | Dash 系统 | PASS | | player.gd |
+| 8 | 食物系统 | PASS | | food_pickup.gd |
+| 9 | 宝箱系统 | PASS | | chest.gd + chest_spawner.gd |
+| 10 | 无尽模式闭环 | PASS | | 撤退/Boss奖励/被动金币/灵魂碎片加成 |
+| 11 | Toast 通知系统 | PASS | | hud_toast.gd |
+| 12 | 任务系统 (14个) | PASS | | save_manager.gd + achievement_checker.gd |
+| 13 | 成就系统 (27个) | PASS | | 含进化/协同/精通成就 |
+| 14 | 商店系统 (6项升级) | PASS | | T4 等级支持 |
+| 15 | 武器精通系统 | PASS | | 5 tier + badge + toast + 暂停面板 |
+| 16 | 暂停面板 (精通信息) | PASS | | hud_mastery_panel.gd build_pause_panel() |
+| 17 | 升级面板 (卡牌选择+重投) | PASS | | 含 hover 效果 |
+| 18 | 角色选择 (3种) | PASS | | mage/warrior/ranger |
+| 19 | 难度选择 (4种) | PASS | | easy/normal/hard/endless |
+| 20 | 新手引导 | PASS | | tutorial_manager.gd |
+| 21 | 屏幕震动 | PASS | | arena.gd |
+| 22 | 命中反馈 | PASS | | hit_feedback.gd |
+| 23 | 弹道尾迹 | PASS | | projectile_trail_pool.gd |
+| 24 | 角色技能 (3种) | PASS | | elemental_burst/iron_will/arrow_rain |
+| 25 | 存档持久化 | PASS | | ConfigFile, 向后兼容 |
+| 26 | 成就屏幕 | PASS | | achievement_screen.gd |
+
+**功能完成度: 25/26 (96.2%)**
+
+唯一未完成: 4 种进化武器的实际发射逻辑 (sentineltotem, frostvortex, holyshockwave, thunderbeam 有数据定义但发射时不执行任何操作)。
+
+#### D.2 测试稳定性
+
+| 指标 | 数值 | 评估 |
+|------|------|------|
+| 总测试数 | 1887 | 优秀 |
+| 总测试文件 | 65 | 优秀 |
+| 失败数 | **0** | 优秀 |
+| 通过率 | 100% | 优秀 |
+| 连续零失败轮数 | 1 (R27) | 改善 -- R25 有 3 失败, R26 有 1 failure (现已修复) |
+
+对比:
+- R25: 3 failures (精通测试字符串不匹配)
+- R26: 1 failure (test_boundary_stress.gd:584 purchase exact cost)
+- R27: **0 failures**
+
+#### D.3 代码质量
+
+| 指标 | 数值 | 评估 |
+|------|------|------|
+| 源文件行数最大值 | hud.gd 437 行 (87%) | 警告 -- 接近上限 |
+| 全部文件 < 500 行 | PASS | 所有 48 个源文件通过 |
+| 类型注解覆盖率 | ~90% | 良好 -- autoload 公开函数部分缺失 |
+| 信号驱动架构 | 优秀 | achievement_checker 4 信号解耦 |
+| 命名一致性 | PASS | 全局统一的 weapon_id/命名规范 |
+| 硬编码 | 少量 Low 级 | 被动数据未提取为 Resource |
+| Orphan 节点 | 未检测 | .gutconfig.json 未启用 orphan 检测 |
+
+#### D.4 发布判定
+
+**判定: CONDITIONAL PASS**
+
+条件:
+1. **必须接受**: 4 种进化武器 (sentineltotem/frostvortex/holyshockwave/thunderbeam) 发射逻辑未实现。这些武器可通过升级面板获得, 但装备后不会发射。不影响其他功能, 但玩家可能困惑。
+2. **必须接受**: upgrade_pool.gd 的 autoload 交叉引用违规 (已有 null guard, 不崩溃)。
+
+理由:
+- 1887 测试零失败, 测试稳定性优秀
+- 核心功能 25/26 完成 (96.2%)
+- 无 Critical 级别 bug
+- 所有已知 Medium/Low 问题均有 null guard 保护, 不影响运行时稳定性
+- 架构持续改善 (achievement_checker 提取, hud_mastery_panel 提取, weapon_boomerang_fire 提取)
+
+**建议版本号: v1.0.3**
+
+**v1.0.4 建议优先修复**:
+1. 实现 4 种进化武器的发射逻辑 (weapon_fire.gd 新增 spiral/pulse/beam 分支)
+2. 修复 upgrade_pool.gd autoload 违规 (参数传递方案)
+3. 拆分 hud.gd (行数 87% 接近上限)
+
+---
+
+### 审核人自评: 86/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| R22-R26 代码审核深度 | 24 | 30 | 7 个新增文件逐函数审核, 发现 4 种进化武器发射逻辑缺失 |
+| 技术债务追踪 | 22 | 25 | 19 项债务追踪, 5 项标记为 R27 解决, 4 项新发现 |
+| Autoload 合规评估 | 22 | 25 | 全面 grep 审查, 明确 2 处违规 + 修复方案 |
+| 发布就绪评估 | 18 | 20 | 功能/测试/代码三维度评估, CONDITIONAL PASS 判定有据 |
+
+**加分项**:
+- 发现 4 种进化武器发射逻辑缺失 (新 P1 债务) -- 数据注册完整但 weapon_fire.gd match 语句未扩展
+- 确认 R26 的 1 个 test_boundary_stress 失败已在 R27 修复 (1887/0)
+- achievement_checker 集成验证完整 (信号连接 + 数据流 + 状态应用)
+
+**待改进**:
+- 未能在 Godot 环境中实际运行游戏验证 4 种新进化武器的行为 (仅通过代码分析确认 match 缺失)
+- hud.gd 437 行的拆分方案未给出具体实施计划

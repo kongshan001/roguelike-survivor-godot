@@ -9,7 +9,7 @@ const MAX_REROLLS: int = 1
 
 # Card hover effect constants
 const CARD_HOVER_SCALE: float = 1.08
-const CARD_HOVER_Y_OFFSET: float = -4.0
+const CARD_HOVER_Y_OFFSET: float = -4.0  # Reserved for future Y-axis hover offset
 const CARD_HOVER_DURATION: float = 0.12
 const CARD_UNHOVER_DURATION: float = 0.1
 const CARD_HOVER_GLOW: Color = Color(1.1, 1.05, 0.95)
@@ -77,20 +77,20 @@ func _ready():
 	_skill_btn = load("res://scripts/hud_skill_button.gd").new(self)
 	_skill_btn.setup(_get_player(), GameManager.selected_character)
 
-func _process(delta: float):
+func _process(delta: float) -> void:
 	$TimerLabel.text = GameManager.format_time(GameManager.elapsed_time)
 	_update_wave_display()
 	if _toast:
 		_toast.process_queue(delta)
 	_skill_btn.update_display(_get_player())
 
-func _on_gold_changed(amount: int):
+func _on_gold_changed(amount: int) -> void:
 	$GoldLabel.text = "Gold: %d" % amount
 
-func _on_combo_changed(count: int):
+func _on_combo_changed(count: int) -> void:
 	$ComboLabel.text = "Combo: %d" % count if count > 1 else ""
 
-func _on_combo_milestone(count: int):
+func _on_combo_milestone(count: int) -> void:
 	var labels: Dictionary = {5: "5 连击！", 10: "10 连击！！", 20: "20 连击！！！", 50: "50 连击！！！" }
 	$ComboLabel.text = labels.get(count, "%d 连击！" % count)
 	match count:
@@ -100,7 +100,7 @@ func _on_combo_milestone(count: int):
 		50: $ComboLabel.add_theme_color_override("font_color", Color(1.0, 0.1, 0.1))
 	_toast.show_toast("%d 连击!" % count, Color(1.0, 0.85, 0.0))
 
-func _on_boss_warning():
+func _on_boss_warning() -> void:
 	$BossWarningLabel.text = "💀 Boss 即将来袭！"
 	$BossWarningLabel.visible = true
 	$BossWarningLabel.add_theme_color_override("font_color", Color(1.0, 0.1, 0.1))
@@ -108,31 +108,31 @@ func _on_boss_warning():
 		$BossWarningLabel.visible = false
 	)
 
-func _on_health_changed(current: float, max_hp: float):
+func _on_health_changed(current: float, max_hp: float) -> void:
 	$HealthBar.value = (current / max_hp) * 100.0
 	$HealthLabel.text = "%d/%d" % [int(current), int(max_hp)]
 
-func _on_xp_changed(current: float, needed: float):
+func _on_xp_changed(current: float, needed: float) -> void:
 	$XPBar.value = (current / needed) * 100.0
 	$LevelLabel.text = "Lv %d" % GameManager.player_level
 
-func _on_level_up(_new_level: int):
+func _on_level_up(_new_level: int) -> void:
 	_pending_level_ups += 1
 	_show_upgrade_panel()
 
-func _on_player_died():
+func _on_player_died() -> void:
 	GameManager.set_meta("run_quests", _run_quests)
 	GameManager.set_meta("run_achievements", _run_achievements)
 
-func _show_upgrade_panel():
+func _show_upgrade_panel() -> void:
 	get_tree().paused = true
 	_pending_level_ups -= 1
 
-	var player = _get_player()
+	var player: Node2D = _get_player()
 	if not player:
 		return
 
-	_upgrade_options = UpgradePool.get_random_upgrades(player.owned_weapons, player.owned_passives, 3)
+	_upgrade_options = UpgradePool.get_random_upgrades(player.owned_weapons, player.owned_passives, 3, GameManager.selected_character)
 
 	for i in range(3):
 		var card = $UpgradePanel/Panel.get_child(i) as Control
@@ -150,11 +150,11 @@ func _show_upgrade_panel():
 	$UpgradePanel.visible = true
 	$UpgradePanel/RerollButton.visible = _rerolls_used < MAX_REROLLS
 
-func _on_card_input(event: InputEvent, index: int):
+func _on_card_input(event: InputEvent, index: int) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		_select_upgrade(index)
 
-func _input(event: InputEvent):
+func _input(event: InputEvent) -> void:
 	if $UpgradePanel.visible and event is InputEventKey and event.pressed:
 		match event.keycode:
 			KEY_1: _select_upgrade(0)
@@ -167,12 +167,12 @@ func _input(event: InputEvent):
 		if not $UpgradePanel.visible:
 			_on_pause_toggled()
 
-func _select_upgrade(index: int):
+func _select_upgrade(index: int) -> void:
 	if index >= _upgrade_options.size():
 		return
 
-	var option = _upgrade_options[index]
-	var player = _get_player()
+	var option: Dictionary = _upgrade_options[index]
+	var player: Node2D = _get_player()
 	if not player:
 		return
 

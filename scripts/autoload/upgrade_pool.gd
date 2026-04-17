@@ -186,7 +186,7 @@ func _register_character_passives() -> void:
 	}
 
 
-func get_random_upgrades(owned_weapons: Dictionary, owned_passives: Dictionary = {}, count: int = 3) -> Array[Dictionary]:
+func get_random_upgrades(owned_weapons: Dictionary, owned_passives: Dictionary = {}, count: int = 3, selected_character: String = "") -> Array[Dictionary]:
 	_ensure_initialized()
 	var options: Array[Dictionary] = []
 
@@ -245,8 +245,8 @@ func get_random_upgrades(owned_weapons: Dictionary, owned_passives: Dictionary =
 				"icon_color": p.icon_color,
 			})
 
-	# Character exclusive passives (filtered by selected_character)
-	var selected_char: String = GameManager.selected_character if GameManager else ""
+	# Character exclusive passives (filtered by selected_character parameter)
+	var selected_char: String = selected_character
 	for cp_id in _character_passives:
 		var cp: Dictionary = _character_passives[cp_id]
 		if cp.get("character", "") != selected_char:

@@ -128,16 +128,15 @@ func test_build_pause_panel_background_color():
 	var result: Control = _panel.build_pause_panel()
 	if result:
 		add_child_autofree(result)
-		# Per spec: background should be semi-transparent dark
-		# The panel or its first child should have a dark background
-		if result is ColorRect:
-			var bg_color: Color = result.color
-			assert_lt(bg_color.r, 0.15,
-				"Background R should be dark (< 0.15)")
-			assert_lt(bg_color.g, 0.15,
-				"Background G should be dark (< 0.15)")
-			assert_lt(bg_color.b, 0.15,
-				"Background B should be dark (< 0.15)")
+		# The panel constant defines the background color spec
+		# build_pause_panel returns a PanelContainer; verify PAUSE_BG_COLOR is dark
+		var bg_color: Color = _panel.PAUSE_BG_COLOR
+		assert_lt(bg_color.r, 0.15,
+			"Background R should be dark (< 0.15)")
+		assert_lt(bg_color.g, 0.15,
+			"Background G should be dark (< 0.15)")
+		assert_lt(bg_color.b, 0.15,
+			"Background B should be dark (< 0.15)")
 
 
 # =====================================================================

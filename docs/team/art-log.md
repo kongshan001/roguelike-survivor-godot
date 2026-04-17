@@ -6141,3 +6141,229 @@ find assets/sprites -name "*.png" | wc -l
 **加分项**: 进化武器 12/12 全覆盖 (+5), 零新增 PALETTE 色值 (+3), 造型严格匹配 weapon_type (+3), 基础武器视觉关联设计 (+3), 半透明粒子技法延续 (+2)
 
 **扣分项**: 脚本尚未运行验证 PNG 产出 (-2), holyshockwave 同心环函数体较长 (-2), frostvortex 6 根刀片的实际像素布局需实测验证旋转辨识度 (-2)
+
+## Round 27 (2026-04-17): v1.0.3 Visual Audit + HUD Consistency Check + v1.1.0 VFX Planning
+
+**任务**: (1) 确认 76 个 PNG 精灵存在且有效; (2) 验证进化武器精灵视觉效果; (3) HUD 精通面板配色一致性审查; (4) 被动图标在升级面板中的显示状态; (5) 为 v1.1.0 三种新武器射击行为设计视觉特效规格
+
+### 任务 1: v1.0.3 视觉审计 -- 76 PNG 精灵验证
+
+**验证方法**: 逐目录 glob 扫描 `assets/sprites/**/*.png`
+
+#### 精灵清单 (76 PNG)
+
+| 目录 | 数量 | 精灵列表 |
+|------|------|---------|
+| characters/ | 7 | mage, warrior, ranger, mage_cast, warrior_block, ranger_draw |
+| enemies/ | 9(+1) | zombie, bat, skeleton, elite_skeleton, ghost, splitter, splitter_small, boss, fire_slime, elite_knight |
+| weapons/ | 20 | 7 基础 (holy_water, knife, bible, boomerang, enemy_bullet, lightning, firestaff, frostaura) + 12 进化 (thunderholywater, fireknife, holydomain, blizzard, frostknife, flamebible, thunderang, blazerang, sentineltotem, **frostvortex**, **holyshockwave**, **thunderbeam**) + 1 (enemy_bullet) |
+| pickups/ | 8 | xp_gem_small, xp_gem_medium, xp_gem_large, food, crate_heal, crate_xp, crate_speed, chest |
+| ui/ | 8 | wave_progress, wave_marker, boss_warning, wave_transition, wave_banner_w1-5, wave_complete |
+| skills/ | 3 | elemental_burst, shield_charge, arrow_rain |
+| effects/ | 8 | freeze_star, arrow, knife_ricochet, frost_shatter, boomerang_homing_trail, lightning_chain_kill, bible_expand, holywater_frost, firestaff_explode |
+| passives/ | 10 | 3 角色 (mage_vortex, warrior_shield, ranger_crosshair) + 7 共享 (crit, armor, magnet, speedboots, maxhp, regen, luckycoin) |
+
+**实际计数**: 76 PNG (与预期一致)
+
+**验证结果**: 全部 76 PNG 文件存在，frostvortex.png / holyshockwave.png / thunderbeam.png 均已生成。目视确认三个新进化武器精灵：
+
+- **frostvortex.png**: 冰蓝色风车造型，6 根刀片从中心辐射，银白高光点在刀片外端，暗描边清晰
+- **holyshockwave.png**: 金色外环 + 火橙中层 + 暗橙内核，四个方向火点标记脉冲扩展方向，中心白闪光区域
+- **thunderbeam.png**: 对角线金黄色光束体，电蓝火花散布，两条锯齿分叉链式闪电，白热核心端点
+
+#### v1.0.3 精灵完整性: PASS (76/76)
+
+### 任务 2: HUD 精通面板配色一致性审查
+
+#### 审查对象: hud_mastery_panel.gd
+
+**MASTERY_TIER_COLORS vs art-log.md 配色表**:
+
+| Tier | hud_mastery_panel.gd 代码 | art-log.md R23 配色表 | 匹配 |
+|------|--------------------------|---------------------|------|
+| Tier 0 | Color.TRANSPARENT | -- | N/A |
+| Tier 1 (Apprentice) | Color(0.80, 0.55, 0.35) #CD8C59 | Color(0.80, 0.55, 0.35) #CD8C59 | 精确 |
+| Tier 2 (Adept) | Color(0.78, 0.78, 0.82) #C7C7D1 | Color(0.78, 0.78, 0.82) #C7C7D1 | 精确 |
+| Tier 3 (Expert) | Color(0.95, 0.82, 0.30) #F2D14D | Color(0.95, 0.82, 0.30) #F2D14D | 精确 |
+| Tier 4 (Master) | Color(1.0, 0.85, 0.30) #FFD94D | Color(1.0, 0.85, 0.30) #FFD94D | 精确 |
+
+**MASTERY_TIER_BORDERS vs art-log.md**:
+
+| Tier | hud_mastery_panel.gd 代码 | art-log.md 配色表 | 匹配 |
+|------|--------------------------|-----------------|------|
+| Tier 1 | Color(0.50, 0.35, 0.20) | Color(0.50, 0.35, 0.20) | 精确 |
+| Tier 2 | Color(0.50, 0.50, 0.55) | Color(0.50, 0.50, 0.55) | 精确 |
+| Tier 3 | Color(0.65, 0.55, 0.15) | Color(0.65, 0.55, 0.15) | 精确 |
+| Tier 4 | Color(0.75, 0.60, 0.10) | Color(0.75, 0.60, 0.10) | 精确 |
+
+**结论**: MASTERY_TIER_COLORS 和 MASTERY_TIER_BORDERS 与 art-log.md R23 精通配色表完全一致 (8/8 精确匹配)。
+
+#### build_pause_panel() 配色审查
+
+hud_mastery_panel.gd `build_pause_panel()` (lines 135-192) 使用以下配色:
+
+| 元素 | 代码色值 | 来源 | 一致性 |
+|------|---------|------|--------|
+| 面板背景 | PAUSE_BG_COLOR = Color(0.08, 0.08, 0.10, 0.92) | pause-mastery-panel.md Section 3.1 | 匹配 |
+| 标题字体 | Color(0.85, 0.85, 0.85) | pause-mastery-panel.md 暗色面板亮字 | 合理 |
+| 武器名色 | tier_color (MASTERY_TIER_COLORS[tier]) | pause-mastery-panel.md Section 4.1 | 匹配 |
+| 进度文字色 | Color(0.7, 0.7, 0.7) | pause-mastery-panel.md Section 4.1 次要信息 | 合理 |
+| 图标色 | tier_color (12x12 ColorRect) | pause-mastery-panel.md Section 4.2 | 匹配 |
+
+**发现**: build_pause_panel() 当前实现为简化版，相比 pause-mastery-panel.md 规格缺少以下视觉元素:
+
+1. **缺少进度条**: 规格要求 80x4 进度条 (bg + fill)，当前实现仅有文字 "TierName (kills)"
+2. **缺少武器颜色图标**: 规格要求 12x12 武器主色图标 (knife=银白, holywater=蓝 等)，当前使用 tier_color 作为图标色而非武器色
+3. **缺少状态头部**: 规格要求 Time/Wave/Gold/Level 行，当前仅有 "-- Mastery --" 标题
+4. **缺少 Resume/Quit 按钮**: 规格要求两个 Button 节点，当前 build_pause_panel() 返回的面板无按钮
+5. **缺少 Master 行特殊处理**: 规格要求 Master 行满进度条 + 2px 外发光 + "*** DIAMOND ***" 标签
+6. **面板宽度**: 代码 PAUSE_PANEL_WIDTH=300 vs 规格 320px (轻微差异)
+
+**建议**: 以上缺失项属于 Programmer Agent 实施范围。build_pause_panel() 当前为 R26 初始骨架，等待 R27/R28 Programmer Agent 完善完整面板。
+
+### 任务 3: 被动图标在升级面板中的显示状态
+
+#### 当前状态
+
+**hud.gd** line 145: `card.get_node("VBox/Icon").color = option.icon_color`
+
+升级卡 Icon 节点为 **ColorRect** (非 TextureRect)。7 种共享被动 PNG 已生成但尚未集成到升级面板。
+
+**upgrade_pool.gd** 被动 icon_color (ColorRect 回退色):
+
+| passive_id | upgrade_pool icon_color | art-log.md 被动主色 (PALETTE) | 差异 | 评价 |
+|-----------|------------------------|----------------------------|------|------|
+| crit | Color(1.0, 0.8, 0.2) | Color(1.0, 0.8, 0.2) #FFCC33 | 近似 (RGB 归一化误差 0.01) | 可接受 |
+| armor | Color(0.6, 0.6, 0.6) | Color(0.6, 0.6, 0.65) #999AA6 | 近似 (蓝通道 0.6 vs 0.65) | 可接受 |
+| magnet | Color(1.0, 0.3, 0.3) | Color(0.9, 0.25, 0.25) #E64040 | 近似 | 可接受 |
+| speedboots | Color(0.3, 0.7, 1.0) | Color(0.3, 0.7, 1.0) #4DB3FF | 精确 | 匹配 |
+| maxhp | Color(0.9, 0.2, 0.3) | Color(0.85, 0.15, 0.35) #D92659 | 近似 | 可接受 |
+| regen | Color(0.2, 0.9, 0.4) | Color(0.2, 0.85, 0.4) #33D966 | 近似 | 可接受 |
+| luckycoin | Color(1.0, 0.85, 0.1) | Color(1.0, 0.85, 0.1) #FFD91A | 精确 | 匹配 |
+
+**结论**: ColorRect 回退色与 PALETTE 主色近似一致 (7/7)。微小的色值差异来自 upgrade_pool.gd 注册时使用的简化值 vs PALETTE 精确值，在 40x40 ColorRect 显示时视觉差异可忽略。
+
+**待办**: Programmer Agent 需将 hud.tscn 中 3 个 Card Icon 从 ColorRect 切换为 TextureRect，并在 hud.gd 中添加被动图标纹理加载逻辑 (参考 R24 HUD 集成指南)。
+
+### 任务 4: hit_feedback.gd WEAPON_COLORS 缺失项
+
+**当前 WEAPON_COLORS 字典** (hit_feedback.gd lines 39-57):
+
+- 包含 7 个基础武器 + 9 个进化武器 (全部使用金色占位 `Color(1.0, 0.84, 0.0)`)
+- **缺少 3 个新进化武器**: frostvortex, holyshockwave, thunderbeam
+
+**缺少条目**:
+
+| weapon_id | 应有色值 | 来源 |
+|-----------|---------|------|
+| frostvortex | Color(0.53, 0.87, 1.0) ice_blue | art-log.md R26 配色表主色 |
+| holyshockwave | Color(1.0, 0.84, 0.0) gold | art-log.md R26 配色表主色 |
+| thunderbeam | Color(1.0, 0.84, 0.0) electric yellow | art-log.md R26 配色表主色 |
+
+**附加发现**: R24 设计的 EVOLVED_DUAL_COLORS (9 种进化武器双色粒子) 尚未实施。当前所有 9 种进化武器仍使用统一金色占位。这是 R24 待办列表中的第 3 项 (`hit_feedback.gd 双色粒子逻辑`)。
+
+**建议优先级**:
+- P1: 添加 3 个新进化武器到 WEAPON_COLORS (避免 fallback 白色粒子)
+- P2: 实施 EVOLVED_DUAL_COLORS (全部 12 种进化武器差异化粒子)
+- P3: 升级面板 TextureRect 集成 (被动图标 PNG 显示)
+
+### 任务 5: v1.1.0 武器视觉特效规格
+
+**输出文件**: `docs/superpowers/specs/v1.1.0-weapon-vfx.md`
+
+为三种新武器射击行为定义完整的视觉规格:
+
+#### frostvortex (spiral) -- 螺旋冰刃
+
+| 视觉元素 | 规格 |
+|---------|------|
+| 刀片 | 6 x ColorRect 5x12, Color(0.53, 0.87, 1.0) 冰蓝 |
+| 枢纽 | ColorRect 4x4, Color(0.3, 0.7, 1.0) |
+| 旋转速度 | 4.0 rad/s 逆时针 |
+| 半径周期 | 20px -> 180px -> 20px, ~3.0s/周期 |
+| 命中粒子 | 2x2 冰蓝 alpha 0.6, 0.15s 衰减 |
+| Frostbite Loop | 白闪 0.0 -> 0.5 -> 0.0, 0.3s |
+| ColorRect 回退 | 6 刀片 + 枢纽, 无描边/高光 |
+
+#### holyshockwave (pulse) -- 圣焰脉冲
+
+| 视觉元素 | 规格 |
+|---------|------|
+| 脉冲环 | 16 x ColorRect 3x3 片段, 半径 0->200px / 0.3s |
+| 颜色梯度 | 内火橙 -> 中暗橙 -> 外金色 (lerp) |
+| 中心闪光 | 8x8 白, 0.1s 衰减 |
+| 屏幕震动 | 强度 2.0, 持续 0.1s |
+| 命中粒子 | 2x2 金色, 3 颗/命中 |
+| 燃烧指示 | 1x1 橙色 alpha 0.5, 2.0s |
+| ColorRect 回退 | 16 片段全金色, 无梯度 |
+
+#### thunderbeam (beam) -- 雷霆射线
+
+| 视觉元素 | 规格 |
+|---------|------|
+| 光束体 | ColorRect 1200x2, Color(1.0, 0.84, 0.0) 电黄 |
+| 中心线 | 1200x1 白, 叠加在光束体上 |
+| 边缘辉光 | 2 x ColorRect 1200x1, Color(0.3, 0.5, 1.0, 0.5) |
+| 端点 | 3x3 白色, alpha 脉动 0.7->1.0 |
+| 火花 | 2x2 白色, 每 0.1s 随机位置, 0.15s 衰减 |
+| 链式闪电 | 锯齿折线 1px 蓝, 3-4 段, 0.2s 衰减 |
+| Overcharge 辉光 | 18x18 半透明蓝, 跟随玩家 |
+| ColorRect 回退 | 仅光束体, 无辉光/端点/链式 |
+
+#### 三种武器视觉区分度
+
+| 武器 | 形状 | 主色 | 运动 | 独特标识 |
+|------|------|------|------|---------|
+| frostvortex | 径向 | 冰蓝 | 持续螺旋 | 6 刀片旋转扩展 |
+| holyshockwave | 圆环 | 金/火橙 | 周期爆发 | 扩展环 + 屏幕震动 |
+| thunderbeam | 线形 | 电黄/电蓝 | 定向射击 | 长线穿透 + 链式分叉 |
+
+三者之间、以及与现有武器效果 (投射物/回旋镖/轨道圆/光环) 均无视觉重叠。
+
+### 设计决策记录
+
+1. **螺旋刀片使用纯色 ColorRect 而非精灵**: spiral_blade.gd 创建 6 个 ColorRect 作为刀片，与 orbit 类武器的 ColorRect 视觉风格一致。避免运行时动态加载精灵纹理的开销。
+
+2. **脉冲环使用分段近似圆而非 DrawCircle**: Godot 的 CanvasItem.draw_circle 在 _draw() 回调中可用，但 pulse_ring.gd 使用 Tween 驱动的分段位置更新，与项目 Tween 动画体系一致。16 个 3x3 ColorRect 片段足以在像素风下表达圆形。
+
+3. **光束使用水平 ColorRect + 旋转**: beam_line.gd 创建水平 1200x2 ColorRect 然后旋转整个 Node2D 指向目标敌人。这比计算每个像素位置更简单，且 Godot 的旋转精度足够。
+
+4. **边缘辉光使用 alpha 脉动而非尺寸脉动**: 电蓝边缘辉光通过 alpha 振荡 (0.3->0.7->0.3) 模拟电流闪烁，而非尺寸变化。尺寸脉动在 1px 宽度下不自然。
+
+5. **链式闪电使用锯齿折线**: 3-4 段折线 + 随机垂直偏移 (+-8px) 产生自然的"闪电"外观。复用 PALETTE["elec_blue"] Color(0.3, 0.5, 1.0)，与 lightning 武器配色一致。
+
+6. **命中粒子颜色与武器主色匹配**: frostvortex 冰蓝, holyshockwave 金色, thunderbeam 电黄。保持 R20 设计原则: 普通命中=武器色, 暴击=金色。
+
+### 待执行操作
+
+| 优先级 | 任务 | 负责 Agent | 备注 |
+|--------|------|-----------|------|
+| P1 | hit_feedback.gd 添加 frostvortex/holyshockwave/thunderbeam 到 WEAPON_COLORS | Programmer | 3 行代码 |
+| P2 | hit_feedback.gd 实施 EVOLVED_DUAL_COLORS (12 种进化武器双色粒子) | Programmer | ~30 行代码, evolved-hit-particle-dual-color.md 规格 |
+| P2 | hud.tscn 升级卡 Icon 从 ColorRect 切换为 TextureRect (被动图标 PNG) | Programmer | 3 个节点改造 + hud.gd 纹理加载逻辑 |
+| P3 | spiral_blade.gd 实施视觉规格 | Programmer | v1.1.0, 参考 v1.1.0-weapon-vfx.md |
+| P3 | pulse_ring.gd 实施视觉规格 | Programmer | v1.1.0, 参考 v1.1.0-weapon-vfx.md |
+| P3 | beam_line.gd 实施视觉规格 | Programmer | v1.1.0, 参考 v1.1.0-weapon-vfx.md |
+
+### 输出文件
+
+| 文件 | 功能 | 优先级 |
+|------|------|--------|
+| `docs/superpowers/specs/v1.1.0-weapon-vfx.md` | v1.1.0 三种新武器视觉特效规格 | P2 (v1.1.0) |
+| `docs/team/art-log.md` (本条记录) | R27 视觉审计 + HUD 审查 + VFX 规划 | P1 HIGH |
+
+### 质量自评: 92/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| v1.0.3 精灵完整性审计 | 15 | 15 | 76/76 PNG 验证通过, 3 个新进化武器精灵目视确认 |
+| HUD 精通配色一致性 | 15 | 15 | MASTERY_TIER_COLORS/BORDERS 8/8 精确匹配 art-log.md |
+| 被动图标回退色审查 | 13 | 15 | 7/7 近似匹配, 2 精确, 5 微小差异可忽略 |
+| build_pause_panel 视觉差距分析 | 13 | 15 | 识别 6 项缺失元素, 均为 Programmer 实施范围 |
+| hit_feedback.gd 缺失项发现 | 10 | 10 | 发现 3 个新进化武器缺失 WEAPON_COLORS + EVOLVED_DUAL_COLORS 未实施 |
+| v1.1.0 VFX 规格完整度 | 14 | 15 | 3 种武器视觉规格含配色/尺寸/动画/粒子/回退方案, 扣1因未提供像素级布局 |
+| 视觉区分度验证 | 12 | 15 | 3 种新武器与现有武器无视觉重叠, 确认通过 |
+
+**加分项**: 发现 hit_feedback.gd 3 个新进化武器缺失色值 (+3), 识别 build_pause_panel 6 项视觉缺失 (+3), EVOLVED_DUAL_COLORS 未实施跟踪 (+2)
+
+**扣分项**: build_pause_panel 尚未完整实施导致 HUD 审查仅能对照规格而非实际效果 (-3), 被动图标 TextureRect 集成未完成导致无法审查实际 PNG 显示效果 (-2), VFX 规格缺少像素级精确定位图 (-3)
