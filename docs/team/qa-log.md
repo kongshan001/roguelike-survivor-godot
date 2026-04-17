@@ -4,7 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
-| 2026-04-17 R25 | 1719 | 3765 | 1719 通过, 0 失败, 0 pending, 0 orphan. **Programmer R25 尚未完成**: hud_mastery_panel.gd 和 achievement_checker.gd 均不存在, 拆分未执行. 现有精通/成就测试全部通过. 待 Programmer R25 完成后补充拆分验证测试. |
+| 2026-04-17 R25 | 1813 | 3890 | 1813 通过, 0 失败, 0 pending, 0 orphan, 94项新测试(hud_mastery_panel 47+achievement_checker 47), 5项已有测试适配(源码验证改为检查panel脚本), 3项R25拆分前失败测试修复 |
 | 2026-04-17 R24 | 1719 | 3768 | 1719 通过, 0 失败, 0 pending, 0 orphan, 19项新测试(教程步骤6-8扩展), 3项已有测试适配(TUTORIAL_TOTAL_STEPS 5->8, complete_step边界更新) |
 | 2026-04-17 R21 | 1635 | 3623 | 1635 通过, 0 失败, 0 pending, 0 orphan, 115项新测试(击中反馈55+投射物拖尾44+已有测试适配7+enemy_loot.gd提取适配6+weapon_lv3修复2), enemy.gd 359行(从500行降低), 3项回归BUG修复(_handle_splitter_death参数变更, die()函数体搜索范围扩展, _spawn_food_at迁移) |
 | 2026-04-17 R20 | 1520 | 3486 | 1520 通过, 0 失败, 0 pending, 0 orphan, 122项新测试(XP曲线31+T4商店39+武器精通52), 2项已有测试适配(max_level 3->4, achievements 28->30), BUG-275 已修复 |
@@ -48,49 +48,68 @@
 
 | 任务 | 状态 | 说明 |
 |------|------|------|
-| 任务A: 验证 Programmer R25 拆分 | **受阻** | hud_mastery_panel.gd 和 achievement_checker.gd 均不存在, Programmer R25 尚未完成 |
-| 任务B: 编写拆分后测试 | **受阻** | 依赖 Programmer R25 先创建目标文件, 无法编写针对不存在代码的测试 |
-| 任务C: 更新现有测试 | 不需要 | hud.gd 和 save_manager.gd 未被修改, 现有测试仍然全部通过 |
-| 任务D: 回归测试 | 完成 | 1719 通过, 0 失败, 3765 断言, 17.2s |
+| 任务A: 验证 Programmer R25 拆分 | 完成 | hud_mastery_panel.gd (123行) 和 achievement_checker.gd (189行) 已验证 |
+| 任务B: 编写拆分后测试 | 完成 | test_hud_mastery_panel.gd (47测试) + test_achievement_checker.gd (47测试) = 94项新测试 |
+| 任务C: 更新现有测试 | 完成 | 5项源码验证测试已更新(从检查hud.gd改为检查hud_mastery_panel.gd) |
+| 任务D: 回归测试 | 完成 | 1813 通过, 0 失败, 3890 断言, 17.1s |
 
 ### 回归测试结果
 
 ```
-Scripts: 60
-Tests: 1719
-Passing: 1719 (100%)
+Scripts: 62
+Tests: 1813
+Passing: 1813 (100%)
 Failing: 0
 Pending: 0
 Orphan: 0
-Asserts: 3765
-Time: 17.244s
+Asserts: 3890
+Time: 17.109s
 ```
 
-### 待 Programmer R25 完成后的验证清单
+### 新增测试文件 (2 files, 94 tests)
 
-**hud_mastery_panel.gd 需要验证的 API 契约** (从 hud.gd 第 401-441 行提取):
-- 常量: MASTERY_TIER_COLORS (5色), MASTERY_TIER_BORDERS (5色), MASTERY_TIER_NAMES (5名), MASTERY_BADGE_SIZE=6.0, MASTERY_FILL_SIZE=4.0, MASTERY_FILL_OFFSET=1.0
-- 变量: _mastery_badges (Dictionary), _mastery_flash (ColorRect)
-- 方法: _ensure_mastery_badge(weapon_id, slot), _on_mastery_tier_up(weapon_id, new_tier), _show_mastery_flash(flash_color), _start_badge_pulse(badge), _get_weapon_display_name(weapon_id)
+| 文件 | 测试数 | 覆盖模块 |
+|------|--------|----------|
+| test_hud_mastery_panel.gd | 47 | 面板初始化(4), 常量验证(13), 方法存在性(6), 徽章创建(9), 武器显示名(8), HUD委托兼容(8) |
+| test_achievement_checker.gd | 47 | 脚本加载/常量(3), 信号存在性(4), 方法存在性(8), 任务信号(7), 成就信号(6), 历史/进化(6), 金币转换(3), 精通成就(4), 状态更新(4), check_all返回值(2) |
 
-**achievement_checker.gd 需要验证的 API 契约** (从 save_manager.gd 第 199-308 行提取):
-- 方法: check_quests_and_achievements(), _check_quest(quest_id, condition), _check_achievement(achievement_id, condition), _check_shop_achievements(), check_mastery_achievements()
-- 信号连接: quest_completed, achievement_unlocked, mastery_tier_up
+### 已有测试适配 (5 tests updated)
 
-### 现有精通测试验证 (全部通过)
+| 文件 | 测试名 | 修改原因 |
+|------|--------|----------|
+| test_mastery_badge.gd | test_source_references_mastery_badge | 从检查hud.gd源码改为检查_mastery_panel引用 |
+| test_mastery_badge.gd | test_source_references_pulse | 从检查hud.gd源码改为检查hud_mastery_panel.gd源码 |
+| test_mastery_badge.gd | test_source_references_flash | 从检查hud.gd源码改为检查hud_mastery_panel.gd源码 |
+| test_mastery_toast.gd | test_mastery_flash_node_name | 从检查hud.gd源码改为检查hud_mastery_panel.gd源码 |
+| test_mastery_toast.gd | test_mastery_flash_for_tier_3 | 从检查hud.gd源码改为检查hud_mastery_panel.gd源码 |
 
-| 测试文件 | 测试数 | 状态 |
-|----------|--------|------|
-| test_mastery_badge.gd | 17 | 17 通过 |
-| test_mastery_toast.gd | 18 | 18 通过 |
+### 拆分验证结果
 
-### 结论
+**hud_mastery_panel.gd (123行)** -- 从 hud.gd 提取的精通徽章/闪光子系统:
+- 常量: MASTERY_TIER_COLORS (5色), MASTERY_TIER_BORDERS (5色), MASTERY_TIER_NAMES (5名), MASTERY_BADGE_SIZE=6.0, MASTERY_FILL_SIZE=4.0, MASTERY_FILL_OFFSET=1.0 -- 全部通过
+- 变量: _mastery_badges (Dictionary), _mastery_flash (ColorRect) -- 全部通过
+- 方法: ensure_badge, on_tier_up, get_weapon_display_name, _show_mastery_flash, _update_badge_tier, _start_badge_pulse -- 全部通过
+- HUD 通过 getter 属性委托, 保持向后兼容 -- 全部通过
 
-Programmer R25 的代码拆分任务 (hud_mastery_panel.gd / achievement_checker.gd) 尚未执行。当前代码库处于 R24 状态, 所有 1719 项测试通过。QA 将在 Programmer R25 完成拆分后:
-1. 读取新建文件确认 API
-2. 编写针对拆分后模块的测试
-3. 更新现有测试以适配新接口
-4. 执行完整回归测试
+**achievement_checker.gd (189行)** -- 从 save_manager.gd 提取的成就检查逻辑:
+- extends RefCounted (不依赖 Node 树) -- 通过
+- 4 个信号: quest_check_requested, achievement_check_requested, soul_reward_requested, state_update_requested -- 全部通过
+- 8 个公开/私有方法存在性 -- 全部通过
+- 任务检查逻辑 (kill_50, warrior_30, endless_5min, no_damage 等) -- 全部通过
+- 成就检查逻辑 (total_kills_100, boss_kill, survive_3min 等) -- 全部通过
+- 历史/进化成就 (evolve_weapon, all_evolved, synergy_first) -- 全部通过
+- 金币转换 (normal 30%, endless 45%) -- 全部通过
+- 精通成就 (mastery_first, mastery_all) -- 全部通过
+- check_all 返回值正确积累数据 -- 全部通过
+- 注意: _check_achievements 需要 12 个参数(含 kills_at_60), 测试已适配
+
+### 发现的问题
+
+1. **GDScript lambda 闭包值类型捕获**: bool/int 等值类型在 lambda 中赋值不会影响外部变量。已改用 Dictionary 容器捕获信号值。这是一个重要的测试模式注意事项。
+
+### 缺陷报告
+
+无新增缺陷。拆分后的代码行为与拆分前一致。
 
 ---
 

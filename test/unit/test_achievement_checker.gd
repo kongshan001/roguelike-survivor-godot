@@ -136,64 +136,64 @@ func test_quest_signal_emitted_on_check_all():
 
 
 func test_quest_kill_50_condition():
-	var result: bool = false
+	# Use Dictionary to capture signal value (GDScript lambdas capture by value for primitives)
+	var captured: Dictionary = {"kill_50": false}
 	_checker.quest_check_requested.connect(func(qid: String, cond: bool):
 		if qid == "kill_50":
-			result = cond
+			captured["kill_50"] = cond
 	)
-	# kills = 50 should trigger kill_50
 	_checker._check_quests(50, 60.0, 0, 10, "normal", "mage", 0, false)
-	assert_true(result, "kill_50 should be true with 50 kills")
+	assert_true(captured["kill_50"], "kill_50 should be true with 50 kills")
 
 
 func test_quest_kill_50_false_below_threshold():
-	var result: bool = true
+	var captured: Dictionary = {"kill_50": true}
 	_checker.quest_check_requested.connect(func(qid: String, cond: bool):
 		if qid == "kill_50":
-			result = cond
+			captured["kill_50"] = cond
 	)
 	_checker._check_quests(49, 60.0, 0, 10, "normal", "mage", 0, false)
-	assert_false(result, "kill_50 should be false with 49 kills")
+	assert_false(captured["kill_50"], "kill_50 should be false with 49 kills")
 
 
 func test_quest_warrior_30_condition():
-	var result: bool = false
+	var captured: Dictionary = {"warrior_30": false}
 	_checker.quest_check_requested.connect(func(qid: String, cond: bool):
 		if qid == "warrior_30":
-			result = cond
+			captured["warrior_30"] = cond
 	)
 	_checker._check_quests(100, 60.0, 0, 10, "normal", "warrior", 30, false)
-	assert_true(result, "warrior_30 should be true with warrior and 30 char_kills")
+	assert_true(captured["warrior_30"], "warrior_30 should be true with warrior and 30 char_kills")
 
 
 func test_quest_warrior_30_wrong_class():
-	var result: bool = true
+	var captured: Dictionary = {"warrior_30": true}
 	_checker.quest_check_requested.connect(func(qid: String, cond: bool):
 		if qid == "warrior_30":
-			result = cond
+			captured["warrior_30"] = cond
 	)
 	_checker._check_quests(100, 60.0, 0, 10, "normal", "mage", 30, false)
-	assert_false(result, "warrior_30 should be false for mage")
+	assert_false(captured["warrior_30"], "warrior_30 should be false for mage")
 
 
 func test_quest_endless_5min():
-	var result: bool = false
+	var captured: Dictionary = {"endless_5min": false}
 	_checker.quest_check_requested.connect(func(qid: String, cond: bool):
 		if qid == "endless_5min":
-			result = cond
+			captured["endless_5min"] = cond
 	)
 	_checker._check_quests(50, 300.0, 0, 10, "endless", "mage", 0, false)
-	assert_true(result, "endless_5min should be true at 300s in endless")
+	assert_true(captured["endless_5min"], "endless_5min should be true at 300s in endless")
 
 
 func test_quest_no_damage():
-	var result: bool = false
+	var captured: Dictionary = {"no_damage": false}
 	_checker.quest_check_requested.connect(func(qid: String, cond: bool):
 		if qid == "no_damage":
-			result = cond
+			captured["no_damage"] = cond
 	)
 	_checker._check_quests(50, 60.0, 0, 10, "normal", "mage", 0, false)
-	assert_true(result, "no_damage should be true with no damage and 60s")
+	assert_true(captured["no_damage"], "no_damage should be true with no damage and 60s")
 
 
 # =====================================================================
@@ -225,53 +225,53 @@ func test_achievement_signal_emitted_on_check_all():
 
 
 func test_achievement_total_kills_100():
-	var result: bool = false
+	var captured: Dictionary = {"total_kills_100": false}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "total_kills_100":
-			result = cond
+			captured["total_kills_100"] = cond
 	)
-	_checker._check_achievements(50, 60.0, 0, 10, "normal", false, 150, 5, {}, {})
-	assert_true(result, "total_kills_100 should be true at 150 total kills")
+	_checker._check_achievements(50, 60.0, 0, 10, "normal", false, 150, 5, {}, {}, 0)
+	assert_true(captured["total_kills_100"], "total_kills_100 should be true at 150 total kills")
 
 
 func test_achievement_total_kills_100_false():
-	var result: bool = true
+	var captured: Dictionary = {"total_kills_100": true}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "total_kills_100":
-			result = cond
+			captured["total_kills_100"] = cond
 	)
-	_checker._check_achievements(50, 60.0, 0, 10, "normal", false, 99, 5, {}, {})
-	assert_false(result, "total_kills_100 should be false at 99 total kills")
+	_checker._check_achievements(50, 60.0, 0, 10, "normal", false, 99, 5, {}, {}, 0)
+	assert_false(captured["total_kills_100"], "total_kills_100 should be false at 99 total kills")
 
 
 func test_achievement_boss_kill():
-	var result: bool = false
+	var captured: Dictionary = {"boss_kill": false}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "boss_kill":
-			result = cond
+			captured["boss_kill"] = cond
 	)
-	_checker._check_achievements(10, 60.0, 1, 5, "normal", false, 10, 1, {}, {})
-	assert_true(result, "boss_kill should be true with boss_kills > 0")
+	_checker._check_achievements(10, 60.0, 1, 5, "normal", false, 10, 1, {}, {}, 0)
+	assert_true(captured["boss_kill"], "boss_kill should be true with boss_kills > 0")
 
 
 func test_achievement_survive_3min_normal():
-	var result: bool = false
+	var captured: Dictionary = {"survive_3min": false}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "survive_3min":
-			result = cond
+			captured["survive_3min"] = cond
 	)
-	_checker._check_achievements(10, 180.0, 0, 5, "normal", false, 10, 1, {}, {})
-	assert_true(result, "survive_3min should be true at 180s in normal")
+	_checker._check_achievements(10, 180.0, 0, 5, "normal", false, 10, 1, {}, {}, 0)
+	assert_true(captured["survive_3min"], "survive_3min should be true at 180s in normal")
 
 
 func test_achievement_survive_3min_wrong_difficulty():
-	var result: bool = true
+	var captured: Dictionary = {"survive_3min": true}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "survive_3min":
-			result = cond
+			captured["survive_3min"] = cond
 	)
-	_checker._check_achievements(10, 180.0, 0, 5, "hard", false, 10, 1, {}, {})
-	assert_false(result, "survive_3min should be false in hard difficulty")
+	_checker._check_achievements(10, 180.0, 0, 5, "hard", false, 10, 1, {}, {}, 0)
+	assert_false(captured["survive_3min"], "survive_3min should be false in hard difficulty")
 
 
 # =====================================================================
@@ -279,36 +279,36 @@ func test_achievement_survive_3min_wrong_difficulty():
 # =====================================================================
 
 func test_evolve_weapon_achievement():
-	var result: bool = false
+	var captured: Dictionary = {"evolve_weapon": false}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "evolve_weapon":
-			result = cond
+			captured["evolve_weapon"] = cond
 	)
 	_checker._check_history_achievements({"thunderholywater": true}, {}, [])
-	assert_true(result, "evolve_weapon should be true with 1 evolution")
+	assert_true(captured["evolve_weapon"], "evolve_weapon should be true with 1 evolution")
 
 
 func test_all_evolved_achievement():
-	var result: bool = false
+	var captured: Dictionary = {"all_evolved": false}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "all_evolved":
-			result = cond
+			captured["all_evolved"] = cond
 	)
 	var all_evos: Dictionary = {}
 	for eid: String in _checker.ALL_EVO_IDS:
 		all_evos[eid] = true
 	_checker._check_history_achievements(all_evos, {}, [])
-	assert_true(result, "all_evolved should be true with all 9 evolutions")
+	assert_true(captured["all_evolved"], "all_evolved should be true with all 9 evolutions")
 
 
 func test_all_evolved_partial():
-	var result: bool = true
+	var captured: Dictionary = {"all_evolved": true}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "all_evolved":
-			result = cond
+			captured["all_evolved"] = cond
 	)
 	_checker._check_history_achievements({"thunderholywater": true}, {}, [])
-	assert_false(result, "all_evolved should be false with only 1 evolution")
+	assert_false(captured["all_evolved"], "all_evolved should be false with only 1 evolution")
 
 
 func test_accumulate_history_evolutions():
@@ -325,13 +325,13 @@ func test_accumulate_history_synergies():
 
 
 func test_synergy_first_achievement():
-	var result: bool = false
+	var captured: Dictionary = {"synergy_first": false}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "synergy_first":
-			result = cond
+			captured["synergy_first"] = cond
 	)
 	_checker._check_history_achievements({}, {"crit_luckycoin": true}, [])
-	assert_true(result, "synergy_first should be true with 1 synergy in history")
+	assert_true(captured["synergy_first"], "synergy_first should be true with 1 synergy in history")
 
 
 # =====================================================================
@@ -339,30 +339,30 @@ func test_synergy_first_achievement():
 # =====================================================================
 
 func test_gold_conversion_normal():
-	var result: int = 0
+	var captured: Dictionary = {"amount": -1}
 	_checker.soul_reward_requested.connect(func(amount: int):
-		result = amount
+		captured["amount"] = amount
 	)
 	_checker._check_gold_conversion(100, "normal")
-	assert_eq(result, 30, "Normal mode should convert 30% gold to souls (100 * 0.3 = 30)")
+	assert_eq(captured["amount"], 30, "Normal mode should convert 30% gold to souls (100 * 0.3 = 30)")
 
 
 func test_gold_conversion_endless():
-	var result: int = 0
+	var captured: Dictionary = {"amount": -1}
 	_checker.soul_reward_requested.connect(func(amount: int):
-		result = amount
+		captured["amount"] = amount
 	)
 	_checker._check_gold_conversion(100, "endless")
-	assert_eq(result, 45, "Endless mode should convert 45% gold to souls (100 * 0.45 = 45)")
+	assert_eq(captured["amount"], 45, "Endless mode should convert 45% gold to souls (100 * 0.45 = 45)")
 
 
 func test_gold_conversion_zero_gold():
-	var result: int = -1
+	var captured: Dictionary = {"amount": -1}
 	_checker.soul_reward_requested.connect(func(amount: int):
-		result = amount
+		captured["amount"] = amount
 	)
 	_checker._check_gold_conversion(0, "normal")
-	assert_eq(result, 0, "Zero gold should give zero soul reward")
+	assert_eq(captured["amount"], 0, "Zero gold should give zero soul reward")
 
 
 # =====================================================================
@@ -370,10 +370,10 @@ func test_gold_conversion_zero_gold():
 # =====================================================================
 
 func test_mastery_first_achievement():
-	var result: bool = false
+	var captured: Dictionary = {"mastery_first": false}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "mastery_first":
-			result = cond
+			captured["mastery_first"] = cond
 	)
 	var save_data: Dictionary = {
 		"weapon_kills": {"knife": 50},
@@ -381,14 +381,14 @@ func test_mastery_first_achievement():
 		"base_weapons": ["knife"],
 	}
 	_checker._check_mastery_achievements(save_data)
-	assert_true(result, "mastery_first should be true with tier 1 weapon")
+	assert_true(captured["mastery_first"], "mastery_first should be true with tier 1 weapon")
 
 
 func test_mastery_first_achievement_false():
-	var result: bool = true
+	var captured: Dictionary = {"mastery_first": true}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "mastery_first":
-			result = cond
+			captured["mastery_first"] = cond
 	)
 	var save_data: Dictionary = {
 		"weapon_kills": {"knife": 10},
@@ -396,14 +396,14 @@ func test_mastery_first_achievement_false():
 		"base_weapons": ["knife"],
 	}
 	_checker._check_mastery_achievements(save_data)
-	assert_false(result, "mastery_first should be false with tier 0 weapon")
+	assert_false(captured["mastery_first"], "mastery_first should be false with tier 0 weapon")
 
 
 func test_mastery_all_achievement():
-	var result: bool = false
+	var captured: Dictionary = {"mastery_all": false}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "mastery_all":
-			result = cond
+			captured["mastery_all"] = cond
 	)
 	var weapon_kills_data: Dictionary = {}
 	for w: String in ["knife", "holywater", "lightning", "bible", "firestaff", "frostaura", "boomerang"]:
@@ -414,14 +414,14 @@ func test_mastery_all_achievement():
 		"base_weapons": ["knife", "holywater", "lightning", "bible", "firestaff", "frostaura", "boomerang"],
 	}
 	_checker._check_mastery_achievements(save_data)
-	assert_true(result, "mastery_all should be true when all 7 weapons at 1000 kills (tier 4)")
+	assert_true(captured["mastery_all"], "mastery_all should be true when all 7 weapons at 1000 kills (tier 4)")
 
 
 func test_mastery_all_false_partial():
-	var result: bool = true
+	var captured: Dictionary = {"mastery_all": true}
 	_checker.achievement_check_requested.connect(func(aid: String, cond: bool):
 		if aid == "mastery_all":
-			result = cond
+			captured["mastery_all"] = cond
 	)
 	var weapon_kills_data: Dictionary = {}
 	for w: String in ["knife", "holywater", "lightning", "bible", "firestaff", "frostaura", "boomerang"]:
@@ -433,7 +433,7 @@ func test_mastery_all_false_partial():
 		"base_weapons": ["knife", "holywater", "lightning", "bible", "firestaff", "frostaura", "boomerang"],
 	}
 	_checker._check_mastery_achievements(save_data)
-	assert_false(result, "mastery_all should be false when one weapon is below tier 4")
+	assert_false(captured["mastery_all"], "mastery_all should be false when one weapon is below tier 4")
 
 
 # =====================================================================
@@ -470,13 +470,10 @@ func test_state_update_endless_unlock_on_boss():
 
 func test_state_update_character_clear():
 	var chars: Dictionary = {}
-	_checker.state_update_requested.connect(func(key: String, value: Variant):
-		updates[key] = value
-		var updates: Dictionary = {}
-	)
 	_checker._update_state(chars, false, 0, "warrior", 200.0, 100, 5, {}, {})
-	# After call, characters_cleared dict should have warrior
-	# (The function modifies the dict in-place and also emits state)
+	# The function modifies the characters_cleared dict in-place
+	assert_true(chars.has("warrior"), "warrior should be marked as cleared after 200s")
+	assert_true(chars["warrior"], "warrior clear flag should be true")
 
 
 # =====================================================================
