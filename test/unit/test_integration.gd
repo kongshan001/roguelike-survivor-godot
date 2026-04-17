@@ -379,7 +379,7 @@ func test_synergy_definitions_load_and_count():
 	var mgr := Node.new()
 	mgr.set_script(load("res://scripts/autoload/synergy_manager.gd"))
 	add_child_autofree(mgr)
-	assert_eq(mgr.SYNERGY_DEFINITIONS.size(), 18, "Should have 18 synergy definitions")
+	assert_eq(mgr.SYNERGY_DEFINITIONS.size(), 20, "Should have 20 synergy definitions (7 passive_passive + 11 weapon_passive + 2 weapon_weapon)")
 	mgr.check_synergies({"knife": 3}, {"crit": 1})
 	assert_true(mgr.has_synergy("knife_crit"), "knife_crit synergy detected")
 

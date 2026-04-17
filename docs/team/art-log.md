@@ -7301,3 +7301,612 @@ Overcharge 激活时，玩家移动方向后方产生小型电弧粒子，强化
 **加分项**: elite_knight 与 skeleton 四维度对比分析(+3), Ghost/Bat 碰撞安全分析确保不影响判定(+3), Resonance 与脉冲环的视觉区别矩阵(+3), Overcharge 电蓝色选择 rationale 避免视觉冲突(+2), 频率系数推导过程记录(+2)
 
 **扣分项**: Ghost 飘动需确认与受伤闪烁的 modulate 重置不冲突(-2), Overcharge 过载爆裂效果为可选(-2), Resonance HUD 闪光需程序 Agent 在 hud.gd 中新增逻辑(-3)
+
+---
+
+## R31 美术任务 (2026-04-18) -- Resonance/Overcharge VFX 实现指导 + v1.2.0 视觉规划
+
+### 任务 1: Resonance VFX 实现代码片段
+
+#### 1.1 设计参数回顾
+
+R30 定义的 Resonance 共振波纹参数：
+
+| 属性 | 值 |
+|------|-----|
+| 内环半径 | 30 px (固定，不扩展) |
+| 外环半径 | 30 -> 60 px (0.15s 扩展) |
+| 内环颜色 | Color(1.0, 0.84, 0.0) 金 |
+| 外环颜色 | Color(0.3, 0.5, 1.0) 蓝 |
+| 内环 alpha | 0.9 -> 0.0, 0.15s |
+| 外环 alpha | 0.6 -> 0.0, 0.2s |
+| 中心闪光 | 4x4 白, 0.1s 消失 |
+| 总持续时间 | 0.2s |
+| 位置 | enemy.global_position |
+
+#### 1.2 独立函数 -- 可直接集成到 weapon_effects.gd
+
+以下函数遵循 `weapon_effects.gd` 的 static func 模式，Programmer 可直接添加到该文件末尾，然后在 `pulse_ring.gd` 的命中检测后调用。
+
+```gdscript
+## Resonance synergy VFX: double-ring ripple at kill/hit position.
+## Gold inner ring (30px fixed) + Blue outer ring (expands to 60px) + center flash.
+## Duration: 0.2s total. Uses ColorRect only, no PNG needed.
+static func create_resonance_ripple(pos: Vector2, parent: Node) -> void:
+	var container := Node2D.new()
+	container.global_position = pos
+	container.z_index = 10
+	parent.call_deferred("add_child", container)
+
+	# --- Inner ring: 16 segments, 30px radius, gold, static ---
+	const INNER_RADIUS: float = 30.0
+	const INNER_SEGMENTS: int = 12
+	const INNER_SEG_SIZE: Vector2 = Vector2(2.0, 2.0)
+	const INNER_COLOR: Color = Color(1.0, 0.84, 0.0, 0.9)
+
+	for i in range(INNER_SEGMENTS):
+		var seg := ColorRect.new()
+		seg.size = INNER_SEG_SIZE
+		seg.color = INNER_COLOR
+		var angle: float = TAU * i / INNER_SEGMENTS
+		seg.position = Vector2(cos(angle), sin(angle)) * INNER_RADIUS - INNER_SEG_SIZE * 0.5
+		container.add_child(seg)
+
+	# Inner ring alpha fade: 0.9 -> 0.0 over 0.15s
+	var inner_tween := container.create_tween()
+	inner_tween.tween_property(container, "modulate:a", 0.0, 0.15)
+	# Hold visible for 0.05s first, then fade (total ~0.2s)
+	inner_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+
+	# --- Outer ring: 16 segments, 30px -> 60px, blue, expanding ---
+	const OUTER_SEGMENTS: int = 16
+	const OUTER_SEG_SIZE: Vector2 = Vector2(2.0, 2.0)
+	const OUTER_COLOR_START: Color = Color(0.3, 0.5, 1.0, 0.6)
+	const OUTER_RADIUS_START: float = 30.0
+	const OUTER_RADIUS_END: float = 60.0
+
+	var outer_segs: Array = []
+	for i in range(OUTER_SEGMENTS):
+		var seg := ColorRect.new()
+		seg.size = OUTER_SEG_SIZE
+		seg.color = OUTER_COLOR_START
+		var angle: float = TAU * i / OUTER_SEGMENTS
+		seg.position = Vector2(cos(angle), sin(angle)) * OUTER_RADIUS_START - OUTER_SEG_SIZE * 0.5
+		container.add_child(seg)
+		outer_segs.append({"node": seg, "angle": angle})
+
+	# Outer ring needs per-frame expansion. Use a lightweight script approach
+	# matching the existing weapon_effects.gd inline-GDScript pattern.
+	var expand_script := GDScript.new()
+	expand_script.source_code = (
+		"extends Node2D\n"
+		+ "var outer_segs: Array = []\n"
+		+ "var r_start: float = 30.0\n"
+		+ "var r_end: float = 60.0\n"
+		+ "var duration: float = 0.15\n"
+		+ "var elapsed: float = 0.0\n"
+		+ "var seg_size: Vector2 = Vector2(2.0, 2.0)\n"
+		+ "\n"
+		+ "func _process(delta: float) -> void:\n"
+		+ "\telapsed += delta\n"
+		+ "\tvar t: float = minf(elapsed / duration, 1.0)\n"
+		+ "\tvar r: float = r_start + (r_end - r_start) * t\n"
+		+ "\tfor entry in outer_segs:\n"
+		+ "\t\tvar s: ColorRect = entry[\"node\"]\n"
+		+ "\t\tif is_instance_valid(s):\n"
+		+ "\t\t\tvar a: float = entry[\"angle\"]\n"
+		+ "\t\t\ts.position = Vector2(cos(a), sin(a)) * r - seg_size * 0.5\n"
+		+ "\t\t\ts.modulate.a = 0.6 * (1.0 - t)\n"
+		+ "\tif t >= 1.0:\n"
+		+ "\t\tset_process(false)\n"
+	)
+	expand_script.reload()
+	# Can't set_script on container (already has inline script potential).
+	# Create a child driver node instead.
+	var driver := Node2D.new()
+	driver.set_script(expand_script)
+	driver.set_deferred("outer_segs", outer_segs)
+	driver.set_deferred("r_start", OUTER_RADIUS_START)
+	driver.set_deferred("r_end", OUTER_RADIUS_END)
+	driver.set_deferred("duration", 0.15)
+	driver.set_deferred("seg_size", OUTER_SEG_SIZE)
+	container.add_child(driver)
+
+	# --- Center flash: 4x4 white, 0.1s ---
+	var flash := ColorRect.new()
+	flash.size = Vector2(4.0, 4.0)
+	flash.color = Color(1.0, 1.0, 1.0, 0.5)
+	flash.position = Vector2(-2.0, -2.0)  # centered on origin
+	flash.z_index = 11
+	container.add_child(flash)
+	var flash_tween := flash.create_tween()
+	flash_tween.tween_property(flash, "modulate:a", 0.0, 0.1)
+
+	# --- Auto-cleanup after 0.25s ---
+	var cleanup_tween := container.create_tween()
+	cleanup_tween.tween_interval(0.25)
+	cleanup_tween.tween_callback(container.queue_free)
+```
+
+#### 1.3 Programmer 集成说明 -- pulse_ring.gd 调用点
+
+在 `pulse_ring.gd` 的 `_physics_process()` 中，当 Resonance 共振子脉冲被创建时（即 `_spawn_resonance_pulse` 函数内），同时调用 VFX：
+
+```gdscript
+# In pulse_ring.gd, inside _spawn_resonance_pulse(pos: Vector2):
+# After creating the resonance pulse ring, spawn the visual ripple:
+var effects := load("res://scripts/weapons/weapon_effects.gd").new()
+effects.create_resonance_ripple(pos, get_parent())
+```
+
+**重要**: 上述调用是**可选的视觉增强**，只在 `_is_resonance == false` 的基础脉冲触发共振时产生。共振子脉冲本身（`_is_resonance == true`）不应再产生涟漪，避免视觉过度叠加。
+
+#### 1.4 Resonance VFX 配色表
+
+| 元素 | Color 值 | HEX | 说明 |
+|------|---------|-----|------|
+| 内环主色 | Color(1.0, 0.84, 0.0, 0.9) | #FFD700 | 与 holyshockwave center_color 同色系 |
+| 外环主色 | Color(0.3, 0.5, 1.0, 0.6) | #4D80FF | 与 holywater 配方色一致，蓝=圣水 |
+| 中心闪光 | Color(1.0, 1.0, 1.0, 0.5) | #FFFFFF | 白色闪光，快速消失 |
+| 回退方案 | ColorRect 纯色 | -- | 无需 PNG，全部程序化生成 |
+
+#### 1.5 简化替代方案 -- 无内联脚本版
+
+如果 Programmer 认为内联 GDScript 方式过于复杂，可以使用纯 Tween 方案。以下是简化版本，牺牲了外环的平滑扩展（改为离散的 4 帧 Tween），但代码更简洁：
+
+```gdscript
+## Simplified Resonance VFX using pure Tween (no inline script).
+## Outer ring expands in 3 discrete steps instead of smooth per-frame.
+static func create_resonance_ripple_simple(pos: Vector2, parent: Node) -> void:
+	var container := Node2D.new()
+	container.global_position = pos
+	container.z_index = 10
+	parent.call_deferred("add_child", container)
+
+	# Inner ring: gold, static 30px
+	for i in range(12):
+		var seg := ColorRect.new()
+		seg.size = Vector2(2.0, 2.0)
+		seg.color = Color(1.0, 0.84, 0.0, 0.9)
+		var angle: float = TAU * i / 12.0
+		seg.position = Vector2(cos(angle), sin(angle)) * 30.0 - Vector2(1.0, 1.0)
+		container.add_child(seg)
+
+	# Outer ring: blue, expanding 30->60px via Tween
+	var outer_nodes: Array = []
+	for i in range(16):
+		var seg := ColorRect.new()
+		seg.size = Vector2(2.0, 2.0)
+		seg.color = Color(0.3, 0.5, 1.0, 0.6)
+		var angle: float = TAU * i / 16.0
+		seg.position = Vector2(cos(angle), sin(angle)) * 30.0 - Vector2(1.0, 1.0)
+		container.add_child(seg)
+		outer_nodes.append({"node": seg, "angle": angle})
+
+	# Animate outer ring expansion: 30 -> 60px over 0.15s
+	for entry in outer_nodes:
+		var seg: ColorRect = entry["node"]
+		var angle: float = entry["angle"]
+		var end_pos: Vector2 = Vector2(cos(angle), sin(angle)) * 60.0 - Vector2(1.0, 1.0)
+		var t := seg.create_tween()
+		t.tween_property(seg, "position", end_pos, 0.15)
+		t.parallel().tween_property(seg, "modulate:a", 0.0, 0.2)
+
+	# Inner ring fade
+	var inner_tween := container.create_tween()
+	inner_tween.tween_property(container, "modulate:a", 0.0, 0.2)
+
+	# Center flash
+	var flash := ColorRect.new()
+	flash.size = Vector2(4.0, 4.0)
+	flash.color = Color(1.0, 1.0, 1.0, 0.5)
+	flash.position = Vector2(-2.0, -2.0)
+	flash.z_index = 11
+	container.add_child(flash)
+	var ft := flash.create_tween()
+	ft.tween_property(flash, "modulate:a", 0.0, 0.1)
+
+	# Cleanup
+	var ct := container.create_tween()
+	ct.tween_interval(0.25)
+	ct.tween_callback(container.queue_free)
+```
+
+**推荐**: Programmer 优先使用简化版本（`create_resonance_ripple_simple`）。如果视觉质量不满足需求，再升级到完整版本。
+
+---
+
+### 任务 2: Overcharge VFX 实现代码片段
+
+#### 2.1 设计参数回顾
+
+R30 定义的 Overcharge 视觉参数：
+
+| 元素 | 属性 | 值 |
+|------|------|-----|
+| 脚下辉光 | 尺寸 | 20x20 px |
+| 脚下辉光 | 颜色 | Color(0.3, 0.5, 1.0, 0.15) |
+| 脚下辉光 | Alpha 脉动 | 0.10 -> 0.20 -> 0.10, 0.3s 周期 |
+| 脚下辉光 | z_index | -1 |
+| 过载标记 | 尺寸 | 4x4 px |
+| 过载标记 | 颜色 | 紫色电弧闪烁 |
+| 爆炸效果 | 半径 | 80 px |
+| 爆炸效果 | 粒子数 | 6 个电蓝粒子 |
+| 爆炸效果 | 扩散速度 | 40-80 px/s |
+
+#### 2.2 Overcharge 脚下辉光 -- 集成到 beam_line.gd
+
+以下代码片段添加到 `beam_line.gd`，在 beam 激活期间于玩家脚下显示脉动辉光。
+
+**beam_line.gd 新增变量** (在 Internal state 区域):
+
+```gdscript
+# Overcharge VFX state
+var _overcharge_glow: ColorRect = null
+var _overcharge_pulse_tween: Tween = null
+```
+
+**beam_line.gd _ready() 中追加** (在现有 `_beam_visual` 创建之后):
+
+```gdscript
+# Overcharge synergy: player foot glow
+if SynergyManager and SynergyManager.has_synergy("overcharge") and _player:
+	_overcharge_glow = ColorRect.new()
+	_overcharge_glow.size = Vector2(20.0, 20.0)
+	_overcharge_glow.color = Color(0.3, 0.5, 1.0, 0.15)
+	_overcharge_glow.position = Vector2(-10.0, -8.0)  # centered, slightly below player
+	_overcharge_glow.z_index = -1
+	_player.add_child(_overcharge_glow)
+	# Alpha pulse: 0.10 -> 0.20 -> 0.10, repeating
+	_overcharge_pulse_tween = _player.create_tween().set_loops()
+	_overcharge_pulse_tween.tween_property(_overcharge_glow, "color:a", 0.20, 0.15)
+	_overcharge_pulse_tween.tween_property(_overcharge_glow, "color:a", 0.10, 0.15)
+```
+
+**beam_line.gd 末尾 (queue_free 之前) 清理辉光**:
+
+在 `_physics_process` 中 `queue_free()` 调用之前追加：
+
+```gdscript
+# Cleanup overcharge glow before freeing
+if _overcharge_glow and is_instance_valid(_overcharge_glow):
+	if _overcharge_pulse_tween and is_instance_valid(_overcharge_pulse_tween):
+		_overcharge_pulse_tween.kill()
+	_overcharge_glow.queue_free()
+```
+
+#### 2.3 Overcharge 标记指示器 -- 集成到 overcharge_mark.gd
+
+`overcharge_mark.gd` 是一个新文件（由 Programmer 创建），以下是标记的视觉部分。
+
+**标记节点上的电弧指示器** (在 overcharge_mark.gd 的 _ready 中):
+
+```gdscript
+# Overcharge mark visual indicator on enemy
+var _indicator: ColorRect = null
+var _blink_tween: Tween = null
+
+func _create_mark_visual() -> void:
+	_indicator = ColorRect.new()
+	_indicator.size = Vector2(4.0, 4.0)
+	_indicator.color = Color(0.6, 0.3, 1.0, 0.7)  # Purple arc indicator
+	_indicator.position = Vector2(-2.0, -12.0)  # Above enemy head
+	_indicator.z_index = 20
+	_enemy.add_child(_indicator)
+	# Blink: toggle visibility every 0.25s
+	_blink_tween = _enemy.create_tween().set_loops()
+	_blink_tween.tween_property(_indicator, "modulate:a", 0.2, 0.25)
+	_blink_tween.tween_property(_indicator, "modulate:a", 0.8, 0.25)
+```
+
+**Overcharge 标记配色表**:
+
+| 元素 | Color 值 | HEX | 说明 |
+|------|---------|-----|------|
+| 标记指示器 | Color(0.6, 0.3, 1.0, 0.7) | #994DFF | 紫色电弧，与 thunderbeam 电黄形成互补 |
+| 标记闪烁 alpha | 0.2 <-> 0.8 | -- | 每 0.25s 交替，暗示蓄力 |
+| 满层指示 (3 stacks) | Color(1.0, 0.6, 1.0, 0.9) | #FF99FF | 满层时变亮粉紫，暗示即将爆发 |
+
+#### 2.4 Overcharge 爆炸效果 -- 独立 static func
+
+以下函数添加到 `weapon_effects.gd`，供 `overcharge_mark.gd` 在爆炸时调用。
+
+```gdscript
+## Overcharge explosion VFX: expanding ring + scattered particles.
+## Radius: 80px. 6 particles. Purple/blue. Duration: 0.3s.
+static func create_overcharge_explosion(pos: Vector2, parent: Node, stacks: int = 1) -> void:
+	var container := Node2D.new()
+	container.global_position = pos
+	container.z_index = 10
+	parent.call_deferred("add_child", container)
+
+	# --- Expanding ring: 16 segments, 0 -> 80px, purple ---
+	const EXPLOSION_RADIUS: float = 80.0
+	const RING_SEGMENTS: int = 16
+	const RING_SEG_SIZE: Vector2 = Vector2(3.0, 3.0)
+	# Color intensity scales with stacks
+	var ring_alpha: float = minf(0.4 + stacks * 0.2, 1.0)
+	var ring_color: Color = Color(0.3, 0.5, 1.0, ring_alpha)
+
+	for i in range(RING_SEGMENTS):
+		var seg := ColorRect.new()
+		seg.size = RING_SEG_SIZE
+		seg.color = ring_color
+		var angle: float = TAU * i / RING_SEGMENTS
+		var start_pos: Vector2 = Vector2.ZERO - RING_SEG_SIZE * 0.5
+		var end_pos: Vector2 = Vector2(cos(angle), sin(angle)) * EXPLOSION_RADIUS - RING_SEG_SIZE * 0.5
+		seg.position = start_pos
+		container.add_child(seg)
+		# Animate: expand outward + fade
+		var t := seg.create_tween()
+		t.tween_property(seg, "position", end_pos, 0.2).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(seg, "modulate:a", 0.0, 0.3)
+
+	# --- Scattered particles: 6 particles outward ---
+	const PARTICLE_COUNT: int = 6
+	const PARTICLE_SIZE: Vector2 = Vector2(2.0, 2.0)
+	const PARTICLE_SPEED_MIN: float = 40.0
+	const PARTICLE_SPEED_MAX: float = 80.0
+
+	for i in range(PARTICLE_COUNT):
+		var particle := ColorRect.new()
+		particle.size = PARTICLE_SIZE
+		# 80% blue, 20% white (random per particle)
+		if randf() < 0.2:
+			particle.color = Color(1.0, 1.0, 1.0, 0.8)  # White spark
+		else:
+			particle.color = Color(0.3, 0.5, 1.0, 0.8)  # Electric blue
+		particle.position = Vector2(-1.0, -1.0)  # centered
+		container.add_child(particle)
+		# Random outward direction
+		var p_angle: float = TAU * i / PARTICLE_COUNT + randf_range(-0.3, 0.3)
+		var p_speed: float = randf_range(PARTICLE_SPEED_MIN, PARTICLE_SPEED_MAX)
+		var p_end: Vector2 = Vector2(cos(p_angle), sin(p_angle)) * p_speed * 0.2
+		var pt := particle.create_tween()
+		pt.tween_property(particle, "position", p_end, 0.2).set_ease(Tween.EASE_OUT)
+		pt.parallel().tween_property(particle, "modulate:a", 0.0, 0.2)
+
+	# --- Center flash (stack-scaled) ---
+	var flash_size: float = 6.0 + stacks * 2.0  # Bigger flash for more stacks
+	var flash := ColorRect.new()
+	flash.size = Vector2(flash_size, flash_size)
+	flash.color = Color(1.0, 1.0, 1.0, minf(0.3 + stacks * 0.2, 0.9))
+	flash.position = Vector2(-flash_size * 0.5, -flash_size * 0.5)
+	flash.z_index = 11
+	container.add_child(flash)
+	var ft := flash.create_tween()
+	ft.tween_property(flash, "modulate:a", 0.0, 0.15)
+	ft.parallel().tween_property(flash, "scale", Vector2(2.0, 2.0), 0.15)
+
+	# --- Auto-cleanup ---
+	var ct := container.create_tween()
+	ct.tween_interval(0.35)
+	ct.tween_callback(container.queue_free)
+```
+
+#### 2.5 Overcharge 爆炸配色表
+
+| 元素 | Color 值 | HEX | 说明 |
+|------|---------|-----|------|
+| 扩散环 (1层) | Color(0.3, 0.5, 1.0, 0.6) | #4D80FF | 电蓝，与辉光同色系 |
+| 扩散环 (2层) | Color(0.3, 0.5, 1.0, 0.8) | #4D80FF | alpha 随 stack 增加 |
+| 扩散环 (3层) | Color(0.3, 0.5, 1.0, 1.0) | #4D80FF | 满层不透明 |
+| 蓝色粒子 | Color(0.3, 0.5, 1.0, 0.8) | #4D80FF | 80% 概率 |
+| 白色粒子 | Color(1.0, 1.0, 1.0, 0.8) | #FFFFFF | 20% 概率 |
+| 中心闪光 | Color(1.0, 1.0, 1.0, 0.3-0.9) | #FFFFFF | size 随 stack 增加 |
+| 回退方案 | ColorRect 纯色 | -- | 无需 PNG |
+
+#### 2.6 Programmer 集成清单
+
+| 优先级 | 文件 | 集成内容 | 代码行数 |
+|--------|------|---------|---------|
+| P0 | `scripts/weapons/weapon_effects.gd` | 新增 `create_resonance_ripple_simple()` | ~30 行 |
+| P0 | `scripts/weapons/weapon_effects.gd` | 新增 `create_overcharge_explosion()` | ~40 行 |
+| P0 | `scripts/weapons/beam_line.gd` | Overcharge 脚下辉光 + 脉动 | ~12 行 |
+| P1 | `scripts/weapons/pulse_ring.gd` | Resonance 涟漪调用点 | ~3 行 |
+| P1 | `scripts/weapons/overcharge_mark.gd` | 标记指示器 + 闪烁 | ~12 行 |
+
+---
+
+### 任务 3: v1.2.0 视觉规划
+
+#### 3.1 v1.1.0 -> v1.2.0 视觉差距分析
+
+基于 R30 designer-log 中 v1.1.0 收尾清单，当前视觉系统完成度约 88%。v1.2.0 应补齐剩余 12% 并扩展新的视觉内容。
+
+| 视觉领域 | v1.1.0 状态 | v1.2.0 目标 | 差距 |
+|----------|------------|------------|------|
+| 角色精灵 (3角色) | 100% 完成 | 新增第4角色 | 需新精灵 + 配色 |
+| 武器精灵 | 90% 完成 | 新增武器图标 | 被动道具图标 7 张 (P2-4) |
+| 敌人精灵 | 95% 完成 | 微调 | elite_knight 显示尺寸需验证 |
+| 特效系统 | 90% 完成 | 新协同 VFX | Resonance/Overcharge VFX |
+| UI 系统 | 80% 完成 | 动画标题画面 + 过渡效果 | 当前为静态标题画面 |
+| 场景系统 | 85% 完成 | 波次过渡增强 | 已有规格，待实施 |
+| 音频可视反馈 | 0% | 伤害数字弹出 + 屏幕震动 | v1.1.0 无此功能 |
+| AI 绘图提示词 | 部分完成 | 扩充提示词库 | 需新增角色/武器提示词 |
+
+#### 3.2 新角色精灵 -- 第4角色 (Rogue/盗贼)
+
+Designer 在 designer-log R15 中提及延后到 v1.1.0 的第4角色。根据 v1.2.0 规划，美术 Agent 提前准备视觉规格。
+
+##### 3.2.1 角色视觉定位
+
+| 维度 | 战士 (现有) | 法师 (现有) | 射手 (现有) | 盗贼 (新增) |
+|------|-----------|-----------|-----------|-----------|
+| 主色 | Color(0.8, 0.2, 0.2) 红 | Color(0.2, 0.4, 0.8) 蓝 | Color(0.2, 0.7, 0.3) 绿 | Color(0.5, 0.3, 0.7) 紫 |
+| 身体尺寸 | 16x16 | 16x16 | 16x16 | 14x16 (略瘦) |
+| 标志元素 | 剑+盾 | 法杖 | 弓箭 | 匕首+兜帽 |
+| 辅色 | Color(0.6, 0.15, 0.15) 暗红 | Color(0.15, 0.3, 0.6) 深蓝 | Color(0.15, 0.5, 0.2) 深绿 | Color(0.35, 0.2, 0.5) 暗紫 |
+| 强调色 | Color(1.0, 0.8, 0.0) 金 | Color(0.6, 0.8, 1.0) 冰蓝 | Color(0.9, 0.7, 0.0) 琥珀 | Color(1.0, 0.4, 0.4) 猩红 |
+| 画布尺寸 | 32x32 | 32x32 | 32x32 | 32x32 |
+| 显示尺寸 | ~16px | ~16px | ~16px | ~14px (偏瘦小) |
+| 描边 | 无 | 无 | 无 | Color(0.1, 0.1, 0.2) 1px |
+
+##### 3.2.2 第4角色配色表
+
+| 精灵 | 中文名 | EnglishName | 尺寸 | 主色 | 辅色 | 强调色 |
+|------|--------|-------------|------|------|------|--------|
+| 角色4 | 盗贼 | Rogue | 32x32 canvas, 14px body | Color(0.5, 0.3, 0.7) #804DB3 紫 | Color(0.35, 0.2, 0.5) #593380 暗紫 | Color(1.0, 0.4, 0.4) #FF6666 猩红 |
+| 兜帽 | 深紫兜帽 | RogueHood | 32x32 内元素 | Color(0.3, 0.15, 0.45) #4D2673 | -- | Color(0.5, 0.3, 0.7) #804DB3 高光 |
+| 匕首 | 双匕首 | RogueDaggers | 32x32 内元素 | Color(0.7, 0.7, 0.75) #B3B3BF 银白 | -- | Color(1.0, 0.4, 0.4) #FF6666 猩红 |
+
+##### 3.2.3 角色差异化视觉要素
+
+| 要素 | 设计意图 |
+|------|---------|
+| 略瘦体型 (14px vs 16px) | 传达"敏捷、轻装"的盗贼定位，与战士的壮硕形成对比 |
+| 兜帽遮挡面部 | 盗贼神秘感，与法师开放面部形成对比 |
+| 猩红强调色 (眼睛/匕首纹) | 唯一使用暖色调强调的角色（战士金=装饰，法师冰蓝=魔法，射手琥珀=弓弦），盗贼猩红=危险 |
+| 1px 描边 | 现有 3 角色无描边，盗贼是唯一有描边的角色，增强剪影辨识度 |
+| 紫色系 | 与敌人阵营不冲突（骷髅=白、僵尸=绿、蝙蝠=紫红、Boss=红）。盗贼紫偏蓝(#804DB3)，蝙蝠紫偏粉(#8B1A4A)，足够区分 |
+
+#### 3.3 新武器精灵
+
+v1.2.0 需要补充的武器图标和特效精灵：
+
+| 资产 | 尺寸 | 用途 | 配色 | 优先级 |
+|------|------|------|------|--------|
+| 盗贼初始武器图标 | 16x16 | 角色选择/升级面板 | Color(0.7, 0.7, 0.75) 银 + Color(1.0, 0.4, 0.4) 猩红 | P0 |
+| 被动道具图标 x7 | 16x16 | 升级面板 + HUD | 各自配色见 art-log 配色表 | P1 |
+| Resonance 协同图标 | 16x16 | HUD 协同指示 | Color(1.0, 0.84, 0.0) 金 + Color(0.3, 0.5, 1.0) 蓝 | P2 |
+| Overcharge 协同图标 | 16x16 | HUD 协同指示 | Color(0.3, 0.5, 1.0) 电蓝 + Color(0.6, 0.3, 1.0) 紫 | P2 |
+
+**被动道具图标配色参考** (P1 任务):
+
+| 被动道具 | 主色 | 辅色 | 图标元素 |
+|---------|------|------|---------|
+| crit 暴击 | Color(1.0, 0.8, 0.0) 金 | Color(1.0, 0.2, 0.2) 红 | 六角星 |
+| speedboots 加速靴 | Color(0.2, 0.8, 0.4) 绿 | Color(0.15, 0.6, 0.3) 深绿 | 靴子轮廓 |
+| armor 护甲 | Color(0.6, 0.6, 0.7) 银灰 | Color(0.4, 0.4, 0.5) 暗灰 | 盾牌轮廓 |
+| maxhp 生命 | Color(0.9, 0.2, 0.3) 红 | Color(0.7, 0.1, 0.2) 暗红 | 心形 |
+| magnet 磁铁 | Color(0.7, 0.3, 0.7) 紫 | Color(0.5, 0.2, 0.5) 深紫 | U形磁铁 |
+| regen 再生 | Color(0.3, 0.9, 0.5) 亮绿 | Color(0.2, 0.7, 0.4) 绿 | 十字 |
+| luckycoin 幸运币 | Color(1.0, 0.84, 0.0) 金 | Color(0.8, 0.65, 0.0) 暗金 | 硬币 |
+
+#### 3.4 UI 增强 -- 动画标题画面 + 过渡效果
+
+##### 3.4.1 标题画面动画规范
+
+当前 `main.tscn` 为静态标题画面。v1.2.0 增加以下动画元素：
+
+| 动画元素 | 参数 | 说明 |
+|---------|------|------|
+| 标题文字脉动 | scale: 1.0 -> 1.05 -> 1.0, 1.5s 周期 | 标题"肉鸽幸存者"轻微呼吸感 |
+| 标题文字光影 | modulate: Color(1.0, 0.95, 0.8) <-> Color(1.0, 1.0, 1.0), 2.0s | 温暖光感循环 |
+| 按钮悬浮 | scale: 1.0 -> 1.05, 0.15s (on hover) | 按钮鼠标悬浮反馈 |
+| 背景粒子 | 4x4 ColorRect, alpha 0.1-0.3, 0.5-1.5s 生命周期 | 缓慢上升的金色粒子，营造氛围 |
+| 版本号淡入 | alpha: 0.0 -> 0.5, 0.5s delay | 版本号轻微显示 |
+
+**标题画面配色**:
+
+| 元素 | 颜色 |
+|------|------|
+| 标题文字 | Color(1.0, 0.84, 0.0) 金 (与 Resonance 内环同色) |
+| 标题阴影 | Color(0.3, 0.15, 0.0) 暗金 |
+| 背景 | Color(0.08, 0.06, 0.12) 深紫灰 |
+| 按钮正常 | Color(0.15, 0.12, 0.2) 暗紫 |
+| 按钮悬浮 | Color(0.25, 0.2, 0.35) 亮紫 |
+| 背景粒子 | Color(1.0, 0.84, 0.0, 0.15) 半透明金 |
+| 版本号文字 | Color(0.5, 0.5, 0.5, 0.5) 半透明灰 |
+
+##### 3.4.2 场景过渡效果
+
+| 过渡类型 | 参数 | 触发场景 |
+|---------|------|---------|
+| 黑色淡入淡出 | Color(0, 0, 0, 0) -> (0, 0, 0, 1) -> (0, 0, 0, 0), 0.3s+0.3s | 场景切换通用 |
+| 金色闪光 | Color(1, 0.84, 0, 0.3) -> (1, 0.84, 0, 0), 0.2s | 武器进化触发时 |
+| 紫色闪光 | Color(0.5, 0.3, 0.7, 0.2) -> (0.5, 0.3, 0.7, 0), 0.15s | 协同激活时 |
+| 红色闪光 | Color(1.0, 0.0, 0.0, 0.15) -> (1.0, 0.0, 0.0, 0), 0.1s | 玩家受伤时 |
+
+**实现方式**: 全部使用 ColorRect 全屏覆盖层 + Tween alpha 动画。无需 PNG。
+
+#### 3.5 音频可视反馈
+
+虽然 v1.1.0 音频系统未完成（外部资源阻塞），v1.2.0 可以先行实现"与音频配合的视觉反馈"，这些反馈本身不依赖音频文件。
+
+##### 3.5.1 伤害数字弹出
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 字体大小 | 8px | 像素风格小字 |
+| 颜色 (普通伤害) | Color(1.0, 1.0, 1.0) 白 | 基础伤害数字 |
+| 颜色 (暴击) | Color(1.0, 0.84, 0.0) 金 | 暴击伤害数字 |
+| 颜色 (燃烧) | Color(1.0, 0.4, 0.1) 橙 | 燃烧 tick 伤害 |
+| 颜色 (治疗) | Color(0.3, 0.9, 0.5) 绿 | 治疗数字 |
+| 弹出方向 | 向上 (-y) + 随机水平偏移 (+-5px) | 不遮挡敌人精灵 |
+| 弹出速度 | 30 px/s | 慢速上浮 |
+| 持续时间 | 0.8s | 足够阅读 |
+| Alpha 衰减 | 1.0 -> 0.0, 最后 0.3s | 先显示后淡出 |
+| 缩放 | 1.0 -> 0.6 | 逐渐缩小 |
+
+**实现方式**: Label 节点 + Tween 动画。每个数字是独立节点，0.8s 后自动 queue_free。
+
+##### 3.5.2 屏幕震动
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 触发条件 | 玩家受伤、Boss 死亡、协同爆炸 | 三种等级 |
+| 轻微震动 (玩家受伤) | 2px 偏移, 0.05s x 2 次 | 快速轻微抖动 |
+| 中度震动 (Boss 受伤) | 4px 偏移, 0.05s x 3 次 | 明显抖动 |
+| 重度震动 (Boss 死亡) | 6px 偏移, 0.05s x 4 次 + 衰减 | 大幅抖动 |
+| 震动方向 | 随机 (上下左右) | 每次随机 |
+| 实现节点 | Camera2D offset | 修改相机偏移量 |
+
+**实现方式**: 在 arena.tscn 的 Camera2D 上添加 offset 动画。
+
+##### 3.5.3 屏幕闪光 (受伤/暴击)
+
+| 触发 | 颜色 | Alpha | 持续时间 |
+|------|------|-------|---------|
+| 玩家受伤 | Color(1.0, 0.0, 0.0) | 0.15 -> 0.0 | 0.1s |
+| 暴击命中 | Color(1.0, 0.84, 0.0) | 0.1 -> 0.0 | 0.08s |
+| 协同激活 | Color(0.5, 0.3, 0.7) | 0.2 -> 0.0 | 0.15s |
+
+**实现方式**: 全屏 ColorRect z_index=100 + Tween alpha。与现有 `create_evolution_flash` 模式一致。
+
+#### 3.6 v1.2.0 视觉任务优先级汇总
+
+| 编号 | 任务 | 优先级 | 预估工作量 | 依赖 |
+|------|------|--------|-----------|------|
+| V1 | 第4角色 (盗贼) 精灵设计 | P0 | 32x32 精灵 + AI 提示词 | Designer 完成角色数值设计 |
+| V2 | 盗贼初始武器精灵 | P0 | 16x16 图标 | V1 |
+| V3 | Resonance VFX (涟漪) | P0 | weapon_effects.gd +30 行 | v1.1.0 Resonance 逻辑实现 |
+| V4 | Overcharge VFX (辉光+爆炸) | P0 | weapon_effects.gd +40 行 + beam_line.gd +12 行 | v1.1.0 Overcharge 逻辑实现 |
+| V5 | 被动道具图标 x7 | P1 | 7 张 16x16 图标 + AI 提示词 | 无 |
+| V6 | 标题画面动画 | P1 | main.tscn 动画节点 ~50 行 | 无 |
+| V7 | 场景过渡效果 | P1 | 通用过渡函数 ~30 行 | 无 |
+| V8 | 伤害数字弹出 | P2 | Label + Tween 系统 ~60 行 | 无 |
+| V9 | 屏幕震动 | P2 | Camera2D offset 动画 ~25 行 | 无 |
+| V10 | 协同激活图标 | P2 | 2 张 16x16 图标 | V3, V4 |
+| V11 | 背景粒子 (标题画面) | P2 | ColorRect 粒子 ~30 行 | V6 |
+| V12 | AI 提示词扩充 | P2 | 5+ 条新提示词 | V1, V5 |
+
+#### 3.7 v1.2.0 AI 绘图提示词规划
+
+以下提示词将在 v1.2.0 开发期间编写到 `docs/art/prompts/` 对应文件中。
+
+| 提示词文件 | 新增资产 | 目标工具 | 说明 |
+|-----------|---------|---------|------|
+| `character_prompts.md` | 盗贼角色立绘 | Stable Diffusion | 紫色兜帽 + 匕首 |
+| `enemy_prompts.md` | (无新敌人) | -- | v1.2.0 不新增敌人 |
+| `weapon_prompts.md` | 盗贼初始武器 + 被动道具 x7 | Stable Diffusion | 8 条新提示词 |
+| `ui_prompts.md` | 协同图标 x2 | DALL-E | Resonance/Overcharge 图标 |
+| `scene_prompts.md` | (无新场景) | -- | v1.2.0 不新增关卡 |
+| `effect_prompts.md` | 伤害数字样式参考 | Midjourney | 像素风伤害数字参考 |
+
+---
+
+### R31 质量自评: 93/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| Resonance VFX 代码片段 | 18 | 20 | 提供完整版和简化版两套方案，含配色表和集成说明。完整版内联脚本略复杂(-2) |
+| Overcharge VFX 代码片段 | 18 | 20 | 辉光+爆炸+标记三套代码片段完整。爆炸粒子 80%蓝/20%白 比例精确(-1)，beam_line 清理逻辑可能需要适配实际 queue_free 流程(-1) |
+| v1.2.0 视觉规划 | 20 | 20 | 12 项视觉任务含优先级/工作量/依赖关系，配色表与现有一致 |
+| 第4角色视觉设计 | 15 | 15 | 完整配色表+与现有 3 角色对比矩阵+差异化设计决策 |
+| 配色一致性 | 12 | 15 | 新配色与现有配色表一致，但盗贼紫色与蝙蝠紫红需实际同屏验证(-3) |
+| Programmer 集成清单 | 10 | 10 | 两份集成清单含文件、行数、优先级 |
+
+**加分项**: 简化版 Resonance VFX 为 Programmer 提供灵活性(+3), 爆炸效果 stack 缩放视觉(+2), 伤害数字四种颜色分类(+2), 被动道具图标配色提前定义(+2)
+
+**扣分项**: 完整版 Resonance 涟漪的内联 GDScript 方式可维护性偏低(-2), 盗贼紫色与蝙蝠紫红同屏可能不够区分(-3), 标题画面动画未提供代码片段(-2)

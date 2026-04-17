@@ -6,6 +6,7 @@
 |------|------|------|
 | 2026-04-12 | 初始项目状态 | 基础版本完整，79测试全通过 |
 | 2026-04-12 | Phase 1-6 全量审核 | 190测试/500断言全通过，架构合规 |
+| 2026-04-18 | R31 审核 | 2145测试全通过, player.gd 未拆分, Resonance/Overcharge 未实现 |
 
 ## 技术债务
 
@@ -16,13 +17,13 @@
 | ~~P2~~ | ~~需要协同效应管理器~~ | 已解决 |
 | ~~P2~~ | ~~weapon_controller.gd 350行接近上限~~ | R28 已降至152行 |
 | ~~P1~~ | ~~3种进化武器发射逻辑未实现 (BUG-290)~~ | R29 CLOSED |
-| P2 | weapon_fire.gd 448行接近上限 (89.6%) | R29-R30 追踪 |
-| LOW | beam_line.gd load+new 热路径 (R29 P2, R30 降级) | R30 降级 |
-| P2 | save_manager.gd 431行 (86.2%) | 持续追踪 |
-| WARNING | player.gd 460行 (92.0%) | R30 新发现 |
-| WARNING | hud.gd 437行 (87.4%) | R30 新发现 |
-| MEDIUM | elite_knight 未在 enemy_spawner.gd 注册模板 | R30 新发现 |
-| LOW | spiral_blade.gd O(n*m) 嵌套循环 (R29 P2, R30 降级) | R30 降级 |
+| P2 | weapon_fire.gd 448行接近上限 (89.6%) | R29-R31 追踪, 无变化 |
+| LOW | beam_line.gd load+new 热路径 (R29 P2, R30 降级) | R31 未修复 |
+| P2 | save_manager.gd 431行 (86.2%) | R31 无变化 |
+| ~~WARNING~~ | ~~player.gd 460行 (92.0%)~~ | R31 未拆分, 升级 P1 |
+| WARNING | hud.gd 437行 (87.4%) | R31 无变化 |
+| ~~MEDIUM~~ | ~~elite_knight 未在 enemy_spawner.gd 注册模板~~ | R31 已解决 |
+| LOW | spiral_blade.gd O(n*m) 嵌套循环 (R29 P2, R30 降级) | R31 未变化 |
 
 ## 优化建议
 
@@ -9879,3 +9880,284 @@ boomerang 已成功拆分为独立 RefCounted 模块 (100 行)。该模式特点
 | weapon_fire.gd 评估 | 20 | 25 | 完成 448 行审计 + 拆分优先级方案 (-5 因未实际执行拆分) |
 | 全局健康检查 | 20 | 25 | 完成 9 文件行数审计 + autoload 交叉引用 + 4 测试文件质量抽查 (-5 因未覆盖全部 50+ 脚本) |
 | 技术债务更新 | 20 | 25 | 3 项债务降级 + 3 项新发现 (elite_knight/player.gd/hud.gd) (-5 因部分旧债长期未清) |
+
+---
+
+## R31 审核报告 (2026-04-18) -- player.gd 拆分审查 + 全局行数检查 + 技术债务更新
+
+### 审核环境
+
+- 基线测试套件: **2145 tests, 0 failures** (QA R31 报告)
+- 审核范围: player.gd 拆分审查 + Resonance/Overcharge 协同实现审查 + 全局行数检查 + 技术债务更新
+
+---
+
+### 任务 1: player.gd 拆分审查
+
+#### 结论: Programmer 未执行拆分
+
+**当前状态: player.gd 仍为 460 行 (92.0%)**
+
+- 不存在 `scripts/player_skill.gd` 或 `scripts/player_passive.gd` 文件
+- player.gd 仍为单体结构，包含所有职责:
+  - 移动 + 碰撞 (行 190-269)
+  - 技能系统 (行 272-304, 约 32 行)
+  - Iron Will 被动 (行 307-333, 约 26 行)
+  - 燃烧 DOT (行 99-101, 242-254, 约 14 行)
+  - 战斗系统 (行 338-360)
+  - 被动应用 (行 405-445, 约 40 行)
+  - 动画 (行 103-116, 258-269, 约 24 行)
+  - 残影特效 (行 448-460, 约 12 行)
+
+#### 拆分可行性评估 (R30 建议回顾)
+
+R30 建议将以下模块提取到独立文件:
+
+| 提取目标 | 行数 | 目标文件 | 说明 |
+|----------|------|----------|------|
+| 技能输入/激活 | 32 | scripts/player_skill.gd | _process_skill_input + _activate_skill |
+| 被动应用逻辑 | 40 | scripts/player_passive.gd | apply_passive match 块 |
+| Iron Will 被动 | 26 | 合并入 player_passive.gd | _update_iron_will |
+| 燃烧 DOT | 14 | 合并入 player_passive.gd | apply_burn + _burn_timer 更新 |
+| 残影特效 | 12 | 可选提取 | _spawn_afterimages |
+
+提取后预估 player.gd 行数: ~336 行 (67.2%), 安全范围。
+
+**API 向后兼容性**: 当前 2145 测试中所有 player.gd 相关测试通过，说明无需 API 变更即可拆分 -- 只需将方法移动到子节点并通过组合模式调用。
+
+#### 严重度升级
+
+**从 WARNING 升级为 P1**:
+- 460 行已占 500 行上限的 92%
+- R30 已明确建议拆分，R31 未执行
+- 新功能 (Resonance/Overcharge) 将进一步增加行数
+- 如再增长 40+ 行将突破 500 行硬上限
+
+---
+
+### 任务 2: 协同实现审查 (Resonance / Overcharge)
+
+#### 结论: Resonance 和 Overcharge 均未实现
+
+**验证过程**:
+
+1. **synergy_manager.gd** (139 行): 审查全部 18 条 SYNERGY_DEFINITIONS，无任何 `resonance` 或 `overcharge` 相关条目。协同定义停留在 R30 状态。
+
+2. **pulse_ring.gd** (79 行): 审查完整文件，无子脉冲逻辑。当前功能为:
+   - 扩展伤害环 (16 段 ColorRect)
+   - 环带碰撞检测 (ring_width 区域内敌人受伤)
+   - 燃烧 DOT 应用
+   - 无子脉冲生成，无概率触发机制
+
+3. **beam_line.gd** (137 行): 审查完整文件，无过载逻辑。当前功能为:
+   - 穿透激光 (tick damage + beam_width)
+   - 火花粒子效果
+   - 链式闪电 (生命周期结束时触发)
+   - 无过载伤害加成，无层数累积机制
+
+4. **weapon_fire.gd** (448 行): 搜索 `resonance`/`overcharge` 关键词，无匹配。
+
+**designer-log.md R31 计划参考**: 行 1973 提到 "R31: 协同效果 (Phase 4) -- Frostbite/Resonance/Overcharge"，但 Programmer 未收到或未执行此需求。
+
+**影响评估**: 不影响当前功能完整性。Resonance/Overcharge 属于增量特性，现有 18 种协同 + 进化武器系统功能完整。
+
+#### beam_line.gd 既有代码审查
+
+虽然 Resonance/Overcharge 未实现，R29-R30 遗留的 `load+new` 问题 (债务 #21) 仍未修复:
+
+```gdscript
+# 行 135-136 -- 仍在使用冗余实例化
+var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
+effects.create_lightning_effect(origin_enemy.global_position, target.global_position, beam_color, parent)
+```
+
+`create_lightning_effect` 是 `static func`，应直接通过脚本调用。影响极低 (每次 beam 销毁最多 2 次)，但违反代码质量原则。维持 LOW 级别。
+
+#### pulse_ring.gd 既有代码审查
+
+代码质量评估: **PASS**
+
+- 常量定义清晰: RING_SEGMENTS=16, SEGMENT_SIZE=(2,2)
+- 视觉使用 ColorRect 段而非 draw API -- 符合项目像素风规范
+- 碰撞检测使用距离 + 环带判断，O(N) 遍历敌人 -- 性能可接受 (pulse ring 生命周期仅 0.3s)
+- 自动销毁逻辑正确 (t >= 1.0 时 queue_free)
+- 唯一注意: 行 65 `GameManager.get_cached_enemies()` 回退到 `get_tree().get_nodes_in_group` -- 防御性编程，合理
+
+**潜在问题**: `_hit_enemies` 使用 Dictionary 而非 Array 存储已击中敌人。性能上 Dictionary O(1) 查找优于 Array O(n)，此实现合理。但 key 为 Object 引用，若 enemy 在 ring 生命周期内被 queue_free，`is_instance_valid` 检查 (行 67) 会正确跳过。
+
+---
+
+### 任务 3: 全局行数检查
+
+#### 完整脚本行数审计 (51 个 .gd 文件)
+
+| 文件 | 行数 | 上限占比 | R30 基线 | 变化 | 状态 |
+|------|------|----------|----------|------|------|
+| scripts/player.gd | 460 | 92.0% | 460 | -- | **P1** |
+| scripts/weapons/weapon_fire.gd | 448 | 89.6% | 448 | -- | WARNING |
+| scripts/hud.gd | 437 | 87.4% | 437 | -- | WARNING |
+| scripts/autoload/save_manager.gd | 431 | 86.2% | 431 | -- | WARNING |
+| scripts/chest.gd | 311 | 62.2% | -- | 首次审计 | PASS |
+| scripts/enemy.gd | 367 | 73.4% | 367 | -- | PASS |
+| scripts/autoload/game_manager.gd | 389 | 77.8% | 389 | -- | PASS |
+| scripts/enemy_spawner.gd | 276 | 55.2% | 276 | -- | PASS |
+| scripts/shop.gd | 279 | 55.8% | -- | 首次审计 | PASS |
+| scripts/enemies/enemy_loot.gd | 260 | 52.0% | 260 | -- | PASS |
+| scripts/weapons/spiral_blade.gd | 247 | 49.4% | 247 | -- | PASS |
+| scripts/effects/hit_feedback.gd | 248 | 49.6% | 248 | -- | PASS |
+| scripts/enemies/enemy_death_effects.gd | 249 | 49.8% | -- | 首次审计 | PASS |
+| scripts/arena.gd | 245 | 49.0% | -- | 首次审计 | PASS |
+| scripts/data/weapon_data.gd | 279 | 55.8% | -- | 首次审计 | PASS |
+| scripts/autoload/synergy_manager.gd | 139 | 27.8% | 139 | -- | PASS |
+| scripts/weapons/beam_line.gd | 137 | 27.4% | 137 | -- | PASS |
+| scripts/weapon_controller.gd | 151 | 30.2% | 151 | -- | PASS |
+| scripts/projectile.gd | 146 | 29.2% | -- | 首次审计 | PASS |
+| scripts/pickup_manager.gd | 5 | 1.0% | -- | 首次审计 | PASS |
+| scripts/weapons/pulse_ring.gd | 79 | 15.8% | 79 | -- | PASS |
+| scripts/weapons/boomerang.gd | 173 | 34.6% | -- | 首次审计 | PASS |
+| scripts/weapons/weapon_effects.gd | 192 | 38.4% | -- | 首次审计 | PASS |
+| scripts/skill_effects.gd | 122 | 24.4% | -- | 首次审计 | PASS |
+| scripts/weapons/weapon_boomerang_fire.gd | 97 | 19.4% | -- | 首次审计 | PASS |
+| scripts/weapons/weapon_registry.gd | 71 | 14.2% | -- | 首次审计 | PASS |
+| scripts/hud_mastery_panel.gd | 279 | 55.8% | -- | 首次审计 | PASS |
+| scripts/tutorial_manager.gd | 157 | 31.4% | -- | 首次审计 | PASS |
+| scripts/data/skill_data.gd | 63 | 12.6% | -- | 首次审计 | PASS |
+| scripts/data/enemy_data.gd | 64 | 12.8% | -- | 首次审计 | PASS |
+| scripts/data/passive_data.gd | 37 | 7.4% | -- | 首次审计 | PASS |
+| scripts/data/character_data.gd | 17 | 3.4% | -- | 首次审计 | PASS |
+| scripts/data/difficulty_data.gd | 11 | 2.2% | -- | 首次审计 | PASS |
+| scripts/autoload/upgrade_pool.gd | 173 | 34.6% | -- | 首次审计 | PASS |
+| scripts/autoload/achievement_checker.gd | 178 | 35.6% | -- | 首次审计 | PASS |
+| scripts/effects/projectile_trail_pool.gd | 99 | 19.8% | -- | 首次审计 | PASS |
+| scripts/xp_gem.gd | 77 | 15.4% | -- | 首次审计 | PASS |
+| scripts/item_crate.gd | 44 | 8.8% | -- | 首次审计 | PASS |
+| scripts/food_pickup.gd | 36 | 7.2% | -- | 首次审计 | PASS |
+| scripts/enemy_bullet.gd | 64 | 12.8% | -- | 首次审计 | PASS |
+| scripts/spin_blade.gd | 58 | 11.6% | -- | 首次审计 | PASS |
+| scripts/chest_spawner.gd | 145 | 29.0% | -- | 首次审计 | PASS |
+| scripts/enemies/boss_ai.gd | 75 | 15.0% | -- | 首次审计 | PASS |
+| scripts/character_select.gd | 121 | 24.2% | -- | 首次审计 | PASS |
+| scripts/weapon_select.gd | 115 | 23.0% | -- | 首次审计 | PASS |
+| scripts/difficulty_select.gd | 311 | 62.2% | -- | 首次审计 | PASS |
+| scripts/title_screen.gd | 47 | 9.4% | -- | 首次审计 | PASS |
+| scripts/game_over_screen.gd | 22 | 4.4% | -- | 首次审计 | PASS |
+| scripts/hud_toast.gd | 108 | 21.6% | -- | 首次审计 | PASS |
+| scripts/hud_skill_button.gd | 99 | 19.8% | -- | 首次审计 | PASS |
+| scripts/achievement_screen.gd | 73 | 14.6% | -- | 首次审计 | PASS |
+
+#### 异常增长检测
+
+**与 R30 对比**: 所有已追踪文件行数 **零变化**。无异常增长。
+
+#### >= 400 行文件汇总
+
+| 文件 | 行数 | 趋势 |
+|------|------|------|
+| player.gd | 460 | R30=460, 停滞 |
+| weapon_fire.gd | 448 | R30=448, 停滞 |
+| hud.gd | 437 | R30=437, 停滞 |
+| save_manager.gd | 431 | R30=431, 停滞 |
+
+---
+
+### 任务 4: 技术债务更新
+
+#### R30 遗留问题状态
+
+| 债务 | R30 严重度 | R31 状态 | R31 严重度 | 说明 |
+|------|-----------|---------|-----------|------|
+| player.gd 460行 | WARNING | 未修复 | **P1** | 两轮未拆分，升级 |
+| weapon_fire.gd 448行 | P2 | 未修复 | P2 | 无变化 |
+| hud.gd 437行 | WARNING | 未修复 | WARNING | 无变化 |
+| save_manager.gd 431行 | P2 | 未修复 | P2 | 无变化 |
+| elite_knight 未注册 | MEDIUM | **已修复** | CLOSED | enemy_spawner.gd 行 59-64 已注册, game_manager.gd WAVE_DEFS 已引用 |
+| beam_line.gd load+new | LOW | 未修复 | LOW | 无变化 |
+| spiral_blade.gd O(n*m) | LOW | 未修复 | LOW | 无变化 |
+
+#### 新增债务
+
+无。R31 未引入新文件或新逻辑。
+
+#### elite_knight 注册验证 (R30 MEDIUM 债务关闭)
+
+确认 `scripts/enemy_spawner.gd` 行 59-64:
+```gdscript
+"elite_knight": {
+    "enemy_id": "elite_knight", "enemy_name": "精英骑士",
+    "max_hp": 7.5, "speed": 18.0, "damage": 2.0,
+    "xp_value": 18, "color": [0.35, 0.15, 0.55], "size": 20.0,
+    "is_ranged": true, "shoot_cd": 1.5, "is_elite": true
+}
+```
+
+确认 `scripts/autoload/game_manager.gd` WAVE_DEFS 引用:
+- wave_elite (行 43): enemies 列表包含 "elite_knight"
+- wave_boss (行 46): enemies 列表包含 "elite_knight"
+- wave 4 (行 40): enemies 列表包含 "elite_knight"
+
+**结论**: elite_knight 已完整注册，可被 wave 4/5 正常生成。R30 MEDIUM 债务关闭。
+
+#### 技术债务总表 (R31 更新)
+
+| # | 债务 | 优先级 | R30 状态 | R31 状态 | 变化 |
+|---|------|--------|---------|---------|------|
+| 1 | die() 60行未重构 | P1 | 未修复 | 未修复 | -- |
+| 7 | save_manager 元数据类型不匹配 | P2 | 未修复 | 未修复 | -- |
+| 13 | chest.gd ColorRect 未迁移 | P2 | 未修复 | 未修复 | -- |
+| 14 | release-readiness.md 过时 | Low | 未修复 | 未修复 | -- |
+| 16 | upgrade_pool.gd 每次调用 load+new | P2 | 未修复 | 未修复 | -- |
+| 18 | hud_mastery_panel 武器名映射需手动同步 | Low | 未修复 | 未修复 | -- |
+| 19 | upgrade_pool.gd 被动数据未提取 | Low | 未修复 | 未修复 | -- |
+| 20 | weapon_fire.gd 448行 (89.6%) | P2 | 追踪 | 追踪 | -- |
+| 21 | beam_line.gd load+new 热路径 | Low | 降级 | 未修复 | -- |
+| 22 | "获取范围内敌人" 15处重复代码 | Low | 追踪 | 追踪 | -- |
+| 23 | beam_line.gd _player 引用未校验 | Low | 追踪 | 追踪 | -- |
+| 24 | spiral_blade.gd O(n*m) 嵌套循环 | Low | 降级 | 未修复 | -- |
+| ~~25~~ | ~~elite_knight 未在 enemy_spawner 注册~~ | ~~MEDIUM~~ | 新发现 | **CLOSED** | R31 已注册 |
+| 26 | **player.gd 460行 (92.0%)** | **P1** | WARNING | 升级 P1 | 两轮未拆分 |
+| 27 | hud.gd 437行 (87.4%) | WARNING | 追踪 | 追踪 | -- |
+
+**已关闭债务**:
+- ~~#25: elite_knight 未在 enemy_spawner 注册~~ -- R31 CLOSED
+
+**升级债务**:
+- ~~#26: player.gd~~ -- WARNING -> P1 (两轮未拆分, 92% 行数占比)
+
+---
+
+### 给各角色的建议
+
+**Programmer**:
+- **[P1] player.gd 拆分 -- 最高优先级**: 两轮未执行，已升级为 P1。建议提取:
+  - `scripts/player_skill.gd`: _process_skill_input, _activate_skill (32 行)
+  - `scripts/player_passive.gd`: apply_passive match 块, _update_iron_will, apply_burn (80 行)
+  - 拆分后 player.gd 降至 ~336 行 (67.2%), 安全范围
+  - 使用组合模式: Player 持有 skill/passive 子节点引用，测试通过函数委托调用，API 无需变更
+- [P2] weapon_fire.gd 448 行 -- 下一个拆分目标 (orbit 84 行优先提取)
+- [LOW] beam_line.gd 行 135 改为 static 调用 (preload + 直接调用)
+- ~~[MEDIUM] elite_knight 注册~~ -- 已完成
+
+**策划**:
+- designer-log.md 行 1973 提到 R31 Resonance/Overcharge 协同设计，但 Programmer 未实现
+- 如需推进协同 Phase 4 (Frostbite/Resonance/Overcharge)，建议先输出详细设计规格到 specs/ 目录
+- elite_knight 数值已定: max_hp=7.5, speed=18, damage=2, xp_value=18, is_ranged=true
+
+**美术**:
+- 无新增视觉需求。pulse_ring.gd 和 beam_line.gd 视觉效果符合像素风规范
+- pulse_ring 使用 16 段 ColorRect 呈现扩展环，视觉辨识度可接受
+
+**QA**:
+- 2145 测试全通过
+- 建议补充 elite_knight 注册后的 spawner 回归测试 (确认 wave 4/5 能生成)
+- player.gd 拆分后需运行全量回归确保无破坏
+
+---
+
+### 审核人自评: 70/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| player.gd 拆分审查 | 15 | 25 | 确认未拆分，完成行数审计和拆分方案 (-10 因拆分未执行非审核人职责，但两轮未推进降低整体分) |
+| 协同实现审查 | 20 | 25 | 确认 Resonance/Overcharge 未实现，审查既有 pulse_ring.gd 和 beam_line.gd 代码质量 (-5 因无新代码可审) |
+| 全局行数检查 | 20 | 25 | 完成 51 个脚本全量审计，无异常增长 (-5 因零变化导致审计价值降低) |
+| 技术债务更新 | 15 | 25 | 1 项关闭 (elite_knight)，1 项升级 (player.gd P1)，无新增 (-10 因长期 P1 债务 #1 持续未清) |

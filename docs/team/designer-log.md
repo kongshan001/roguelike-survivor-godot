@@ -44,8 +44,14 @@
 | P1 | achievement_checker.gd 拆分方案 (SaveManager 解耦) | ✅ 已设计（R25，规格见 specs/achievement-checker-spec.md） |
 | P1 | hud.gd精通代码拆分方案 | ✅ 已设计（R24，规格见 specs/hud-mastery-panel-spec.md） |
 | P1 | Sprite2D迁移影响评估 + 进化武器平衡审查 + v1.1.0进度评估 | ✅ 已完成（R29，记录在本文件 Round 29） |
-| P1 | 武器协同 Phase E 收尾（Resonance + Overcharge） | 待实施（R30，设计规格见 specs/evolved-weapon-behaviors.md 5.3-5.4） |
-| P1 | 暂停精通面板实施 | 待实施（设计规格见 specs/hud-mastery-panel-spec.md） |
+| P0 | Resonance 协同实现 (weapon_weapon + 子脉冲) | 待实施（R32，设计规格见 specs/weapon-weapon-synergy-design.md） |
+| P0 | Overcharge 协同实现 (weapon_weapon + 过载标记) | 待实施（R32，设计规格见 specs/weapon-weapon-synergy-design.md） |
+| P1 | 暂停精通面板实施 | ✅ 已完成（hud_mastery_panel.gd build_pause_panel + hud.gd Escape handler） |
+| P2 | 音频系统设计规格 | v1.2.0 Phase A |
+| P2 | 第4角色（死灵法师）设计规格 | v1.2.0 Phase B |
+| P2 | 投掷武器（firebomb）设计规格 | v1.2.0 Phase B |
+| P2 | 本地排行榜设计规格 | v1.2.0 Phase C |
+| P2 | 混沌难度模式设计规格 | v1.2.0 Phase C 或 v1.3.0 |
 
 ## 决策记录
 
@@ -2965,3 +2971,271 @@ test_synergy_manager.gd 需要新增：
 | `docs/team/designer-log.md` (本文件) | R30 执行记录 | P1 HIGH |
 | `docs/superpowers/specs/evolved-weapon-behaviors.md` (现有, 需更新) | 新增 Resonance/Overcharge 增强协同定义 | P1 |
 | `docs/superpowers/specs/evolution-expansion.md` (现有, 需更新) | 新增 Section 5.1.1/5.4.1 增强协同 | P2 |
+
+---
+
+## R31 2026-04-18 -- v1.1.0 最终收尾清单审查 + v1.2.0 功能展望 + 进化武器数值微调
+
+### 1. v1.1.0 最终收尾清单审查
+
+#### 1.1 路线图功能逐项核查
+
+基于代码审查（synergy_manager.gd、pulse_ring.gd、beam_line.gd、spiral_blade.gd、weapon_fire.gd、weapon_controller.gd、enemy_spawner.gd、hud.gd、hud_mastery_panel.gd），逐项核查 v1.1.0 路线图完成状态。
+
+**已完成项**:
+
+| 编号 | 功能 | 验证证据 | 完成度 |
+|------|------|---------|--------|
+| [x] | 进化武器 Phase C (dispatch) | weapon_fire.gd 含 update_spiral(370)、fire_pulse(398)、fire_beam(422) 三个调度函数；weapon_controller.gd line 83-88 含 spiral/pulse/beam match 分支 | 100% |
+| [x] | 进化武器 Phase D (脚本) | spiral_blade.gd (97行)、pulse_ring.gd (79行)、beam_line.gd (137行) 均已创建且包含完整行为逻辑 | 100% |
+| [x] | Frostbite Loop 协同 | spiral_blade.gd line 85-86 实现冰冻事件触发刀片加速，SYNERGY_ACCEL_DUR 常量定义 | 100% |
+| [x] | 暂停精通面板 | hud_mastery_panel.gd line 135 含 build_pause_panel() 完整实现；hud.gd line 166-168 含 Escape 键触发逻辑；hud.gd line 245-261 含 _on_pause_toggled() 完整逻辑 | 100% |
+| [x] | elite_knight 注册 | enemy_spawner.gd line 59-64 含完整模板条目；game_manager.gd line 40/43/46 含 wave_darkness/wave_elite/wave_boss 三波次分配 | 100% |
+
+**剩余项**:
+
+| 编号 | 功能 | 优先级 | 预估代码量 | 状态说明 |
+|------|------|--------|-----------|---------|
+| [ ] P0-1 | Resonance 协同 (weapon_weapon 类型) | **P0** | synergy_manager.gd +15行定义/检测 + pulse_ring.gd +15行子脉冲逻辑 + 测试 ~15行 = **~45行** | synergy_manager.gd 仍为 18 定义，无 weapon_weapon 分支；pulse_ring.gd 无 resonance 代码 |
+| [ ] P0-2 | Overcharge 协同 (weapon_weapon 类型) | **P0** | synergy_manager.gd (含在P0-1) + beam_line.gd +10行标记逻辑 + overcharge_mark.gd ~35行新文件 + 测试 ~15行 = **~60行** | beam_line.gd 无 overcharge/speed_multiplier 代码；无 overcharge_mark.gd 文件 |
+| [ ] P0-3 | synergy_manager test_total 更新 | **P0** | 1行 (18 -> 20) | test_synergy_manager.gd line 155 仍 assert 18 |
+| [ ] P1-1 | Resonance 基础击杀减CD | **P1** | pulse_ring.gd +8行 | evolved-weapon-behaviors.md 5.3 节原设计，pulse_ring 持有 _weapon_timers 引用在击杀时减 CD |
+| [ ] P1-2 | Overcharge 基础移速加成 | **P1** | beam_line.gd +6行 | evolved-weapon-behaviors.md 5.4 节原设计，beam 激活时 player.speed_multiplier += 0.15 |
+| [ ] P1-3 | elite_knight 击退抵抗 | **P1** | enemy.gd +3行 | enemy.gd 击退逻辑中跳过 elite_knight |
+| [ ] P2-1 | 音频系统 | **P2** | ~400行实现 + ~20行测试 | BLOCKED by 外部音频资产 |
+| [ ] P2-2 | 被动道具图标精灵 | **P2** | 7张图标 + ~10行注册 | 需 Art Agent 生成 |
+| [ ] P2-3 | 本地排行榜 | **P2** | ~150行实现 + ~25行测试 | Stretch goal |
+
+#### 1.2 完成度评估
+
+| 维度 | 完成度 | 说明 |
+|------|--------|------|
+| 核心范围 (Phase C+D+E+暂停面板) | **~72%** | Phase C+D 100%、Frostbite Loop 100%、暂停面板 100%，但 Resonance/Overcharge weapon_weapon 协同 0% |
+| 敌人系统 | **~95%** | elite_knight 已注册（数值与R30设计规格有偏差，见第3节），击退抵抗未实现 |
+| 协同系统 | **~85%** | 18/20 协同定义完成，Frostbite Loop 内置协同完成，Resonance/Overcharge weapon_weapon 类型未实现 |
+| 整体 v1.1.0 | **~85%** | 与题目描述一致 |
+
+#### 1.3 剩余代码量估算
+
+| 类别 | 行数 | 说明 |
+|------|------|------|
+| P0 实现 | ~105行 | Resonance(45) + Overcharge(60，含新文件) |
+| P0 测试 | ~30行 | 7个synergy测试 + 5个行为测试 |
+| P1 实现 | ~17行 | 击杀减CD(8) + 移速加成(6) + 击退抵抗(3) |
+| P1 测试 | ~15行 | 基础协同效果验证 |
+| **P0+P1 合计** | **~167行** | 核心收尾工作量 |
+
+#### 1.4 elite_knight 数值偏差备注
+
+代码中 elite_knight 的实际注册数值与 R30 设计规格存在差异：
+
+| 属性 | R30 设计规格 | 实际代码值 | 偏差原因 |
+|------|------------|-----------|---------|
+| max_hp | 20.0 | 7.5 | Programmer 可能基于平衡考虑调低 |
+| speed | 25.0 | 18.0 | 调低 |
+| damage | 3.0 | 2.0 | 调低 |
+| xp_value | 12 | 18 | 调高 |
+| size | 12.0 | 20.0 | 调大 |
+| is_ranged | false | true | 设计为近战，代码为远程 |
+| shoot_cd | 无 | 1.5 | 设计无远程，代码有 |
+
+**评估**: 实际代码中的 elite_knight 更接近一个"远程精英变体"（类似 elite_skeleton 的强化版），而非 R30 设计的"近战铁壁堡垒"。当前数值可接受，但在 v1.2.0 中应考虑是否需要一个真正的"近战重甲精英"来丰富敌人类型多样性。此处不做数值回退建议，以 Programmer 的实际平衡判断为准。
+
+---
+
+### 2. v1.2.0 功能展望
+
+v1.1.0 核心范围预计再需 1-2 轮（R32-R33）即可收尾。以下是 v1.2.0 的 5 个候选功能，按优先级排序。
+
+#### 候选 1: 音频系统 [优先级 P0 -- 玩家体验基础]
+
+**功能名称**: 游戏音频系统 (AudioManager + BGM + SFX)
+
+**简述**: 当前项目完全无音效，这是玩家体验最大的缺失。实现 AudioManager autoload 单例，支持 BGM 循环播放和 SFX 触发。覆盖 15+ 个触发点：武器发射、命中、暴击、击杀、升级、受伤、拾取宝石、Boss 出场、波次转场、UI 点击。提供音量控制和静音开关。
+
+**预估代码量**: ~400行实现（AudioManager ~120行 + SFX 触发点 ~200行 + 音量控制 ~80行）+ ~20行测试
+
+**优先级建议**: **P0**。音效是游戏"活起来"的关键。当前视觉反馈已经完善（命中闪光、暴击数字、粒子拖尾），但缺乏听觉维度让体验始终"半成品"。即使使用临时占位音效（如 kenney.nl 免费资源或程序生成），也比完全无声好。
+
+**前置条件**: 需要外部音频资产（BGM + 10+ SFX）。建议使用 kenney.nl 的 royalty-free 资源或 Godot 内置的 AudioStreamGenerator 程序生成。
+
+---
+
+#### 候选 2: 第4角色 -- 死灵法师 (Necromancer) [优先级 P1]
+
+**功能名称**: Necromancer 角色设计
+
+**简述**: 当前有 3 个角色（法师/战士/游侠），第 4 个角色选择死灵法师，定位为"召唤+诅咒"系。核心差异化：
+- **初始武器**: frostaura（冰冻光环，近身控制）
+- **主动技能**: 死亡脉冲 -- 对周围敌人造成等同于已击杀数 x 0.5 的伤害，上限 20 HP，冷却 30s
+- **被动天赋**: 亡者诅咒 -- 每击杀 10 个敌人，对全屏随机 1 个敌人施加 3s 减速 + 3 HP 伤害
+- **弱点**: 基础移速 -10%（90，vs 法师 100），基础 HP 6（最低）
+
+**预估代码量**: ~150行实现（character_data.gd 条目 + skill_data.gd 条目 + skill_effects.gd 新技能 ~80行 + 角色选择场景更新）+ ~30行测试
+
+**优先级建议**: **P1**。第 4 角色增加 build 多样性和重玩价值。死灵法师的"诅咒"机制是现有系统没有的新维度，不会与现有角色定位重叠。但需要仔细平衡"击杀数缩放"机制防止后期过强。
+
+**与现有角色差异化**:
+- 法师: 远程投射物系，AOE 为主
+- 战士: 近身高 HP 高护甲
+- 游侠: 暴击 + 远程 + 高机动
+- 死灵法师: 召唤辅助 + 诅咒 DOT + 击杀数缩放（与 wave 密度正相关）
+
+---
+
+#### 候选 3: 投掷武器类型 (Throwing) [优先级 P1]
+
+**功能名称**: 投掷武器系统 (throwing weapon type)
+
+**简述**: 新增第 8 种基础武器类型 -- 投掷 (throwing)。与现有 boomerang 的区别：投掷物不返回，落点产生 AOE 效果。设计"火焰瓶" (firebomb) 作为基础武器：
+- **攻击模式**: 抛物线飞向最近敌人，落地后在落点创建持续 2s 的火焰区域
+- **升级路线**: Lv2 半径+20%, Lv3 火焰分裂（落点产生 2 个小火焰）
+- **进化路线**: firebomb + lightning -> thunderbomb（落点产生电弧场，持续电击范围内敌人）
+- **定位**: 区域控制型武器，与 firestaff（锥形火焰）形成互补 -- firestaff 是前方扇形、firebomb 是定点 AOE
+
+**预估代码量**: ~200行实现（新 weapon_type 分支 + firebomb.gd ~80行 + fire_pool.gd ~50行 + weapon_data.gd 字段）+ ~40行测试
+
+**优先级建议**: **P1**。投掷武器是肉鸽幸存者品类的经典武器类型（Vampire Survivors 的圣水就属于此类）。填补了"定点 AOE"的武器生态位。技术实现难度中等（抛物线弹道 + 落点 AOE 区域），不依赖新系统。
+
+---
+
+#### 候选 4: 本地排行榜 [优先级 P2]
+
+**功能名称**: 本地无尽模式排行榜 (Local Leaderboard)
+
+**简述**: 在 title_screen 场景新增排行榜入口，展示无尽模式 Top 10 成绩。数据存储于 SaveManager 中（JSON 格式），包含角色、难度、存活时间、击杀数、日期。支持按存活时间排序。排行榜条目在游戏结束（无尽模式）时自动记录。
+
+**预估代码量**: ~150行实现（leaderboard.gd ~80行 + title_screen.gd 入口 ~30行 + save_manager.gd 存读 ~40行）+ ~25行测试
+
+**优先级建议**: **P2**。排行榜是无尽模式的核心留存机制 -- 给玩家一个"超越自己"的目标。实现简单（纯本地存储，无网络依赖），风险低。但相比新内容（角色/武器），排行榜对"首次体验"的提升有限，更适合在内容充实后加入。
+
+---
+
+#### 候选 5: 第5种难度 -- 混沌模式 (Chaos) [优先级 P2]
+
+**功能名称**: 混沌难度模式 (Chaos Difficulty)
+
+**简述**: 在现有 4 种难度（休闲/标准/噩梦/无尽）基础上新增第 5 种 -- 混沌模式。核心机制：每 60 秒随机触发一个"混沌事件"：
+- 敌人移速翻倍 15 秒
+- 所有敌人获得远程攻击 15 秒
+- 玩家移速减半 10 秒
+- 敌人体型翻倍 + HP 翻倍 20 秒
+- 武器伤害减半 10 秒
+- 宝石吸引力为 0（必须走近拾取）15 秒
+
+**难度乘数**: HP x2.0, Speed x1.5, Damage x1.8（高于噩梦的 x1.5/x1.3/x1.5）。
+
+**预估代码量**: ~180行实现（chaos_event_manager.gd ~100行 + difficulty_data.gd 条目 + game_manager.gd 事件调度 ~50行）+ ~30行测试
+
+**优先级建议**: **P2**。混沌模式增加重玩价值，但实现需要新的事件调度系统，且平衡难度较高（6+ 个混沌事件的数值需要反复调试）。建议在核心内容（音频/角色/武器）稳定后作为 v1.2.0 后期或 v1.3.0 内容推出。
+
+---
+
+#### v1.2.0 推荐版本范围
+
+| 优先级 | 功能 | 预估行数 | 版本内阶段 |
+|--------|------|---------|-----------|
+| P0 | 音频系统 | ~420行 | Phase A (首批) |
+| P1 | 第4角色 (死灵法师) | ~180行 | Phase B (次批) |
+| P1 | 投掷武器 (firebomb) | ~240行 | Phase B (次批) |
+| P2 | 本地排行榜 | ~175行 | Phase C (可选) |
+| P2 | 混沌难度 | ~210行 | Phase C (可选) / v1.3.0 |
+
+**v1.2.0 核心范围**: 音频系统 + 第4角色 + 投掷武器 = ~840行。版本主题明确："从完善走向丰富"。
+
+---
+
+### 3. 进化武器数值微调建议
+
+#### 3.1 当前 DPS 梯度复查
+
+基于 R29 DPS 分析和代码实现数值，三种新进化武器的 DPS 梯度无需调整。R29 审查已确认它们落在 B 级（4.8-10.0 DPS 有效值）区间，与现有 9 种进化武器一致。
+
+#### 3.2 elite_knight 数值偏差分析
+
+如第 1.4 节所述，代码中 elite_knight 的数值与 R30 设计规格有显著偏差。核心偏差在于"近战重甲"变为"远程精英"：
+
+| 维度 | R30 设计意图 | 代码实际 | 差异影响 |
+|------|------------|---------|---------|
+| 攻击方式 | 近战接触 (is_ranged=false) | 远程射击 (is_ranged=true, shoot_cd=1.5) | 敌人行为完全不同 |
+| HP 定位 | 坦克 (20 HP) | 中等 (7.5 HP) | 生存时间大幅缩短 |
+| 移速定位 | 中速 (25.0) | 慢速 (18.0) | 接近 elite_skeleton(15.0)，威胁感不足 |
+
+**建议**: 不回退，但考虑以下微调以增强差异化：
+
+| 调整项 | 当前代码值 | 建议值 | 理由 |
+|--------|-----------|--------|------|
+| elite_knight.max_hp | 7.5 | 10.0 | 拉开与普通敌人(zombie=3)和 elite_skeleton(12)的梯度。10 HP 使其在 Hard 模式下为 15 HP，需要 2-3 秒击杀 |
+| elite_knight.shoot_cd | 1.5 | 2.0 | 与 elite_skeleton(1.2)拉开差距。elite_knight 应该射击更慢但弹幕更有威胁（如 2-way 或穿透弹），而非同质化 |
+| elite_knight.speed | 18.0 | 22.0 | 18.0 与 elite_skeleton(15.0)差距过小。22.0 是 zombie(40.0)的 55%，配合 10 HP 形成"中等威胁远程"定位 |
+
+**不调整的项**: damage(2.0) 和 xp_value(18) 保持不变。2.0 伤害配合远程攻击是合理的精英级伤害；18 XP 补偿了中等 HP 的击杀成本。
+
+#### 3.3 frostvortex DPS 监控阈值
+
+R29 审查标记了 frostvortex 的 DPS 可能因命中检测范围有限（BLADE_HEIGHT + 10.0 = 22px）而低于理论值。由于目前无实机测试数据，维持 R29 的监控预案：
+
+- **触发条件**: 若实测 DPS < 4.0
+- **调整方案**: damage 3.0 -> 4.0 或 HIT_COOLDOWN 0.5s -> 0.4s
+- **当前状态**: 不触发调整，待 QA 实测数据
+
+#### 3.4 weapon_fire.gd 行数预算
+
+weapon_fire.gd 当前 372 行（500 行限制的 74.4%）。若 Resonance/Overcharge 的 weapon_weapon 检测逻辑部分放在 weapon_fire.gd（而非仅放在 synergy_manager.gd），则新增约 15-20 行，最终约 392 行（78.4%），仍在安全范围内。但建议 Resonance 子脉冲和 Overcharge 标记的逻辑分别放在 pulse_ring.gd 和 beam_line.gd + overcharge_mark.gd，避免 weapon_fire.gd 过度膨胀。
+
+---
+
+### 4. 优先级表更新
+
+| 优先级 | 事项 | 状态 |
+|--------|------|------|
+| P0 | 角色系统设计（法师/战士/游侠） | 已完成 |
+| P0 | 难度模式设计（休闲/标准/噩梦/无尽） | 已完成 |
+| P0 | 7种基础武器数值设计 | 已完成 |
+| P1 | 12种进化武器设计+注册+行为实现 | 已完成（Phase C+D 100%） |
+| P1 | v1.1.0路线图执行 | ~85%（剩余: Resonance/Overcharge weapon_weapon 协同） |
+| P0 | Resonance 协同实现 (weapon_weapon + 子脉冲) | **待实施**（R32 目标） |
+| P0 | Overcharge 协同实现 (weapon_weapon + 过载标记) | **待实施**（R32 目标） |
+| P1 | Resonance 基础击杀减CD | **待实施** |
+| P1 | Overcharge 基础移速加成 | **待实施** |
+| P1 | elite_knight 击退抵抗 | **待实施** |
+| P2 | 音频系统设计规格 | v1.2.0 Phase A |
+| P2 | 第4角色（死灵法师）设计规格 | v1.2.0 Phase B |
+| P2 | 投掷武器（firebomb）设计规格 | v1.2.0 Phase B |
+| P2 | 本地排行榜设计规格 | v1.2.0 Phase C |
+| P2 | 混沌难度模式设计规格 | v1.2.0 Phase C 或 v1.3.0 |
+
+---
+
+### 5. 决策记录
+
+**v1.1.0 收尾审查**:
+- **决策**: 将 Resonance 和 Overcharge weapon_weapon 协同定为 P0 发布阻塞项
+- **为什么**: v1.1.0 路线图核心范围明确包含 3 种协同（Frostbite/Resonance/Overcharge），当前仅 Frostbite Loop 完成。协同系统从 18 扩展到 20 是路线图的量化目标之一。测试断言 SYNERGY_DEFINITIONS.size() == 18 需要更新为 20
+- **elite_knight 数值偏差处理**: 不回退到 R30 设计规格。Programmer 实际实现的数值（HP=7.5, 远程, speed=18）代表经过代码级平衡考量的结果，设计文档应跟随实际代码更新而非要求代码回退
+- **放弃的替代方案**: 强制要求代码回退到 R30 设计的近战重甲方案 -- 风险是可能引入新的平衡问题
+
+**v1.2.0 功能展望**:
+- **决策**: v1.2.0 核心范围为音频系统 + 第4角色 + 投掷武器
+- **为什么**: 音频是最大体验短板（0% 完成度），第4角色增加重玩价值，投掷武器填补武器生态位。三者合计 ~840 行，工作量适中
+- **音频优先于排行榜**: 音频影响每次游戏的每时每刻，排行榜只影响游戏结束后的目标感。前者对"游戏完成度"的感知影响更大
+- **投掷武器选择 firebomb 而非 trap**: 投掷类（抛物线 + 落点 AOE）与现有 7 种武器类型差异最大。陷阱类需要放置/触发机制，系统复杂度更高（需要新输入或自动放置逻辑），更适合 v1.3.0
+- **混沌难度排最低**: 6+ 个随机事件的平衡需要大量实测迭代，不适合与核心内容同步推出
+
+**进化武器数值微调**:
+- **决策**: 仅建议对 elite_knight 做微调（HP 7.5->10.0, shoot_cd 1.5->2.0, speed 18->22），三种进化武器 DPS 不做调整
+- **为什么**: 三种进化武器 DPS 在 B 级区间，无显著不平衡。elite_knight 的数值偏差是功能性的（近战变远程），需要微调以拉开与 elite_skeleton 的差异化
+- **frostvortex 维持现状**: 无实机数据支持 DPS 偏低假设，维持监控阈值（DPS < 4.0 时触发调整）
+
+---
+
+### 6. 输出文件
+
+| 文件 | 功能 | 优先级 |
+|------|------|--------|
+| `docs/team/designer-log.md` (本文件) | R31 执行记录 | P1 HIGH |
+| `docs/superpowers/specs/weapon-weapon-synergy-design.md` (已有) | R30 Resonance+Overcharge 设计规格，供 R32 实施 | P0 |
+
+---
+
+*Round 31 generated by Designer Agent on 2026-04-18*

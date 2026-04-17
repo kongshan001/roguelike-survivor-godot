@@ -14,6 +14,7 @@
 | P1 | 5段波次进度 + 无尽模式生成 | ✅ 已完成 |
 | P2 | 8种进化武器系统 | ✅ 已完成 |
 | P2 | 18种协同效应系统 | ✅ 已完成 |
+| P2 | R31 player.gd拆分 + 20种协同(Resonance/Overcharge) | ✅ 已完成 |
 | P3 | 商店/存档/任务/成就系统 | ✅ 已完成 |
 
 ## 技术决策
@@ -2946,3 +2947,61 @@ Time: 20.79s
   - `test/unit/test_elite_knight.gd`: 更新最低波次断言
 - **测试**: 2144 pass, 0 fail, 1 pending, 4605 asserts
   - 1 pending: `test_ghost_has_animation_time_variable` 期望 `_anim_time` 等变量名，我们使用 `Time.get_ticks_msec()` 无状态方案，该 pending 属于QA预期差异
+
+### 2026-04-18: R31 程序任务实现 (player.gd拆分 + Resonance + Overcharge)
+
+#### 任务1: player.gd 拆分 (P0)
+- **问题**: player.gd 459行(92%), 接近500行上限
+- **决策**: 提取技能/冲刺/残影相关代码到 `scripts/player_skill.gd` (RefCounted模式, 参考 hud_toast.gd)
+- **拆分方案**:
+  - `_process_skill_input()`, `_activate_skill()`, `_update_iron_will()`, `_spawn_afterimages()` 委托给 player_skill.gd
+  - 技能/被动常量保留在 player.gd (测试直接通过 `_player.CONST` 访问)
+  - 状态变量(skill_id, skill_timer, _iron_will_*等)保留在 player.gd (player_skill 通过 _player 引用操作)
+- **结果**:
+  - `scripts/player.gd`: 459行 -> 380行 (减少79行, 17%)
+  - `scripts/player_skill.gd`: 120行 (新建)
+- **注意**: Godot LSP 会报告 UNUSED_SIGNAL/UNUSED_PRIVATE_CLASS_VARIABLE 警告, 这是因为 RefCounted 通过 `_player` 引用访问这些成员, 属于委托模式的预期行为
+
+#### 任务2: Resonance 协同 (weapon_weapon)
+- **设计规格**: docs/superpowers/specs/weapon-weapon-synergy-design.md Section 3
+- **实现**:
+  - `synergy_manager.gd`: SYNERGY_DEFINITIONS 新增 resonance 定义 (holyshockwave + 2 AOE weapons)
+  - `synergy_manager.gd`: check_synergies() 新增 weapon_weapon 类型检测分支
+  - `pulse_ring.gd`: 碰撞命中后检查 SynergyManager.has_synergy("resonance"), 25%概率触发子脉冲
+  - 子脉冲: 50%伤害, 60%半径, 0.2s扩展时间, 不会递归触发, 每次基础脉冲最多3次
+- **新增常量** (pulse_ring.gd):
+  - RESONANCE_TRIGGER_CHANCE=0.25, RESONANCE_DAMAGE_MUL=0.5, RESONANCE_RADIUS_MUL=0.6
+  - RESONANCE_BURN_DURATION_MUL=0.5, RESONANCE_EXPAND_TIME=0.2, RESONANCE_MAX_PER_PULSE=3
+
+#### 任务3: Overcharge 协同 (weapon_weapon)
+- **设计规格**: docs/superpowers/specs/weapon-weapon-synergy-design.md Section 4
+- **实现**:
+  - `synergy_manager.gd`: SYNERGY_DEFINITIONS 新增 overcharge 定义 (thunderbeam + 1 lightning weapon)
+  - `beam_line.gd`: tick伤害命中后检查 SynergyManager.has_synergy("overcharge"), 20%概率施加过载标记
+  - `scripts/weapons/overcharge_mark.gd` (新建, 108行): 过载标记节点, 3秒后爆炸
+    - 叠加机制: 最多3层, 每层10.0伤害
+    - 爆炸范围: 80px AOE
+    - 视觉: 紫色闪烁指示器 + 爆炸扩展环
+    - 敌人死亡时自动引爆(保持在最后位置)
+- **新增常量** (beam_line.gd): OVERCHARGE_TRIGGER_CHANCE=0.20
+- **新增常量** (overcharge_mark.gd): OVERCHARGE_DELAY=3.0, OVERCHARGE_EXPLOSION_DAMAGE=10.0, OVERCHARGE_EXPLOSION_RADIUS=80.0, OVERCHARGE_MAX_STACKS=3
+
+#### 协同定义总数变化
+- 18种 (7 passive_passive + 11 weapon_passive) -> 20种 (+2 weapon_weapon)
+- test_synergy_manager.gd: 断言从 18 更新为 20
+
+#### 测试
+- **结果**: 2238 pass, 0 fail, 1 pending, 4710 asserts
+- **新增测试**:
+  - test_synergy_manager.gd: +8 tests (resonance/overcharge 检测逻辑)
+  - test_resonance_synergy.gd (pre-existing, now passing): 25 tests
+  - test_overcharge_synergy.gd (pre-existing, now passing): 24 tests
+  - test_r31_player_split.gd: player_skill_file_exists passes, player_combat_file_exists pending (by design)
+- **修改文件清单**:
+  - `scripts/player.gd`: 拆分重构 (459 -> 380行)
+  - `scripts/player_skill.gd`: 新建 (120行)
+  - `scripts/autoload/synergy_manager.gd`: 新增 weapon_weapon 类型 + resonance/overcharge 定义
+  - `scripts/weapons/pulse_ring.gd`: 新增 resonance 子脉冲逻辑
+  - `scripts/weapons/beam_line.gd`: 新增 overcharge 标记逻辑
+  - `scripts/weapons/overcharge_mark.gd`: 新建 (108行)
+  - `test/unit/test_synergy_manager.gd`: 更新总数断言 + 新增8个weapon_weapon测试

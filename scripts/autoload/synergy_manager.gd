@@ -4,7 +4,7 @@ extends Node
 
 var active_synergies: Dictionary = {}  # synergy_id -> Dictionary (definition)
 
-# 18 种协同配方定义
+# 20 种协同配方定义 (7 passive_passive + 11 weapon_passive + 2 weapon_weapon)
 const SYNERGY_DEFINITIONS: Array = [
 	# --- 被动+被动 (7种) ---
 	{
@@ -98,6 +98,25 @@ const SYNERGY_DEFINITIONS: Array = [
 		"weapon": "boomerang", "passive": "crit",
 		"effect": "can_crit_boomerang", "size_mul": 1.2, "pierce_bonus": 1, "desc": "回旋镖可暴击"
 	},
+	# --- 武器+武器 (2种) ---
+	{
+		"id": "resonance", "name": "共振", "type": "weapon_weapon",
+		"primary_weapon": "holyshockwave",
+		"tag_weapons": ["holywater", "bible", "frostaura", "firestaff",
+						"blizzard", "holydomain", "flamebible",
+						"thunderholywater", "sentineltotem"],
+		"tag_threshold": 2,
+		"effect": "resonance_subpulse",
+		"desc": "脉冲命中时有概率触发额外小范围脉冲"
+	},
+	{
+		"id": "overcharge", "name": "过载", "type": "weapon_weapon",
+		"primary_weapon": "thunderbeam",
+		"tag_weapons": ["lightning", "thunderholywater", "blizzard", "thunderang"],
+		"tag_threshold": 1,
+		"effect": "overcharge_mark",
+		"desc": "光束命中时施加过载标记，3秒后爆炸"
+	},
 ]
 
 
@@ -113,6 +132,13 @@ func check_synergies(owned_weapons: Dictionary, owned_passives: Dictionary) -> v
 			var has_w: bool = owned_weapons.get(def["weapon"], 0) > 0
 			var has_p: bool = owned_passives.get(def["passive"], 0) > 0
 			is_match = has_w and has_p
+		elif def["type"] == "weapon_weapon":
+			var has_primary: bool = owned_weapons.get(def["primary_weapon"], 0) > 0
+			var tag_count: int = 0
+			for tw: String in def["tag_weapons"]:
+				if owned_weapons.get(tw, 0) > 0:
+					tag_count += 1
+			is_match = has_primary and tag_count >= def["tag_threshold"]
 		if is_match:
 			active_synergies[def["id"]] = def
 

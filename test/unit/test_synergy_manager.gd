@@ -152,4 +152,46 @@ func test_crit_luckycoin_synergy():
 
 
 func test_total_synergy_definitions():
-	assert_eq(_mgr.SYNERGY_DEFINITIONS.size(), 18, "Should have 18 synergy definitions")
+	assert_eq(_mgr.SYNERGY_DEFINITIONS.size(), 20, "Should have 20 synergy definitions")
+
+
+# --- Weapon+Weapon Synergies ---
+
+func test_resonance_with_holyshockwave_and_2_aoe():
+	_check({"holyshockwave": 1, "holywater": 1, "bible": 1}, {})
+	assert_true(_mgr.has_synergy("resonance"), "Resonance should trigger with holyshockwave + 2 AOE")
+
+
+func test_resonance_no_primary():
+	_check({"holywater": 1, "bible": 1}, {})
+	assert_false(_mgr.has_synergy("resonance"), "Resonance needs holyshockwave")
+
+
+func test_resonance_only_1_aoe():
+	_check({"holyshockwave": 1, "holywater": 1}, {})
+	assert_false(_mgr.has_synergy("resonance"), "Resonance needs 2 AOE weapons")
+
+
+func test_resonance_with_evolved_aoe():
+	_check({"holyshockwave": 1, "blizzard": 1, "flamebible": 1}, {})
+	assert_true(_mgr.has_synergy("resonance"), "Resonance works with evolved AOE weapons")
+
+
+func test_overcharge_with_thunderbeam_and_lightning():
+	_check({"thunderbeam": 1, "lightning": 1}, {})
+	assert_true(_mgr.has_synergy("overcharge"), "Overcharge should trigger with thunderbeam + lightning")
+
+
+func test_overcharge_no_primary():
+	_check({"lightning": 1}, {})
+	assert_false(_mgr.has_synergy("overcharge"), "Overcharge needs thunderbeam")
+
+
+func test_overcharge_no_lightning_weapon():
+	_check({"thunderbeam": 1}, {})
+	assert_false(_mgr.has_synergy("overcharge"), "Overcharge needs a lightning weapon")
+
+
+func test_overcharge_with_evolved_lightning():
+	_check({"thunderbeam": 1, "thunderholywater": 1}, {})
+	assert_true(_mgr.has_synergy("overcharge"), "Overcharge works with evolved lightning weapons")

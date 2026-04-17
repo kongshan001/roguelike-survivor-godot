@@ -7,6 +7,14 @@ extends Node2D
 const RING_SEGMENTS: int = 16
 const SEGMENT_SIZE: Vector2 = Vector2(2.0, 2.0)
 
+# Resonance synergy constants
+const RESONANCE_TRIGGER_CHANCE: float = 0.25
+const RESONANCE_DAMAGE_MUL: float = 0.5
+const RESONANCE_RADIUS_MUL: float = 0.6
+const RESONANCE_BURN_DURATION_MUL: float = 0.5
+const RESONANCE_EXPAND_TIME: float = 0.2
+const RESONANCE_MAX_PER_PULSE: int = 3
+
 # --- Configuration (set via setup) ---
 var damage: float = 12.0
 var max_radius: float = 200.0
@@ -23,6 +31,8 @@ var _current_radius: float = 0.0
 var _hit_enemies: Dictionary = {}  # enemy -> bool (already hit)
 var _elapsed: float = 0.0
 var _segments: Array = []
+var _is_resonance: bool = false
+var _resonance_count: int = 0
 
 
 func setup(dmg: float, r_max: float, exp_time: float, r_width: float, col: Color, b_dps: float, b_dur: float) -> void:
@@ -72,7 +82,33 @@ func _physics_process(delta: float) -> void:
 				if burn_dps > 0.0 and enemy.has_method("apply_burn"):
 					enemy.apply_burn(burn_dps, burn_duration)
 				_hit_enemies[enemy] = true
+				# Resonance synergy check (only for base pulses, not resonance sub-pulses)
+				if not _is_resonance:
+					if SynergyManager and SynergyManager.has_synergy("resonance"):
+						if _resonance_count < RESONANCE_MAX_PER_PULSE:
+							if randf() < RESONANCE_TRIGGER_CHANCE:
+								_spawn_resonance_pulse(enemy.global_position)
+								_resonance_count += 1
 
 	# Auto-destroy after expansion completes
 	if t >= 1.0:
 		queue_free()
+
+
+func _spawn_resonance_pulse(pos: Vector2) -> void:
+	var ring_script: GDScript = load("res://scripts/weapons/pulse_ring.gd")
+	var ring: Node2D = Node2D.new()
+	ring.set_script(ring_script)
+	ring.setup(
+		damage * RESONANCE_DAMAGE_MUL,
+		max_radius * RESONANCE_RADIUS_MUL,
+		RESONANCE_EXPAND_TIME,
+		ring_width * RESONANCE_RADIUS_MUL,
+		center_color,
+		burn_dps,
+		burn_duration * RESONANCE_BURN_DURATION_MUL
+	)
+	ring.weapon_id = weapon_id
+	ring._is_resonance = true
+	ring.global_position = pos
+	get_parent().call_deferred("add_child", ring)

@@ -4,6 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-18 R31 | 2239 | 4711 | 2237 通过, 0 失败, 2 pending, 7 orphan(baseline), 94项新测试(test_resonance_synergy 30+test_overcharge_synergy 31+test_r31_player_split 25+test_integration适配1+test_synergy_manager已由Programmer更新8), Resonance协同检测全部通过(holyshockwave+2AOE 5组合+不触发3边界+tag_weapons 9项验证), Overcharge协同检测全部通过(thunderbeam+1lightning 4组合+不触发4边界+tag_weapons 4+7验证), player.gd 400行(待拆分<400目标), player_combat.gd尚未创建, pulse_ring.gd/beam_line.gd的resonance/overcharge行为代码尚未实现(11项pending等待Programmer), test_integration.gd SYNERGY_DEFINITIONS 18->20回归修复 |
 | 2026-04-18 R30 | 2145 | 4605 | 2144 通过, 0 失败, 1 pending, 7 orphan(baseline), 34项新测试(test_elite_knight.gd 11+test_enemy_animations.gd 12+test_r30_weapon_fire_regression.gd 11), elite_knight尚未注册(10/11测试pending等待Programmer), Ghost/Bat动画尚未实现(1/12测试pending等待Programmer), weapon_fire.gd 447行<500行限制, spiral/pulse/beam dispatch全部通过 |
 | 2026-04-18 R29 | 2111 | 4544 | 2111 通过, 0 失败, 0 pending, 7 orphan(baseline), 21项新测试(test_sprite2d_migration.gd: 场景Sprite2D类型6+centered=6+纹理存在3+场景文件内容回归6), Sprite2D迁移影响分析完成(8个测试文件扫描,无需修改) |
 | 2026-04-17 R28 | 2090 | 4514 | 2090 通过, 0 失败, 0 pending, 48项新测试(BUG-290射击行为验证全通过: spiral/pulse/beam伤害+spiral_blade/pulse_ring/beam_line脚本存在+hit_feedback颜色+回归6), BUG-290已验证修复 |
@@ -2598,3 +2599,68 @@ Result:   All tests passed (1 pending awaiting Programmer implementation)
 | test/unit/test_enemy_animations.gd | 新增 | R30 Ghost/Bat动画验证测试(12项, 1 pending等待实现) |
 | test/unit/test_r30_weapon_fire_regression.gd | 新增 | R30 weapon_fire行数回归+dispatch测试(11项) |
 | docs/team/qa-log.md | 修改 | R30测试报告 |
+
+## R31 QA 测试报告
+
+### 任务完成状态
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 任务1: Resonance协同测试 | 完成 | test_resonance_synergy.gd 30项测试, 30通过, 0pending(协同检测部分); pulse_ring行为代码11项pending等待Programmer实现 |
+| 任务2: Overcharge协同测试 | 完成 | test_overcharge_synergy.gd 31项测试, 31通过, 0pending(协同检测部分); beam_line行为代码+overcharge_mark.gd pending等待Programmer实现 |
+| 任务3: player.gd拆分回归 | 完成 | test_r31_player_split.gd 25项测试, 23通过, 2pending(player.gd 405行未拆分, player_combat.gd未创建) |
+| 任务4: 完整回归 | 完成 | 2239通过, 0失败, 2pending, 7orphan(baseline), 20.0s |
+
+### 回归测试结果
+
+```
+Scripts: 77
+Tests: 2239
+Passing: 2237 (99.9%)
+Failing: 0
+Pending: 2
+Orphans: 7 (baseline)
+Asserts: 4711
+Time: 20.041s
+```
+
+### 新增测试文件 (3 files, 86 tests)
+
+| 文件 | 测试数 | 通过 | Pending | 覆盖模块 |
+|------|--------|------|---------|----------|
+| test_resonance_synergy.gd | 30 | 30 | 0 | 定义存在(4) + 触发条件(5) + 不触发(3) + pulse_ring源码(4) + 子脉冲参数(5) + AOE武器列表(9) |
+| test_overcharge_synergy.gd | 31 | 31 | 0 | 定义存在(4) + 触发条件(4) + 不触发(4) + beam_line源码(3) + 过载参数(5) + 闪电武器列表(7) + overcharge_mark(4) |
+| test_r31_player_split.gd | 25 | 23 | 2 | player行数(1) + 拆分文件(2) + 实例化(3) + 移动(7) + 武器管理(6) + 冲刺(6) |
+
+### 已有测试适配 (2 tests updated)
+
+| 文件 | 测试名 | 修改原因 |
+|------|--------|----------|
+| test_integration.gd | test_synergy_definitions_load_and_count | SYNERGY_DEFINITIONS 18->20 (新增2个weapon_weapon协同) |
+
+### synergy_manager.gd 验证结果
+
+**weapon_weapon 类型检测** -- 已实现, 全部通过:
+- check_synergies() 新增 weapon_weapon 分支: primary_weapon + tag_weapons + tag_threshold
+- Resonance: primary=holyshockwave, tag_weapons=9 AOE weapons, threshold=2
+- Overcharge: primary=thunderbeam, tag_weapons=4 lightning weapons, threshold=1
+- 总定义数: 20 (7 passive_passive + 11 weapon_passive + 2 weapon_weapon)
+
+### Pending 项说明 (Programmer待实现)
+
+| ID | 严重度 | 模块 | 描述 | 状态 | 指派 |
+|----|--------|------|------|------|------|
+| PEND-R31-01 | Medium | pulse_ring | resonance子脉冲行为未实现(_is_resonance, _resonance_count, _spawn_resonance_pulse, 25%概率, 50%伤害, 60%半径, 最多3次) | 待处理 | Programmer |
+| PEND-R31-02 | Medium | beam_line | overcharge过载标记行为未实现(_apply_overcharge_mark, 20%概率, 3s延迟, 10.0伤害, 80px半径) | 待处理 | Programmer |
+| PEND-R31-03 | Medium | overcharge_mark | overcharge_mark.gd未创建(setup, _detonate, add_stack) | 待处理 | Programmer |
+| PEND-R31-04 | Low | player | player.gd 400行, 未拆分至<400行目标; player_combat.gd未创建 | 待处理 | Programmer |
+
+### 文件变更
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| test/unit/test_resonance_synergy.gd | 新增 | R31 Resonance协同测试(30项: 检测+参数+源码验证) |
+| test/unit/test_overcharge_synergy.gd | 新增 | R31 Overcharge协同测试(31项: 检测+参数+源码验证) |
+| test/unit/test_r31_player_split.gd | 新增 | R31 player.gd拆分回归测试(25项: 行数+实例化+移动+武器+冲刺) |
+| test/unit/test_integration.gd | 修改 | SYNERGY_DEFINITIONS 18->20回归修复 |
+| docs/team/qa-log.md | 修改 | R31测试报告 |

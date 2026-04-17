@@ -12,6 +12,9 @@ const SPARK_COLOR: Color = Color(1.0, 1.0, 1.0)
 const SPARK_SIZE: Vector2 = Vector2(2.0, 2.0)
 const CHAIN_RANGE: float = 120.0
 
+# Overcharge synergy constants
+const OVERCHARGE_TRIGGER_CHANCE: float = 0.20
+
 # --- Configuration (set via setup) ---
 var damage: float = 4.0
 var beam_range: float = 1200.0
@@ -93,6 +96,10 @@ func _apply_tick_damage() -> void:
 			if perp_dist <= beam_width:
 				enemy.take_damage(damage, weapon_id)
 				_hit_enemies.append(enemy)
+				# Overcharge synergy check
+				if SynergyManager and SynergyManager.has_synergy("overcharge"):
+					if randf() < OVERCHARGE_TRIGGER_CHANCE:
+						_apply_overcharge_mark(enemy)
 
 
 func _spawn_spark() -> void:
@@ -134,3 +141,15 @@ func _apply_chain_lightning() -> void:
 		if parent:
 			var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
 			effects.create_lightning_effect(origin_enemy.global_position, target.global_position, beam_color, parent)
+
+
+func _apply_overcharge_mark(enemy: Node2D) -> void:
+	var existing_mark: Node = enemy.get_node_or_null("OverchargeMark")
+	if existing_mark:
+		existing_mark.add_stack()
+		return
+	var mark: Node2D = Node2D.new()
+	mark.name = "OverchargeMark"
+	mark.set_script(load("res://scripts/weapons/overcharge_mark.gd"))
+	mark.setup(enemy, 3.0, 10.0, 80.0, 3)
+	enemy.add_child(mark)

@@ -1,6 +1,5 @@
 extends CharacterBody2D
 
-
 signal died
 signal skill_activated(skill_id: String)
 signal skill_cooldown_changed(current: float, max_val: float)
@@ -13,8 +12,6 @@ const LOW_HP_THRESHOLD: float = 0.3
 const LOW_HP_ARMOR_BONUS: int = 3
 const FLASH_INTERVAL: float = 0.1
 const FLASH_VISIBLE_THRESHOLD: float = 0.05
-
-# Dash constants
 const DASH_INVINCIBILITY_TIME: float = 0.15
 
 # Regen constants
@@ -30,7 +27,7 @@ const REGEN_AMOUNT_BONUS: float = 1.0
 const CRIT_DAMAGE_BONUS: float = 0.5
 const DEFAULT_PASSIVE_MAX_STACK: int = 3
 
-# Afterimage constants
+# Afterimage constants (delegated to player_skill.gd)
 const AFTERIMAGE_ALPHA: float = 0.3
 const AFTERIMAGE_DELAY: float = 0.03
 const AFTERIMAGE_FADE_DURATION: float = 0.2
@@ -47,6 +44,11 @@ const WARRIOR_PASSIVE_HP_THRESHOLD: float = SkillData.WARRIOR_PASSIVE_HP_THRESHO
 const WARRIOR_PASSIVE_DURATION: float = SkillData.WARRIOR_PASSIVE_DURATION
 const WARRIOR_PASSIVE_COOLDOWN: float = SkillData.WARRIOR_PASSIVE_COOLDOWN
 const RANGER_PASSIVE_HIT_COUNT: int = SkillData.RANGER_PASSIVE_HIT_COUNT
+
+# Character exclusive passive constants (R12 TOP3 -- canonical source: SkillData)
+const MAGE_DAMAGE_SCALE_BONUS: float = SkillData.MAGE_DAMAGE_SCALE_BONUS
+const WARRIOR_ARMOR_MASTERY_BONUS: int = SkillData.WARRIOR_ARMOR_MASTERY_BONUS
+const RANGER_CRIT_BOOST_BONUS: float = SkillData.RANGER_CRIT_BOOST_BONUS
 
 @export var move_speed: float = 160.0
 @export var max_health: float = 8.0
@@ -84,24 +86,15 @@ var skill_timer: float = 0.0
 var is_skill_ready: bool = true
 var skill_effects_node: Node = null
 
-# Character exclusive passive constants (R12 TOP3 -- canonical source: SkillData)
-const MAGE_DAMAGE_SCALE_BONUS: float = SkillData.MAGE_DAMAGE_SCALE_BONUS
-const WARRIOR_ARMOR_MASTERY_BONUS: int = SkillData.WARRIOR_ARMOR_MASTERY_BONUS
-const RANGER_CRIT_BOOST_BONUS: float = SkillData.RANGER_CRIT_BOOST_BONUS
-
-# Passive: keen_eye counter (Ranger)
+# Delegated state (iron_will managed by player_skill.gd)
 var _keen_eye_counter: int = 0
-# Passive: iron_will (Warrior)
 var _iron_will_active: bool = false
 var _iron_will_timer: float = 0.0
 var _iron_will_cooldown: float = 0.0
-
-# Burn DOT (from fire_slime burn aura)
 var _burn_dps: float = 0.0
 var _burn_timer: float = 0.0
 
-# Animation frame constants (Method C: Sprite2D + _physics_process)
-const ANIM_INTERVAL: float = 1.0 / 4.0  # 4 FPS = 0.25s per frame
+const ANIM_INTERVAL: float = 1.0 / 4.0  # 4 FPS
 
 @onready var hurtbox: Area2D = $Hurtbox
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
@@ -113,6 +106,9 @@ var _anim_time: float = 0.0
 var _anim_frame: int = 0
 var _idle_texture: Texture2D = null
 var _action_texture: Texture2D = null
+
+# Skill module (delegated from player_skill.gd)
+var _skill_module: RefCounted = null
 
 
 func _ready():
@@ -131,15 +127,15 @@ func _ready():
 	skill_effects_node.set_script(load("res://scripts/skill_effects.gd"))
 	add_child(skill_effects_node)
 
+	# Initialize skill module
+	_skill_module = load("res://scripts/player_skill.gd").new(self)
+
 	# Apply character-specific bonuses and animation textures
 	_setup_character_animation()
 
 
 func _init_skill(sid: String, cooldown: float) -> void:
-	skill_id = sid
-	skill_cooldown_max = cooldown
-	skill_timer = 0.0
-	is_skill_ready = true
+	_skill_module.init_skill(sid, cooldown)
 
 
 func _setup_character_animation() -> void:
@@ -255,7 +251,7 @@ func _physics_process(delta):
 
 	GameManager.update_combo(delta)
 
-	# Character walk animation (Method C: Sprite2D + _physics_process)
+	# Character walk animation
 	if is_moving and _idle_texture:
 		_anim_time += delta
 		if _anim_time >= ANIM_INTERVAL:
@@ -268,82 +264,26 @@ func _physics_process(delta):
 		if _idle_texture:
 			sprite.texture = _idle_texture
 
-
-# --- Skill system ---
-
+# --- Delegated to player_skill.gd ---
 func _process_skill_input(delta: float) -> void:
-	# Update skill cooldown
-	if not is_skill_ready:
-		skill_timer -= delta
-		skill_cooldown_changed.emit(skill_timer, skill_cooldown_max)
-		if skill_timer <= 0.0:
-			skill_timer = 0.0
-			is_skill_ready = true
-			skill_ready_signal.emit(skill_id)
-
-	# Check for skill activation
-	if Input.is_action_just_pressed("skill") and is_skill_ready and skill_id != "":
-		_activate_skill()
-
+	_skill_module.process_skill_input(delta)
 
 func _activate_skill() -> void:
-	is_skill_ready = false
-	skill_timer = skill_cooldown_max
-	skill_activated.emit(skill_id)
-
-	if not skill_effects_node:
-		return
-
-	match skill_id:
-		"elemental_burst":
-			skill_effects_node.elemental_burst(self, damage_bonus)
-		"shield_charge":
-			var dir: Vector2 = velocity.normalized() if velocity.length_squared() > 1.0 else Vector2.DOWN
-			skill_effects_node.shield_charge(self, dir, damage_bonus)
-		"arrow_rain":
-			skill_effects_node.arrow_rain(self, damage_bonus)
-
-
-# --- Iron Will passive (Warrior) ---
+	_skill_module._activate_skill()
 
 func _update_iron_will(delta: float) -> void:
-	if skill_id != "shield_charge":
-		return
-
-	# Decrease internal cooldown
-	if _iron_will_cooldown > 0:
-		_iron_will_cooldown -= delta
-		if _iron_will_cooldown <= 0:
-			_iron_will_cooldown = 0.0
-
-	# Decrease active duration
-	if _iron_will_active:
-		_iron_will_timer -= delta
-		if _iron_will_timer <= 0:
-			_iron_will_active = false
-			_iron_will_timer = 0.0
-			armor -= WARRIOR_PASSIVE_ARMOR_BONUS
-
-	# Check trigger condition
-	if not _iron_will_active and _iron_will_cooldown <= 0:
-		if current_health > 0 and current_health <= max_health * WARRIOR_PASSIVE_HP_THRESHOLD:
-			_iron_will_active = true
-			_iron_will_timer = WARRIOR_PASSIVE_DURATION
-			_iron_will_cooldown = WARRIOR_PASSIVE_COOLDOWN
-			armor += WARRIOR_PASSIVE_ARMOR_BONUS
-
+	_skill_module.update_iron_will(delta)
 
 # --- Combat ---
-
 func take_damage(amount: float):
 	if invincible_timer > 0 or not is_alive:
 		return
 
 	var effective_armor: int = armor
-	# armor_maxhp synergy: 护甲效果翻倍
+	# armor_maxhp synergy
 	if SynergyManager and SynergyManager.has_synergy("armor_maxhp"):
 		effective_armor *= 2
-	# armor_regen synergy: 低HP时临时+3护甲
+	# armor_regen synergy
 	if SynergyManager and SynergyManager.has_synergy("armor_regen"):
 		if current_health <= max_health * LOW_HP_THRESHOLD:
 			effective_armor += LOW_HP_ARMOR_BONUS
@@ -358,16 +298,13 @@ func take_damage(amount: float):
 	else:
 		invincible_timer = HIT_INVINCIBILITY_TIME
 
-
 func heal(amount: float):
 	current_health = minf(current_health + amount, max_health)
 	GameManager.health_changed.emit(current_health, max_health)
 
-
 func apply_burn(dps: float, duration: float) -> void:
 	_burn_dps = maxf(_burn_dps, dps)
 	_burn_timer = maxf(_burn_timer, duration)
-
 
 func die():
 	is_alive = false
@@ -380,12 +317,11 @@ func die():
 		get_tree().change_scene_to_file("res://scenes/game_over_screen.tscn")
 	)
 
-
+# --- Weapon/Passive management ---
 func add_weapon(weapon_id: String):
 	owned_weapons[weapon_id] = 1
 	if SynergyManager:
 		SynergyManager.check_synergies(owned_weapons, owned_passives)
-
 
 func upgrade_weapon(weapon_id: String) -> bool:
 	if owned_weapons.has(weapon_id) and owned_weapons[weapon_id] < 3:
@@ -393,14 +329,11 @@ func upgrade_weapon(weapon_id: String) -> bool:
 		return true
 	return false
 
-
 func get_weapon_level(weapon_id: String) -> int:
 	return owned_weapons.get(weapon_id, 0)
 
-
 func has_passive(passive_id: String) -> bool:
 	return owned_passives.get(passive_id, 0) > 0
-
 
 func apply_passive(passive_id: String):
 	if not owned_passives.has(passive_id):
@@ -432,7 +365,6 @@ func apply_passive(passive_id: String):
 			regen_amount += REGEN_AMOUNT_BONUS
 		"luckycoin":
 			crit_damage_mul += CRIT_DAMAGE_BONUS
-		# Character exclusive passives (R12 TOP3)
 		"mage_damage_scale":
 			damage_bonus += MAGE_DAMAGE_SCALE_BONUS
 		"warrior_armor_mastery":
@@ -444,16 +376,5 @@ func apply_passive(passive_id: String):
 	if SynergyManager:
 		SynergyManager.check_synergies(owned_weapons, owned_passives)
 
-
 func _spawn_afterimages() -> void:
-	for i in range(dash_afterimage_count):
-		var afterimage: Sprite2D = Sprite2D.new()
-		afterimage.texture = sprite.texture
-		afterimage.centered = true
-		afterimage.modulate = Color(_char_color.r, _char_color.g, _char_color.b, AFTERIMAGE_ALPHA)
-		afterimage.z_index = -1
-		get_parent().call_deferred("add_child", afterimage)
-		var tween: Tween = afterimage.create_tween()
-		tween.tween_interval(i * AFTERIMAGE_DELAY)
-		tween.tween_property(afterimage, "modulate:a", 0.0, AFTERIMAGE_FADE_DURATION)
-		tween.tween_callback(afterimage.queue_free)
+	_skill_module.spawn_afterimages(sprite, _char_color)
