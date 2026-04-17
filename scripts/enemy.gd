@@ -136,6 +136,14 @@ func _physics_process(delta: float):
 		if dist < enemy_data.size + 16.0:
 			_player.apply_burn(enemy_data.burn_aura_dps, enemy_data.burn_aura_duration)
 
+	# Per-enemy-id idle animations
+	var sprite: Sprite2D = $Sprite as Sprite2D
+	if sprite and is_instance_valid(sprite):
+		if enemy_data.enemy_id == "ghost":
+			sprite.position.y = sin(Time.get_ticks_msec() * 0.002) * 3.0
+		elif enemy_data.enemy_id == "bat":
+			sprite.scale.y = 1.0 + sin(Time.get_ticks_msec() * 0.01) * 0.2
+
 
 
 # --- Ghost behavior ---

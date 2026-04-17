@@ -45,7 +45,7 @@ func test_wave_def_boss_has_boss_flag():
 # --- Enemy templates ---
 
 func test_enemy_templates_count():
-	assert_eq(_spawner.ENEMY_TEMPLATES.size(), 7, "Should have 7 enemy types")
+	assert_eq(_spawner.ENEMY_TEMPLATES.size(), 8, "Should have 8 enemy types")
 
 
 func test_zombie_template():
@@ -194,7 +194,7 @@ func test_types_wave_3_darkness():
 	var types: Array = _spawner._get_available_types()
 	assert_has(types, "skeleton", "Wave 3 should have skeleton")
 	assert_has(types, "ghost", "Wave 3 should have ghost")
-	assert_eq(types.size(), 4, "Wave 3 should have 4 types")
+	assert_eq(types.size(), 5, "Wave 3 should have 5 types")
 
 
 func test_types_wave_4_elite():
@@ -202,13 +202,13 @@ func test_types_wave_4_elite():
 	var types: Array = _spawner._get_available_types()
 	assert_has(types, "elite_skeleton", "Wave 4 should have elite_skeleton")
 	assert_has(types, "splitter", "Wave 4 should have splitter")
-	assert_eq(types.size(), 7, "Wave 4 should have 7 types (including fire_slime)")
+	assert_eq(types.size(), 8, "Wave 4 should have 8 types (including fire_slime and elite_knight)")
 
 
 func test_types_wave_5_boss():
 	GameManager.current_wave = 5
 	var types: Array = _spawner._get_available_types()
-	assert_eq(types.size(), 7, "Wave 5 (boss wave) should have 7 types (including fire_slime)")
+	assert_eq(types.size(), 8, "Wave 5 (boss wave) should have 8 types (including fire_slime and elite_knight)")
 
 
 # --- Boss spawn time ---

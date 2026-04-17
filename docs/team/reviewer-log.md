@@ -11,14 +11,18 @@
 
 | 优先级 | 描述 | 状态 |
 |--------|------|------|
-| ~~P1~~ | ~~武器系统需要重构支持7种武器~~ | ✅ 已解决 |
-| ~~P1~~ | ~~敌人系统需要支持状态效果~~ | ✅ 已解决 |
-| ~~P2~~ | ~~需要协同效应管理器~~ | ✅ 已解决 |
+| ~~P1~~ | ~~武器系统需要重构支持7种武器~~ | 已解决 |
+| ~~P1~~ | ~~敌人系统需要支持状态效果~~ | 已解决 |
+| ~~P2~~ | ~~需要协同效应管理器~~ | 已解决 |
 | ~~P2~~ | ~~weapon_controller.gd 350行接近上限~~ | R28 已降至152行 |
 | ~~P1~~ | ~~3种进化武器发射逻辑未实现 (BUG-290)~~ | R29 CLOSED |
-| P2 | weapon_fire.gd 448行接近上限 (89.6%) | R29 追踪 |
-| P2 | beam_line.gd load+new 热路径 | R29 新发现 |
+| P2 | weapon_fire.gd 448行接近上限 (89.6%) | R29-R30 追踪 |
+| LOW | beam_line.gd load+new 热路径 (R29 P2, R30 降级) | R30 降级 |
 | P2 | save_manager.gd 431行 (86.2%) | 持续追踪 |
+| WARNING | player.gd 460行 (92.0%) | R30 新发现 |
+| WARNING | hud.gd 437行 (87.4%) | R30 新发现 |
+| MEDIUM | elite_knight 未在 enemy_spawner.gd 注册模板 | R30 新发现 |
+| LOW | spiral_blade.gd O(n*m) 嵌套循环 (R29 P2, R30 降级) | R30 降级 |
 
 ## 优化建议
 
@@ -9585,3 +9589,293 @@ var _spiral_instance: Node2D = null
 **待改进**:
 - 无法在 Programmer 代码交付前进行实际的射击行为代码审核
 - 新增的 3 个场景文件 (spiral_blade.gd 等) 需等待 Programmer 创建后再审核
+
+---
+
+## R30 审核报告 (2026-04-18) -- 遗留跟进 + 全局健康检查
+
+### 审核环境
+
+- 基线测试套件: **2111 tests, 0 failures** (QA R30 报告)
+- 审核范围: R29 遗留问题跟进 + weapon_fire.gd 拆分评估 + 全局健康检查 + 技术债务更新
+
+---
+
+### 任务 1: R29 遗留问题跟进
+
+#### MEDIUM-29-1: beam_line.gd _apply_chain_lightning 中 load+new 冗余
+
+**状态: 未修复 -- 持续技术债**
+
+文件 `scripts/weapons/beam_line.gd` 行 135 仍为:
+```gdscript
+var effects: RefCounted = load("res://scripts/weapons/weapon_effects.gd").new()
+effects.create_lightning_effect(origin_enemy.global_position, target.global_position, beam_color, parent)
+```
+
+问题依然存在: `create_lightning_effect` 在 `scripts/weapons/weapon_effects.gd` 中被声明为 `static func` (行 6)，无需实例化 `RefCounted` 对象。每次 beam 销毁时触发 chain，最多创建 `chain_count` 个无用 `RefCounted` 实例。
+
+**建议**: 改为直接调用 static 方法:
+```gdscript
+var effects_script: GDScript = load("res://scripts/weapons/weapon_effects.gd")
+effects_script.create_lightning_effect(origin_enemy.global_position, target.global_position, beam_color, parent)
+```
+
+或在文件顶部 preload:
+```gdscript
+const _Effects: GDScript = preload("res://scripts/weapons/weapon_effects.gd")
+```
+然后直接调用 `_Effects.create_lightning_effect(...)`.
+
+**实际影响**: 低。beam 每次生命周期约 1.0s，chain 最多 2 次，GC 压力极小。但作为代码质量问题应修复。
+
+**升级为**: 降级为 LOW -- 无性能风险，但违反 "static func 不需要实例化" 的原则。
+
+#### MEDIUM-29-2: spiral_blade.gd O(blade_count * enemy_count) 嵌套循环
+
+**状态: 维持观察 -- 当前可接受**
+
+`scripts/weapons/spiral_blade.gd` 行 69-86 的嵌套循环:
+```gdscript
+for i in range(blade_count):          # 6 iterations
+    for enemy in all_enemies:          # N enemies
+        # distance check
+```
+
+**实际评估**:
+- blade_count 固定为 6
+- 普通模式敌人数上限 70 (enemy_spawner.gd 行 124)，endless 模式上限 100 (行 122)
+- 最坏情况: 6 * 100 = 600 次 Vector2.distance_to / 帧
+- 在 60 FPS 下约 36,000 次简单距离计算/秒，对 GDScript 完全可接受
+- enemy cache 已过滤 `is_alive` (game_manager.gd 行 158-161)
+
+**空间分区评估**: 引入 grid-based 空间分区会增加代码复杂度约 100-150 行，而当前瓶颈不在此处。仅当敌人数 > 200 时才有实际收益。
+
+**建议**: 维持观察，不实施空间分区。endless 模式 cap 为 100 个敌人，性能安全。
+
+**升级为**: 降级为 LOW -- 性能安全，无需空间分区。
+
+---
+
+### 任务 2: weapon_fire.gd 拆分评估
+
+#### 当前行数: 448 行 (89.6%)
+
+**Programmer 未进行拆分**。文件仍为单体结构，包含 9 种武器类型:
+- projectile (行 57-108)
+- orbit (行 128-212)
+- lightning (行 217-252)
+- cone (行 257-296)
+- aura (行 301-349)
+- boomerang (已委托到 weapon_boomerang_fire.gd, 行 352-366)
+- spiral (行 370-393)
+- pulse (行 398-414)
+- beam (行 418-447)
+
+#### 现有拆分模式评估 (weapon_boomerang_fire.gd)
+
+boomerang 已成功拆分为独立 RefCounted 模块 (100 行)。该模式特点:
+- `extends RefCounted` + `_init(controller: Node)` 接收控制器引用
+- 通过 `_controller._get_enemies_in_range()` 委托敌人查询
+- 通过 `_controller.notify_weapon_hit()` 委托暴击检测
+- 暴露公共 `fire_boomerang()` 和 `_create_boomerang()` 方法
+- weapon_fire.gd 通过 `_get_boomerang_fire()` 懒加载委托
+
+**评估**: 拆分质量优秀。API 简洁，职责单一，委托模式清晰。
+
+#### 拆分优先级建议
+
+如需拆分 weapon_fire.gd，建议按以下顺序:
+
+| 优先级 | 提取目标 | 当前行数 | 预估拆分行数 | 理由 |
+|--------|----------|----------|-------------|------|
+| 1 | orbit 逻辑 (holywater/bible) | 84 | ~90 | 逻辑最复杂，含 orbit_fire 子系统 |
+| 2 | lightning + beam 逻辑 | 52 | ~55 | 同为链式伤害模式 |
+| 3 | cone + aura 逻辑 | 39 + 49 | ~95 | 同为 AOE 伤害模式 |
+| 4 | spiral + pulse 逻辑 | 24 + 17 | ~45 | 逻辑简单，最后拆分 |
+
+拆分后预估 weapon_fire.gd 行数: ~150-180 行 (调度 + projectile + 常量)
+
+**当前建议**: 不急于拆分。448 行仍在 500 行上限内。仅当新增武器类型时才需执行。
+
+---
+
+### 任务 3: 全局健康检查
+
+#### 3.1 文件行数审计
+
+| 文件 | 行数 | 上限占比 | R29 基线 | 变化 | 状态 |
+|------|------|----------|----------|------|------|
+| scripts/weapons/weapon_fire.gd | 448 | 89.6% | 448 | -- | WARNING |
+| scripts/autoload/save_manager.gd | 431 | 86.2% | 431 | -- | WARNING |
+| scripts/hud.gd | 437 | 87.4% | 351 | +86 | WARNING |
+| scripts/player.gd | 460 | 92.0% | 374 | +86 | WARNING |
+| scripts/enemy.gd | 360 | 72.0% | 362 | -2 | PASS |
+| scripts/autoload/game_manager.gd | 390 | 78.0% | 320 | +70 | PASS |
+| scripts/weapon_controller.gd | 152 | 30.4% | 152 | -- | PASS |
+| scripts/enemies/enemy_loot.gd | 246 | 49.2% | -- | 新审计 | PASS |
+| scripts/effects/hit_feedback.gd | 248 | 49.6% | 248 | -- | PASS |
+
+**需要关注的文件 (>= 400 行)**:
+
+1. **scripts/weapons/weapon_fire.gd: 448 行 (89.6%)** -- 已知问题，追踪中
+2. **scripts/autoload/save_manager.gd: 431 行 (86.2%)** -- 持续追踪，增长点有限
+3. **scripts/hud.gd: 437 行 (87.4%)** -- 从 R29 的 351 行增长 +86 行，需关注原因
+4. **scripts/player.gd: 460 行 (92.0%)** -- 从 R29 的 374 行增长 +86 行，接近上限
+
+**hud.gd +86 行分析**: 新增 wave display system (行 287-363, 约 76 行) 和 card hover effects (行 386-404, 约 18 行)。增长合理但已接近上限。
+
+**player.gd +86 行分析**: 新增 skill system (行 272-304, 约 32 行)、iron will passive (行 307-333, 约 26 行)、burn DOT (行 99-101, 242-254, 约 14 行)、animation (行 103-116, 258-269, 约 24 行)。功能增长合理但 92% 占比需要警惕。
+
+#### 3.2 Autoload 交叉引用审计
+
+| Autoload | 引用的 Autoload | 合规性 |
+|----------|----------------|--------|
+| SaveManager | GameManager (行 202-213) | 已知豁免 -- 桥接层 |
+| SaveManager | SynergyManager (行 249-252) | 已知豁免 -- 数据读取 |
+| SaveManager | AchievementChecker (行 228) | PASS -- 信号解耦 |
+| GameManager | (无) | PASS |
+| SynergyManager | (无) | PASS |
+| UpgradePool | (无) | PASS |
+
+**新增交叉引用**: 无。所有 autoload 保持独立。
+
+#### 3.3 测试质量抽查
+
+抽查 4 个近期测试文件:
+
+**test_evolved_weapon_firing.gd** -- 评级: PASS (优秀)
+- 使用场景实例化 (`load("res://scenes/player.tscn").instantiate()`) 而非 mock
+- 测试实际行为: spiral 实例创建/damage 正确性/位置跟踪/清理
+- 测试 beam 无敌人时不发射 (行 152-162)
+- 唯一不足: pulse ring 检测用 `has_method("setup")` 过于宽泛 (行 114-115)
+
+**test_enemy_cache.gd** -- 评级: PASS
+- 使用 preload 引用 mock (`preload("res://test/unit/mock_enemy.gd")`)
+- 测试注册/注销/stale entry 清理/reset
+- 使用 `await wait_frames(2)` 等待 queue_free 完成 (行 47-48)
+- 测试了实际行为而非内部状态
+
+**test_weapon_balance.gd** -- 评级: PASS
+- 测试 R11 武器调参的回归保护
+- 直接测试 WeaponData 数值而非运行时行为
+- 结构清晰，每个 test 覆盖一个具体数值变更
+
+**test_integration.gd** -- 评级: PASS
+- 构建完整 arena 树 (Arena + ProjectileManager + PickupManager + Player)
+- 使用场景实例化 player
+- 测试所有武器发射不崩溃 (smoke test)
+- cleanup 正确 (行 43-54)
+
+**硬编码路径检查**: 未发现不合理的硬编码路径。所有路径使用 `res://` 协议，符合 Godot 规范。
+
+---
+
+### 任务 4: 技术债务更新
+
+#### R29 遗留问题状态
+
+| 债务 | R29 严重度 | R30 状态 | R30 严重度 | 说明 |
+|------|-----------|---------|-----------|------|
+| beam_line.gd load+new 热路径 | MEDIUM | 未修复 | LOW | 实际性能影响极小，降级 |
+| spiral_blade.gd O(n*m) 嵌套循环 | MEDIUM | 维持观察 | LOW | endless cap=100 敌人，性能安全，降级 |
+
+#### elite_knight 注册债务评估
+
+**elite_knight 未在 enemy_spawner.gd 中注册**。该敌人拥有:
+- 完整的 24x24 PNG 精灵 (`assets/sprites/enemies/elite_knight.png`)
+- 完整的死亡动画逻辑 (`enemy_death_effects.gd` 行 46-47, 56, 91-92, 107, 217)
+- 完整的受伤反馈 (`enemy_death_effects.gd` 行 46-47)
+- 完整的动画测试 (`test_enemy_animation.gd` 行 97, 102, 157-159, 343-348)
+- 配色规格 (`art-log.md`, `sprite2d-migration-color-spec.md`)
+
+**但在 enemy_spawner.gd ENEMY_TEMPLATES 中没有模板**。该敌人不会被任何波次生成。
+
+**债务分级**: MEDIUM -- 所有视觉/动画/测试基础设施完整，仅缺少 1 个模板条目 (~10 行)。
+
+**建议**: Programmer 在 R30 或 R31 补注册:
+```gdscript
+"elite_knight": {
+    "enemy_id": "elite_knight", "enemy_name": "精英骑士",
+    "max_hp": 15.0, "speed": 25.0, "damage": 2.0,
+    "xp_value": 10, "color": [0.27, 0.13, 0.4], "size": 12.0,
+    "is_ranged": true, "shoot_cd": 1.5, "is_elite": true
+}
+```
+并添加到 WAVE_DEFS 的 wave_elite/wave_boss 敌人列表中 (game_manager.gd 行 43-47)。
+
+#### v1.1.0 收尾阶段代码健康评估
+
+**整体评级: PASS -- 项目健康**
+
+| 维度 | 评级 | 说明 |
+|------|------|------|
+| 文件行数合规 | WARNING | 4 个文件 >= 400 行，player.gd 92% 最接近上限 |
+| Autoload 隔离 | PASS | 无新增交叉引用 |
+| 测试覆盖 | PASS | 2111 测试全通过，抽查 4 个测试文件质量优秀 |
+| 代码重复 | LOW | "获取范围内敌人" 15 处重复未减少 |
+| 功能完整度 | PASS | 7 武器 + 8 进化 + 7 被动 + 18 协同 + 10 敌人类型(含 elite_knight 未注册) |
+| 类型注解 | PARTIAL | 部分公开函数缺少返回值注解 |
+
+---
+
+### 技术债务总表 (R30 更新)
+
+| # | 债务 | 优先级 | R29 状态 | R30 状态 | 变化 |
+|---|------|--------|---------|---------|------|
+| 1 | die() 60行未重构 | P1 | 未修复 | 未修复 | -- |
+| 7 | save_manager 元数据类型不匹配 | P2 | 未修复 | 未修复 | -- |
+| 13 | chest.gd ColorRect 未迁移 | P2 | 未修复 | 未修复 | -- |
+| 14 | release-readiness.md 过时 | Low | 未修复 | 未修复 | -- |
+| 16 | upgrade_pool.gd 每次调用 load+new | P2 | 未修复 | 未修复 | -- |
+| 18 | hud_mastery_panel 武器名映射需手动同步 | Low | 未修复 | 未修复 | -- |
+| 19 | upgrade_pool.gd 被动数据未提取 | Low | 未修复 | 未修复 | -- |
+| 20 | weapon_fire.gd 448行 (89.6%) | P2 | 追踪 | 追踪 | -- |
+| 21 | beam_line.gd load+new 热路径 | ~~P2~~ | 追踪 | 降级为 LOW | 实际影响极小 |
+| 22 | "获取范围内敌人" 15处重复代码 | Low | 追踪 | 追踪 | -- |
+| 23 | beam_line.gd _player 引用未校验 | Low | 追踪 | 追踪 | -- |
+| 24 | spiral_blade.gd O(n*m) 嵌套循环 | ~~P2~~ | 追踪 | 降级为 LOW | endless cap=100 安全 |
+| 25 | **elite_knight 未在 enemy_spawner 注册** | **MEDIUM** | -- | 新发现 | 所有基础设施完整，仅缺模板条目 |
+| 26 | **player.gd 460行 (92.0%)** | **WARNING** | -- | 新发现 | 从 374 行增长到 460 行，接近上限 |
+| 27 | **hud.gd 437行 (87.4%)** | **WARNING** | -- | 新发现 | 从 351 行增长到 437 行 |
+
+**已关闭债务**:
+- ~~#15: 3种进化武器发射逻辑~~ -- R29 CLOSED
+
+**降级债务**:
+- ~~#21: beam_line.gd load+new~~ -- P2 -> LOW (实际影响极小)
+- ~~#24: spiral_blade.gd O(n*m)~~ -- P2 -> LOW (endless cap=100 安全)
+
+---
+
+### 给各角色的建议
+
+**Programmer**:
+- [P1] player.gd 460 行 (92.0%) -- 下一个拆分目标。建议将 skill system (32 行) 和 iron will passive (26 行) 提取到 `scripts/player_passives.gd` 或 `scripts/player_skills.gd`
+- [MEDIUM] elite_knight 注册到 enemy_spawner.gd ENEMY_TEMPLATES (~10 行) + game_manager.gd WAVE_DEFS 敌人列表
+- [LOW] beam_line.gd 行 135 改为 static 调用
+- [LOW] hud.gd 437 行 -- wave display 和 card hover 系统如再增长需考虑子模块
+
+**策划**:
+- elite_knight 的数值 (HP/speed/damage/xp_value) 需要确认。建议基于 designer-log.md 的推测值: max_hp=18, speed=25, damage=2, xp_value=10
+- 无其他数值平衡性新问题
+
+**美术**:
+- elite_knight 的 24x24 精灵和配色已完整，无需额外工作
+- 进化武器仍使用金色占位符 (已知 Low 级别)
+
+**QA**:
+- 2111 测试全通过，测试质量抽查优秀
+- 建议补充 elite_knight 注册后的 spawner 回归测试
+- 建议为 player.gd 新增的 skill/iron_will/burn 系统补充单元测试
+
+---
+
+### 审核人自评: 85/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| R29 遗留跟进 | 25 | 25 | 确认 MEDIUM-29-1 未修复但实际影响低 (降级)，MEDIUM-29-2 性能安全 (降级) |
+| weapon_fire.gd 评估 | 20 | 25 | 完成 448 行审计 + 拆分优先级方案 (-5 因未实际执行拆分) |
+| 全局健康检查 | 20 | 25 | 完成 9 文件行数审计 + autoload 交叉引用 + 4 测试文件质量抽查 (-5 因未覆盖全部 50+ 脚本) |
+| 技术债务更新 | 20 | 25 | 3 项债务降级 + 3 项新发现 (elite_knight/player.gd/hud.gd) (-5 因部分旧债长期未清) |

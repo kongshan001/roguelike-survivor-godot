@@ -2913,3 +2913,36 @@ Time: 20.79s
 | 暂停精通面板 | 30 | 30 | build_pause_panel() 实现, Esc 键暂停/恢复 |
 | BUG-280 修复 | 15 | 15 | frostknife 重分配到 frostaura+boomerang, 无重复配方 |
 | 行数合规 | 10 | 15 | 所有 .gd <= 500 行; 2 个 Risky 测试未断言 (面板子节点检查) |
+
+### 2026-04-18: R30 elite_knight 注册 + Ghost/Bat 动画 + weapon_fire.gd 行数评估
+
+- **决策**: 完成三项R30程序任务，所有2111测试通过 (2144 pass, 1 pending)
+- **任务1: elite_knight 注册到 ENEMY_TEMPLATES** (P0):
+  - 精灵资源 `assets/sprites/enemies/elite_knight.png` 已存在，死亡特效 `enemy_death_effects.gd` 已有 `_play_elite_knight_death` 和 `_play_elite_knight_hit` 方法
+  - 在 `scripts/enemy_spawner.gd` 的 `ENEMY_TEMPLATES` 字典中添加 `elite_knight` 条目:
+    - HP: 7.5 (skeleton的1.5倍), 速度: 18.0 (略慢), 伤害: 2.0 (较高), XP: 18
+    - is_ranged: true, shoot_cd: 1.5, is_elite: true (三发散射弹幕)
+    - 配色: [0.35, 0.15, 0.55] 深紫色, size: 20.0
+  - 在 `scripts/autoload/game_manager.gd` 的 `WAVE_DEFS` 中将 `elite_knight` 添加到 wave 3/4/5 的 enemies 列表
+  - 更新 test_enemy_spawner.gd 的类型计数断言 (7->8 for wave 4/5, 4->5 for wave 3)
+  - 更新 test_elite_knight.gd 的最低波次断言 (index >= 3 改为 >= 2)
+- **任务2: weapon_fire.gd 行数评估**:
+  - 当前 447 行，距 500 行上限有 53 行余量
+  - spiral/pulse/beam 三个函数各约 25-40 行，结构清晰且职责分明
+  - 暂缓拆分，下次新增武器类型前需重新评估
+- **任务3: Ghost飘动 + Bat扇翅动画** (P0):
+  - 在 `scripts/enemy.gd` 的 `_physics_process` 末尾添加 per-enemy-id 动画块:
+    - Ghost: `sprite.position.y = sin(Time.get_ticks_msec() * 0.002) * 3.0` (3px上下飘动)
+    - Bat: `sprite.scale.y = 1.0 + sin(Time.get_ticks_msec() * 0.01) * 0.2` (0.8-1.2范围扇翅)
+  - 使用 `Time.get_ticks_msec()` 全局时钟而非累积器变量:
+    - 无需额外状态变量，enemy queue_free 时无清理问题
+    - 动画从出生即同步，不受帧率波动影响
+  - 安全性: `is_instance_valid(sprite)` 守卫确保死亡动画期间不会报错
+- **修改文件**:
+  - `scripts/enemy_spawner.gd`: ENEMY_TEMPLATES 新增 elite_knight
+  - `scripts/autoload/game_manager.gd`: WAVE_DEFS wave 3/4/5 添加 elite_knight
+  - `scripts/enemy.gd`: _physics_process 新增 ghost/bat 动画块
+  - `test/unit/test_enemy_spawner.gd`: 更新类型计数断言
+  - `test/unit/test_elite_knight.gd`: 更新最低波次断言
+- **测试**: 2144 pass, 0 fail, 1 pending, 4605 asserts
+  - 1 pending: `test_ghost_has_animation_time_variable` 期望 `_anim_time` 等变量名，我们使用 `Time.get_ticks_msec()` 无状态方案，该 pending 属于QA预期差异

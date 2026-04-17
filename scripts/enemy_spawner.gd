@@ -55,6 +55,12 @@ const ENEMY_TEMPLATES: Dictionary = {
 		"max_hp": 6.0, "speed": 30.0, "damage": 1.0,
 		"xp_value": 4, "color": [0.9, 0.4, 0.1], "size": 14.0,
 		"has_burn_aura": true, "burn_aura_dps": 2.0, "burn_aura_duration": 1.5
+	},
+	"elite_knight": {
+		"enemy_id": "elite_knight", "enemy_name": "精英骑士",
+		"max_hp": 7.5, "speed": 18.0, "damage": 2.0,
+		"xp_value": 18, "color": [0.35, 0.15, 0.55], "size": 20.0,
+		"is_ranged": true, "shoot_cd": 1.5, "is_elite": true
 	}
 }
 
