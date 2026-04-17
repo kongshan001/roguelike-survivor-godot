@@ -9,6 +9,11 @@ var _effects: RefCounted = null
 var _weapon_fire: RefCounted = null
 
 
+func _ready() -> void:
+	if GameManager:
+		GameManager.enemy_killed.connect(_on_enemy_killed)
+
+
 func _get_effects() -> RefCounted:
 	if not _effects:
 		_effects = load("res://scripts/weapons/weapon_effects.gd").new()
@@ -95,6 +100,14 @@ func _update_boomerangs(_delta: float):
 	for bm in _boomerang_instances:
 		if is_instance_valid(bm) and bm.has_method("update_player_pos"):
 			bm.update_player_pos(player.global_position)
+
+
+func _on_enemy_killed(_source: String) -> void:
+	## Resonance synergy: each kill reduces holyshockwave cooldown by 0.1s.
+	if SynergyManager and SynergyManager.has_synergy("resonance"):
+		var cdr: float = SynergyManager.get_cooldown_reduction("resonance")
+		if _weapon_timers.has("holyshockwave"):
+			_weapon_timers["holyshockwave"] = maxf(0.0, _weapon_timers["holyshockwave"] - cdr)
 
 
 # --- Helpers ---

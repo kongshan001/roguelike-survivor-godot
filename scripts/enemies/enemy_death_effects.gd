@@ -32,7 +32,11 @@ func play_hit_feedback(enemy: CharacterBody2D, sprite: Sprite2D) -> void:
 	# Knockback shake on sprite position (local offset)
 	# Use absolute values since PropertyTweener has no set_relative in Godot 4.x
 	var base_pos: Vector2 = sprite.position
-	var shake_dir := Vector2(SHAKE_STRENGTH if randi() % 2 == 0 else -SHAKE_STRENGTH, 0.0)
+	var shake_str: float = SHAKE_STRENGTH
+	# Elite enemies have 50% knockback resistance
+	if enemy.enemy_data and enemy.enemy_data.is_elite:
+		shake_str *= 0.5
+	var shake_dir := Vector2(shake_str if randi() % 2 == 0 else -shake_str, 0.0)
 	var shake_tween: Tween = enemy.create_tween()
 	shake_tween.tween_property(sprite, "position", base_pos + shake_dir, SHAKE_STEP_DURATION)
 	shake_tween.tween_property(sprite, "position", base_pos - shake_dir * 0.5, SHAKE_STEP_DURATION)

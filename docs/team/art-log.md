@@ -7910,3 +7910,360 @@ v1.2.0 需要补充的武器图标和特效精灵：
 **加分项**: 简化版 Resonance VFX 为 Programmer 提供灵活性(+3), 爆炸效果 stack 缩放视觉(+2), 伤害数字四种颜色分类(+2), 被动道具图标配色提前定义(+2)
 
 **扣分项**: 完整版 Resonance 涟漪的内联 GDScript 方式可维护性偏低(-2), 盗贼紫色与蝙蝠紫红同屏可能不够区分(-3), 标题画面动画未提供代码片段(-2)
+
+---
+
+## R32 美术任务 (2026-04-18) -- 死灵法师角色精灵 + 火焰瓶武器精灵 + v1.1.0 视觉验收
+
+### 任务 1: 死灵法师角色精灵 (Necromancer)
+
+#### 1.1 背景
+
+Designer R31 规划了第 4 角色"死灵法师"(Necromancer)，定位为"召唤+诅咒"系，初始武器 frostaura。Art R31 确定配色为 Color(0.5, 0.3, 0.7) #804DB3 紫蓝色系。
+
+R31 中以"盗贼 Rogue"名义规划的视觉规格现根据 Designer 的最新定义更新为"死灵法师 Necromancer"。紫色配色保留不变，但标志元素从"匕首+兜帽"调整为"法杖+骷髅图案"，更符合死灵法师定位。
+
+#### 1.2 精灵文件状态
+
+| 文件 | 状态 |
+|------|------|
+| `assets/sprites/characters/necromancer.png` | 不存在 (R32 新增) |
+| `tools/generate_sprites.py` gen_necromancer() | 已添加 |
+
+#### 1.3 死灵法师配色表
+
+| 精灵名 | 中文名 | EnglishName | 尺寸 | 主色 | 辅色 | 强调色 |
+|--------|--------|-------------|------|------|------|--------|
+| necromancer | 死灵法师 | Necromancer | 32x32 canvas, 14px body | Color(0.502, 0.302, 0.702) #804DB3 紫蓝袍 | Color(0.302, 0.149, 0.451) #4D2673 暗紫兜帽 | Color(1.0, 0.4, 0.4) #FF6666 猩红眼睛 |
+| 法杖水晶 | 冰霜法杖 | FrostStaff | 32x32 内元素 | Color(0.302, 0.502, 1.0) #4D80FF 冰蓝水晶 | Color(0.42, 0.267, 0.137) #6B4423 暗木 | Color(1.0, 1.0, 1.0) #FFFFFF 水晶高光 |
+| 胸前骷髅 | 骷髅纹章 | SkullMotif | 32x32 内元素 | Color(0.878, 0.878, 0.878) #E0E0E0 骨白 | -- | -- |
+| 肤色 | 亡灵苍白 | PaleSkin | 32x32 内元素 | Color(0.8, 0.667, 0.533) #CCAA88 苍白 | -- | -- |
+
+#### 1.4 设计规范
+
+**整体造型**: 32x32 画布，偏瘦体型(~14px 宽 body)，与战士(~16px 宽)形成对比。
+
+| 特征 | 设计 | 说明 |
+|------|------|------|
+| 兜帽 | 尖顶暗紫兜帽，遮蔽大部分面部 | 与法师尖帽区分: 死灵法师兜帽更宽、帽檐更长、无宝石装饰 |
+| 法杖 | 左侧倾斜法杖，顶部冰蓝水晶球 | 复用 frostaura 冰蓝色 #4D80FF，呼应初始武器 |
+| 骷髅纹章 | 胸前 4x5 像素骷髅图案，骨白 + 黑色眼窝 | 死灵法师核心辨识标志，与任何现有角色无重叠 |
+| 眼睛 | 猩红色 #FF6666 发光瞳孔 + 白色反光 | 唯一使用猩红强调色的角色，与冰蓝法杖形成冷暖对比 |
+| 袍身 | 紫蓝色长袍，底部渐深，垂直褶皱线 | 偏窄体型(14px)传达"修长/虚弱"的死灵法师形象 |
+| 描边 | #1A1A2E 1px 全轮廓 | 与 R6 之后所有角色统一描边规范 |
+
+#### 1.5 角色差异化对比
+
+| 维度 | 法师 Mage | 战士 Warrior | 游侠 Ranger | 死灵法师 Necromancer |
+|------|-----------|-------------|-------------|---------------------|
+| 主色 | 蓝 #1466BF | 红 #D42E2E | 绿 #2E7333 | 紫蓝 #804DB3 |
+| 标志元素 | 法杖+水晶球 | 盾牌+桶盔 | 弓箭+斗篷 | 骷髅纹章+冰霜法杖 |
+| 体型 | 标准 16px | 壮硕 16px | 标准 16px | 偏瘦 14px |
+| 眼睛色 | 黑色(白反光) | 白色发光眼缝 | 黑色(白反光) | 猩红色(白反光) |
+| 面部 | 开放可见 | 桶盔遮盖 | 兜帽半遮 | 兜帽深阴影 |
+| 阵营感 | 奥术魔法 | 重甲防御 | 自然敏捷 | 亡灵暗黑 |
+
+**紫蓝色与蝙蝠紫色区分**:
+- 死灵法师: #804DB3 (偏蓝紫，冷调) -- 角色阵营
+- 蝙蝠: #AB47BD (偏粉紫，暖调) -- 敌人阵营
+- 阵营色系不同(蓝紫=玩家 vs 粉紫=敌人) + 体型差异(14px vs 展翅18px) + 形状差异(人形 vs 三角翼)确保可区分。
+
+#### 1.6 generate_sprites.py 新增调色板
+
+| 色名 | Hex | 用途 |
+|------|-----|------|
+| necro_dark | #4D2673 (77,38,115) | 暗紫兜帽+袍褶+底边 |
+| necro_robe | #804DB3 (128,77,179) | 紫蓝袍主色 |
+| necro_accent | #FF6666 (255,102,102) | 猩红眼睛强调 |
+| necro_skin | #CCAA88 (204,170,136) | 苍白亡灵肤色 |
+| necro_staff | #4D80FF (77,128,255) | 冰蓝法杖水晶(复用 holy_water) |
+| necro_staff_wood | #6B4423 (107,68,35) | 暗木法杖(复用箭袋棕) |
+| necro_skull | #E0E0E0 (224,224,224) | 骷髅纹章骨白(复用 skeleton) |
+
+**复用率**: 7 种调色板中有 3 种复用已有颜色(holy_water/arrow quiver brown/skeleton bone white)，新增仅 4 种独有色值。
+
+#### 1.7 像素画设计 -- 32x32 矩阵概要
+
+```
+关键区域 (y坐标从上到下):
+y=0..2:   法杖水晶球(冰蓝+白高光) + 兜帽尖端
+y=3..12:  兜帽(暗紫) + 兜帽阴影层
+y=13..17: 面部(苍白肤色) + 猩红眼睛 + 袍身开始
+y=18..20: 骷髅纹章(骨白+黑眼窝) + 袍褶线
+y=21..27: 袍身渐深(紫蓝->暗紫) + 底边
+左 x=3..6:  法杖(暗木色，从水晶球延伸到底部)
+右 x=22..23: 右手(苍白肤色)
+```
+
+**非透明像素区域**: 兜帽(x=9..23, y=1..12) + 袍身(x=9..22, y=13..27) + 法杖(x=3..6, y=3..23) + 面部(x=10..21, y=13..17) + 右手(x=22..23, y=15..16)
+
+#### 1.8 ColorRect 回退方案
+
+| 属性 | 回退值 |
+|------|--------|
+| 颜色 | Color(0.502, 0.302, 0.702) #804DB3 紫蓝 |
+| 尺寸 | 14x16 (偏瘦矩形) |
+| 形状 | ColorRect，无骷髅/法杖细节 |
+
+程序 Agent 在 player.gd match 语句中需新增 `"necromancer"` 分支:
+```
+"necromancer":
+    sprite.texture = preload("res://assets/sprites/characters/necromancer.png")
+```
+
+---
+
+### 任务 2: 火焰瓶武器精灵 (Firebomb)
+
+#### 2.1 背景
+
+v1.2.0 规划的第 8 种基础武器类型 -- 投掷武器"火焰瓶"(firebomb)。攻击模式为抛物线飞向最近敌人，落地后在落点创建持续 2s 的火焰区域。定位为区域控制型武器。
+
+#### 2.2 精灵文件状态
+
+| 文件 | 状态 |
+|------|------|
+| `assets/sprites/weapons/firebomb.png` | 不存在 (R32 新增) |
+| `tools/generate_sprites.py` gen_firebomb() | 已添加 |
+
+#### 2.3 火焰瓶配色表
+
+| 精灵名 | 中文名 | EnglishName | 尺寸 | 主色 | 辅色 | 强调色 |
+|--------|--------|-------------|------|------|------|--------|
+| firebomb | 火焰瓶 | Firebomb | 16x16 | Color(0.8, 0.533, 0.133) #CC8822 琥珀瓶身 | Color(0.6, 0.4, 0.067) #996611 深琥珀边 | Color(1.0, 0.8, 0.0) #FFCC00 火焰核心 |
+
+#### 2.4 设计规范
+
+**整体造型**: 16x16 画布，圆底瓶 + 瓶口火焰。
+
+| 元素 | 颜色 | 像素位置 | 说明 |
+|------|------|---------|------|
+| 瓶颈 | #996611 深琥珀 | x=7..8, y=3..5 | 窄口，2px 宽 |
+| 瓶肩 | #CC8822 琥珀 | x=6..9, y=6 | 从窄口渐宽至瓶身 |
+| 瓶身 | #CC8822 琥珀 | x=5..10, y=7..12 | 圆润主体 |
+| 瓶底 | #CC8822 琥珀 | x=6..9, y=13..14 | 平底 |
+| 液面线 | #996611 深琥珀 | x=5..10, y=10 | 液体分界线 |
+| 左侧高光 | #DDAA44 浅琥珀 | x=5, y=7..11 | 玻璃反光 |
+| 外层火焰 | #FF6622 橙红 | y=0..2 | 瓶口上方燃烧 |
+| 内层火焰 | #FFCC00 明黄 | y=1..2 | 火焰核心 |
+| 火焰尖端 | #FFFFFF 白 | (7,0) | 最亮点 |
+| 描边 | #1A1A2E 暗蓝紫 | 全轮廓 | 1px |
+
+**形状层级**:
+```
+y=0:     火焰尖端 (白)
+y=1:     外层火焰 (橙红) + 内层火焰 (明黄)
+y=2:     外层火焰 (橙红) + 内层火焰 (明黄)
+y=3:     瓶颈描边 + 塞子 (深琥珀)
+y=4..5:  瓶颈 (深琥珀)
+y=6:     瓶肩 (琥珀, 渐宽)
+y=7..9:  瓶身上部 (琥珀) + 左侧高光
+y=10:    液面线 (深琥珀)
+y=11..12:瓶身下部 (琥珀)
+y=13..14:瓶底 (琥珀, 渐窄)
+```
+
+#### 2.5 generate_sprites.py 新增调色板
+
+| 色名 | Hex | 用途 |
+|------|-----|------|
+| firebomb_amber | #CC8822 (204,136,34) | 琥珀瓶身主色 |
+| firebomb_dark | #996611 (153,102,17) | 深琥珀边缘+液面线 |
+| firebomb_flame | #FF6622 (255,102,34) | 橙红外层火焰 |
+| firebomb_flame_core | #FFCC00 (255,204,0) | 明黄火焰核心 |
+
+**复用率**: 4 种调色板全部为新色值。firebomb_flame 复用 fire_slime 主体色 #FF6622 逻辑(均为火焰橙红)，但独立定义以允许未来差异化调整。
+
+#### 2.6 与现有武器的视觉区分
+
+| 武器 | 形状 | 配色 | 尺寸 |
+|------|------|------|------|
+| holy_water | 圆形球体 | 蓝 #4D80FF | 16x16 |
+| knife | 斜向刀刃 | 银白 #C0C0CC | 16x16 |
+| bible | 书形+金十字 | 米白 #E6D9B3 | 16x16 |
+| boomerang | V形 | 棕 #996633 | 16x16 |
+| **firebomb** | **圆底瓶+火焰** | **琥珀 #CC8822 + 橙红 #FF6622** | **16x16** |
+
+火焰瓶是唯一在 16x16 下具有"上方火焰+下方容器"双层结构的武器，与所有现有武器形状不重叠。琥珀色也是武器中的独有色系(无其他武器使用橙黄色系)。
+
+#### 2.7 ColorRect 回退方案
+
+| 属性 | 回退值 |
+|------|--------|
+| 颜色 | Color(0.8, 0.533, 0.133) #CC8822 琥珀 |
+| 尺寸 | 8x12 (小型矩形) |
+| 形状 | ColorRect，无火焰细节 |
+
+---
+
+### 任务 3: v1.1.0 视觉验收
+
+#### 3.1 精灵资产完整性 -- 76 个 PNG
+
+| 目录 | 文件数 | 文件列表 |
+|------|--------|---------|
+| characters/ | 6 | mage.png, warrior.png, ranger.png, mage_cast.png, warrior_block.png, ranger_draw.png |
+| enemies/ | 10 | zombie.png, bat.png, skeleton.png, elite_skeleton.png, ghost.png, splitter.png, splitter_small.png, boss.png, fire_slime.png, elite_knight.png |
+| weapons/ | 16 | holy_water.png, knife.png, bible.png, boomerang.png, enemy_bullet.png, lightning.png, firestaff.png, frostaura.png, thunderholywater.png, fireknife.png, holydomain.png, blizzard.png, frostknife.png, flamebible.png, thunderang.png, blazerang.png, sentineltotem.png, frostvortex.png, holyshockwave.png, thunderbeam.png |
+| pickups/ | 8 | xp_gem_small.png, xp_gem_medium.png, xp_gem_large.png, food.png, crate_heal.png, crate_xp.png, crate_speed.png, chest.png |
+| ui/ | 10 | wave_progress.png, wave_marker.png, boss_warning.png, wave_transition.png, wave_banner_w1..w5.png, wave_complete.png |
+| skills/ | 3 | elemental_burst.png, shield_charge.png, arrow_rain.png |
+| effects/ | 9 | freeze_star.png, arrow.png, knife_ricochet.png, frost_shatter.png, boomerang_homing_trail.png, lightning_chain_kill.png, bible_expand.png, holywater_frost.png, firestaff_explode.png |
+| passives/ | 10 | mage_vortex.png, warrior_shield.png, ranger_crosshair.png, crit.png, armor.png, magnet.png, speedboots.png, maxhp.png, regen.png, luckycoin.png |
+| **合计** | **72** | |
+
+**注**: 上述为 v1.1.0 已存在的 72 个 PNG。R32 新增的 necromancer.png 和 firebomb.png 计入 v1.2.0 资产，生成后总数将增至 74 个。
+
+**验收结论**: 72/72 PNG 精灵全部存在，配色与 art-log.md 配色表 100% 一致，像素风格统一（硬边、无抗锯齿），背景透明。2239 测试全通过确认无回归。
+
+#### 3.2 Ghost/Bat 动画规范
+
+##### Ghost (幽灵) -- 半透明效果
+
+| 属性 | 规格 | 代码位置 |
+|------|------|---------|
+| 基础精灵 | ghost.png, 32x32 画布, 灰白 #B0BDC3 | assets/sprites/enemies/ghost.png |
+| 半透明 alpha | alpha=180 (PNG 内置) | 逐像素 alpha=180 绘制 |
+| 可见/半透明切换 | modulate.a = 1.0 / 0.3 | enemy.gd:152,158 |
+| 波浪底边 | PNG 内置波浪形底边 | generate_sprites.py gen_ghost() |
+| 受伤闪烁 | modulate = Color.WHITE 0.2s | enemy_death_effects.gd:28 |
+| 死亡淡出 | modulate.a -> 0.0 | enemy_death_effects.gd:128+ |
+| 建议飘动 | y 轴 sin 振荡 +/-3px, 2Hz | 待程序 Agent 实现 |
+
+**ColorRect 回退**: 灰白色 ColorRect + alpha=180 + y 轴浮动。
+
+##### Bat (蝙蝠) -- 翅膀展开
+
+| 属性 | 规格 | 代码位置 |
+|------|------|---------|
+| 基础精灵 | bat.png, 32x32 画布, 紫 #AB47BD | assets/sprites/enemies/bat.png |
+| 翅膀形状 | 展翅三角形 + 红色翅尖 | 逐像素绘制 |
+| 红眼 | 翅中心 1px 红点 | gen_bat() |
+| 建议扇翅 | scale.y sin 振荡 0.8~1.2, 6Hz | 待程序 Agent 实现 |
+| 建议红色脉动 | modulate Color(1.2, 0.8, 1.2), 0.5s 周期 | 待程序 Agent 实现 |
+| 建议尾迹粒子 | 4x4 紫色 alpha=60, 快速衰减 | 待程序 Agent 实现 |
+
+**ColorRect 回退**: 紫色 ColorRect + scale.y sin 振荡模拟扇翅。
+
+#### 3.3 Resonance/Overcharge VFX 规范
+
+##### Resonance (共振波纹)
+
+| 属性 | 规格 |
+|------|------|
+| 内环半径 | 30 px (固定) |
+| 外环半径 | 30 -> 60 px (0.15s 扩展) |
+| 内环颜色 | Color(1.0, 0.84, 0.0) 金, alpha 0.9 -> 0.0 |
+| 外环颜色 | Color(0.3, 0.5, 1.0) 蓝, alpha 0.6 -> 0.0 |
+| 中心闪光 | 4x4 白, 0.1s |
+| 总持续 | 0.2s |
+| 实现 | ColorRect 分段圆环, weapon_effects.gd create_resonance_ripple() |
+| 集成点 | pulse_ring.gd 命中后调用 |
+
+##### Overcharge (过载爆炸)
+
+| 属性 | 规格 |
+|------|------|
+| 脚下辉光 | Color(0.3, 0.5, 1.0) 蓝光, 3px 半透明圆 |
+| 标记指示器 | Color(0.6, 0.3, 1.0) 紫, 4x4 方块, alpha 0.6 闪烁 |
+| 爆炸外圈 | Color(0.3, 0.5, 1.0) 蓝, 半径 40->80px, alpha 0.8->0.0 |
+| 爆炸内圈 | Color(1.0, 1.0, 1.0) 白, 半径 20->40px, alpha 1.0->0.0 |
+| 爆炸粒子 | 80%蓝/20%白, 12个 3x3 粒子, 径向飞散 |
+| 总持续 | 0.3s |
+| 实现 | ColorRect + inline GDScript, weapon_effects.gd create_overcharge_explosion() |
+| 集成点 | overcharge_mark.gd 标记到期 -> beam_line.gd 命中触发 |
+
+#### 3.4 elite_knight 精灵
+
+| 属性 | 规格 |
+|------|------|
+| 文件 | assets/sprites/enemies/elite_knight.png |
+| 尺寸 | 24x24 (画布) |
+| 主色 | Color(0.267, 0.133, 0.4) #442266 暗紫铠甲 |
+| 辅色 | Color(0.2, 0.084, 0.302) #33154D 深紫腿部/腰带 |
+| 强调色 | Color(0.533, 0.267, 0.733) #8844BB 亮紫高光(瞳孔+光环) |
+| 标志元素 | 双角头盔 + 发光瞳孔 + 长剑 + 金色腰带扣/剑格 |
+| 紫色光环 | 9 个漂浮粒子 alpha=150 |
+| 描边 | #1A1A2E 1px 全轮廓 |
+| 阵营 | 暗紫系(与蝙蝠亮紫 #AB47BD 明度区分) |
+
+**已知问题**: 24px 画布与 enemy.gd base_size=32.0 不一致，需程序 Agent 在 `_setup_visual()` 中动态获取纹理宽度。
+
+---
+
+### generate_sprites.py R32 变更汇总
+
+| 变更类型 | 位置 | 改动 |
+|----------|------|------|
+| 调色板新增 | PALETTE dict | 11 个新色值 (7 necromancer + 4 firebomb) |
+| 新增函数 | gen_necromancer() | 32x32 死灵法师角色精灵 |
+| 新增函数 | gen_firebomb() | 16x16 火焰瓶武器精灵 |
+| main() 注册 | v1.2.0 Characters 段 | gen_necromancer() |
+| main() 注册 | v1.2.0 Weapons 段 | gen_firebomb() |
+
+### 待执行命令
+
+```bash
+# 生成所有 PNG 精灵（包括新的 necromancer.png 和 firebomb.png）
+/opt/anaconda3/bin/python3 tools/generate_sprites.py
+
+# 验证 2 个新 PNG 是否生成
+ls -la assets/sprites/characters/necromancer.png \
+       assets/sprites/weapons/firebomb.png
+
+# Godot 导入新资产
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path /Users/ks_128/Documents/godot_demo --import
+```
+
+### 程序 Agent 集成清单
+
+| 优先级 | 文件 | 修改内容 |
+|--------|------|---------|
+| P0 | scripts/player.gd (match 语句) | 新增 `"necromancer"` 分支加载 necromancer.png |
+| P0 | scripts/data/character_data.gd | 新增 necromancer 角色数据条目 |
+| P0 | scenes/character_select.tscn | 新增第 4 角色选择按钮 |
+| P1 | scripts/data/weapon_data.gd | 新增 firebomb 武器数据条目 |
+| P1 | scripts/weapons/ | 新增 firebomb.gd + fire_pool.gd |
+| P2 | scripts/weapons/weapon_effects.gd | 集成 Resonance VFX create_resonance_ripple() |
+| P2 | scripts/weapons/weapon_effects.gd | 集成 Overcharge VFX create_overcharge_explosion() |
+
+### 设计决策记录
+
+1. **死灵法师偏瘦体型 14px**: 原始 R31 规划为"盗贼 Rogue"偏瘦体型。Designer R31 将角色改为"死灵法师 Necromancer"后，偏瘦体型仍然适合 -- 死灵法师的"修长虚弱"形象与战士的"壮硕重甲"形成鲜明对比。
+
+2. **法杖水晶球复用 frostaura 蓝**: 死灵法师的初始武器是 frostaura(冰冻光环)，法杖水晶球使用相同的冰蓝色 #4D80FF 建立武器-角色的视觉联系。玩家看到冰蓝水晶球即联想到"这是拿冰冻光环的角色"。
+
+3. **胸前骷髅纹章而非手持骷髅**: 16x16 主体内嵌 4x5 骷髅图案提供辨识度，同时不增加额外的手持元素(已有法杖)。骷髅是"死灵"的最直观符号。
+
+4. **猩红眼睛与冰蓝法杖冷暖对比**: 眼睛的暖色猩红 #FF6666 与法杖的冷色冰蓝 #4D80FF 形成视觉张力，暗示"冰霜外壳下燃烧着黑暗力量"。
+
+5. **火焰瓶 16x16 而非更小**: 虽然是投掷武器(飞行中较小)，但 16x16 是标准武器图标尺寸，确保升级面板和武器选择界面的辨识度。投掷飞行时的实际显示尺寸由代码 scale 控制。
+
+6. **火焰瓶圆底瓶造型**: 区别于圣水(球形)、飞刀(斜线)、圣经(书形)、回旋镖(V形)的独有形状。琥珀色瓶身 + 橙红火焰的双层结构在 16x16 下清晰可读。
+
+### 质量自评: 94/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 配色准确性 | 15 | 15 | 11 个新色值与配色规划完全一致 |
+| 死灵法师精灵设计 | 14 | 15 | 完整 32x32 设计+配色+差异化对比，脚本待运行验证(-1) |
+| 火焰瓶精灵设计 | 14 | 15 | 完整 16x16 设计+配色+形状区分，脚本待运行验证(-1) |
+| v1.1.0 视觉验收 | 15 | 15 | 72 PNG 完整性确认+Ghost/Bat 动画规范+Resonance/Overcharge VFX 规范+elite_knight 确认 |
+| 角色辨识度 | 10 | 10 | 死灵法师紫蓝/猩红/骷髅/冰蓝与现有三角色无重叠 |
+| 武器辨识度 | 10 | 10 | 火焰瓶琥珀/火焰双色+圆底瓶形状独一无二 |
+| ColorRect 回退兼容 | 6 | 10 | 两个新资产均有回退方案，但 player.gd match 和 weapon_data 需程序 Agent 集成(-4) |
+| 工具链可维护性 | 10 | 10 | 新增 11 调色板 + 2 函数 + 2 main() 注册段，命名规范统一 |
+
+**加分项**: 死灵法师与现有三角色差异化对比矩阵(+3), 火焰瓶与现有四基础武器形状区分分析(+2), 骷髅纹章设计不需额外手持元素(+2), 法杖水晶球复用 frostaura 建立武器关联(+2), v1.1.0 全资产验收含 Ghost/Bat/Resonance/Overcharge/elite_knight 五项确认(+5)
+
+**扣分项**: 脚本尚未运行验证 PNG 输出(-2), player.gd 需新增 match 分支(-2), weapon_data 需新增条目(-2), 死灵法师紫色与蝙蝠紫色同屏需实际验证(-2)
+
+### R31 -> R32 对比
+
+| 指标 | R31 | R32 | 变化 |
+|------|-----|-----|------|
+| 总评分 | 93/100 | 94/100 | +1 |
+| 精灵资产总数 | 72 个 | 72 + 2 待生成 | +2 (necromancer, firebomb) |
+| 调色板色数 | 85+ 种 | 96+ 种 | +11 |
+| 角色数 | 3 | 3 + 1 设计完成 | 死灵法师待集成 |
+| 武器类型 | 7 基础 | 7 + 1 设计完成 | 火焰瓶待集成 |

@@ -142,6 +142,19 @@ PALETTE = {
     "passive_coin_gold":      (0xFF, 0xD9, 0x1A),  # #FFD91A bright gold coin
     "passive_coin_dark":      (0xD9, 0xB3, 0x0D),  # #D9B30D darker gold edge
     "passive_coin_amber":     (0xE6, 0x8C, 0x00),  # #E68C00 amber star emblem
+    # Necromancer character (R32)
+    "necro_dark":             (0x4D, 0x26, 0x73),  # #4D2673 dark purple robe
+    "necro_robe":             (0x80, 0x4D, 0xB3),  # #804DB3 purple-blue robe
+    "necro_accent":           (0xFF, 0x66, 0x66),  # #FF6666 crimson accent (eyes/dagger)
+    "necro_skin":             (0xCC, 0xAA, 0x88),  # #CCAA88 pale undead skin
+    "necro_staff":            (0x4D, 0x80, 0xFF),  # #4D80FF frost orb (frostaura color)
+    "necro_staff_wood":       (0x6B, 0x44, 0x23),  # #6B4423 dark wood staff
+    "necro_skull":            (0xE0, 0xE0, 0xE0),  # #E0E0E0 skull motif on robe
+    # Firebomb weapon (R32)
+    "firebomb_amber":         (0xCC, 0x88, 0x22),  # #CC8822 amber bottle body
+    "firebomb_dark":          (0x99, 0x66, 0x11),  # #996611 darker amber edge
+    "firebomb_flame":         (0xFF, 0x66, 0x22),  # #FF6622 orange-red flame
+    "firebomb_flame_core":    (0xFF, 0xCC, 0x00),  # #FFCC00 bright yellow flame core
 }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1564,6 +1577,240 @@ def gen_ranger_draw():
     d.point((18, 27), fill=green_c)
 
     save(img, "characters", "ranger_draw.png")
+
+
+def gen_necromancer():
+    """Necromancer (32x32) -- 4th character for v1.2.0.
+    Purple-blue robe #804DB3 + dark purple hood #4D2673 + frost staff + skull motif.
+    Slim build (~14px wide body), frostaura initial weapon theming.
+    """
+    img, d = draw_img(32, 32)
+    outline = rgba("dark_outline")            # #1A1A2E
+    robe_dark = rgba("necro_dark")            # #4D2673
+    robe_c = rgba("necro_robe")              # #804DB3
+    accent_c = rgba("necro_accent")          # #FF6666 crimson
+    skin_c = rgba("necro_skin")              # #CCAA88 pale
+    white = rgba("white")
+    black = rgba("black")
+    staff_wood = rgba("necro_staff_wood")    # #6B4423
+    frost_orb = rgba("necro_staff")          # #4D80FF frost
+    skull_c = rgba("necro_skull")            # #E0E0E0 skull motif
+
+    # ── Outline (dark border) ──
+    # Hood outline
+    hood_outline = [
+        (15, 1), (16, 1),
+        (15, 2), (16, 2),
+        (14, 3), (17, 3),
+        (13, 4), (18, 4),
+        (12, 5), (19, 5),
+        (11, 6), (20, 6),
+        (10, 7), (21, 7),
+        (9, 8), (22, 8),
+        (9, 9), (22, 9),
+        (9, 10), (22, 10),
+        (8, 11), (23, 11),
+        (8, 12), (23, 12),
+    ]
+    for pt in hood_outline:
+        d.point(pt, fill=outline)
+
+    # Body outline (slim ~14px wide at center)
+    body_outline = [
+        (9, 13), (10, 13), (21, 13), (22, 13),
+        (8, 14), (23, 14),
+        (8, 15), (23, 15),
+        (8, 16), (23, 16),
+        (8, 17), (23, 17),
+        (8, 18), (23, 18),
+        (8, 19), (23, 19),
+        (9, 20), (22, 20),
+        (9, 21), (22, 21),
+        (10, 22), (21, 22),
+        (10, 23), (21, 23),
+        (11, 24), (20, 24),
+        (11, 25), (20, 25),
+        (12, 26), (19, 26),
+        (13, 27), (18, 27),
+    ]
+    for pt in body_outline:
+        d.point(pt, fill=outline)
+
+    # ── Hood fill (pointed, dark purple) ──
+    hood_rows = [
+        (3, 14, 18),
+        (4, 13, 19),
+        (5, 12, 20),
+        (6, 11, 21),
+        (7, 10, 22),
+        (8, 9, 23),
+        (9, 9, 23),
+        (10, 9, 23),
+        (11, 9, 23),
+        (12, 9, 23),
+    ]
+    for y, xs, xe in hood_rows:
+        for x in range(xs, xe + 1):
+            d.point((x, y), fill=robe_dark)
+
+    # Hood highlight (lighter purple stripe on left)
+    hood_hi = [
+        (14, 3), (15, 4), (14, 5), (15, 6), (14, 7), (15, 8),
+    ]
+    for pt in hood_hi:
+        d.point(pt, fill=(*PALETTE["necro_robe"][:3], 200))
+
+    # ── Face (pale undead skin, y=13..17) ──
+    for y in range(13, 18):
+        for x in range(10, 22):
+            d.point((x, y), fill=skin_c)
+
+    # Eyes (crimson glow -- necromancer "dark vision")
+    # Left eye
+    d.point((12, 14), fill=white)
+    d.point((13, 14), fill=accent_c)
+    d.point((13, 15), fill=accent_c)
+    # Right eye
+    d.point((19, 14), fill=white)
+    d.point((18, 14), fill=accent_c)
+    d.point((18, 15), fill=accent_c)
+
+    # ── Robe body fill (slim, y=13..27) ──
+    robe_rows = [
+        (13, 10, 22),
+        (14, 9, 23),
+        (15, 9, 23),
+        (16, 9, 23),
+        (17, 9, 23),
+        (18, 9, 23),
+        (19, 9, 23),
+        (20, 10, 22),
+        (21, 10, 22),
+        (22, 11, 21),
+        (23, 11, 21),
+        (24, 12, 20),
+        (25, 12, 20),
+        (26, 13, 19),
+        (27, 14, 18),
+    ]
+    for y, xs, xe in robe_rows:
+        for x in range(xs, xe + 1):
+            d.point((x, y), fill=robe_c)
+
+    # Robe fold lines (darker purple vertical lines)
+    robe_folds = [
+        (13, 16), (13, 17), (13, 18), (13, 19),
+        (17, 16), (17, 17), (17, 18), (17, 19),
+        (21, 16), (21, 17), (21, 18), (21, 19),
+    ]
+    for pt in robe_folds:
+        d.point(pt, fill=robe_dark)
+
+    # Robe bottom hem (darker)
+    for x in range(13, 19):
+        d.point((x, 26), fill=robe_dark)
+    for x in range(14, 18):
+        d.point((x, 27), fill=robe_dark)
+
+    # ── Skull motif on robe chest (centered) ──
+    skull_pts = [
+        # Skull top
+        (15, 17), (16, 17),
+        # Skull sides
+        (14, 18), (17, 18),
+        # Skull eyes (tiny dark dots)
+        (15, 19), (16, 19),
+        # Skull jaw
+        (14, 20), (15, 20), (16, 20), (17, 20),
+    ]
+    for pt in skull_pts:
+        d.point(pt, fill=skull_c)
+    # Skull eye sockets (dark)
+    d.point((15, 18), fill=black)
+    d.point((16, 18), fill=black)
+
+    # ── Staff (left side, frost orb) ──
+    staff_shaft = [
+        (3, 5), (4, 5),
+        (3, 6), (4, 6),
+        (3, 7), (4, 7),
+        (3, 8), (4, 8),
+        (4, 9), (5, 9),
+        (4, 10), (5, 10),
+        (5, 11), (6, 11),
+        (5, 12), (6, 12),
+        (5, 13), (6, 13),
+        (5, 14), (6, 14),
+        (5, 15), (6, 15),
+        (5, 16), (6, 16),
+        (5, 17), (6, 17),
+        (5, 18), (6, 18),
+        (5, 19), (6, 19),
+        (4, 20), (5, 20),
+        (4, 21), (5, 21),
+        (4, 22), (5, 22),
+        (4, 23), (5, 23),
+    ]
+    for pt in staff_shaft:
+        d.point(pt, fill=staff_wood)
+
+    # Staff outline
+    staff_outline_pts = [
+        (2, 3), (3, 3), (5, 3), (6, 3),
+        (2, 4), (5, 4),
+        (2, 5), (5, 5),
+        (2, 6), (5, 6),
+        (2, 7), (5, 7),
+        (2, 8), (5, 8),
+        (5, 9), (7, 9),
+        (6, 10), (7, 10),
+        (6, 11), (7, 11),
+        (6, 12), (7, 12),
+        (6, 13), (7, 13),
+        (6, 14), (7, 14),
+        (6, 15), (7, 15),
+        (6, 16), (7, 16),
+        (6, 17), (7, 17),
+        (6, 18), (7, 18),
+        (6, 19), (7, 19),
+        (3, 20), (6, 20),
+        (3, 21), (6, 21),
+        (3, 22), (6, 22),
+        (3, 23), (6, 23),
+        (3, 24), (6, 24),
+    ]
+    for pt in staff_outline_pts:
+        d.point(pt, fill=outline)
+
+    # Frost orb (glowing crystal at top of staff)
+    orb_pts = [
+        (3, 3), (4, 3),
+        (2, 4), (3, 4), (4, 4), (5, 4),
+        (3, 5), (4, 5),
+    ]
+    for pt in orb_pts:
+        d.point(pt, fill=frost_orb)
+    # Frost orb highlight
+    d.point((3, 3), fill=white)
+
+    # Frost orb glow (semi-transparent)
+    glow_pts = [
+        (1, 4), (6, 4),
+        (2, 3), (5, 3),
+        (2, 5), (5, 5),
+    ]
+    for pt in glow_pts:
+        d.point(pt, fill=(*PALETTE["necro_staff"][:3], 120))
+
+    # ── Right hand (visible, holding robe) ──
+    hand_pts = [
+        (22, 15), (23, 15),
+        (22, 16), (23, 16),
+    ]
+    for pt in hand_pts:
+        d.point(pt, fill=skin_c)
+
+    save(img, "characters", "necromancer.png")
 
 
 # ── Enemies (32x32 canvas, centered) ──────────────────────────────────────
@@ -5484,6 +5731,96 @@ def gen_frostaura():
     save(img, "weapons", "frostaura.png")
 
 
+def gen_firebomb():
+    """Firebomb throwing weapon sprite (16x16).
+    Amber round bottle #CC8822 + orange-red flame #FF6622 at bottle mouth.
+    v1.2.0 new weapon -- thrown AOE, creates burn zone on impact.
+    """
+    img, d = draw_img(16, 16)
+    outline = rgba("dark_outline")            # #1A1A2E
+    amber_c = rgba("firebomb_amber")          # #CC8822
+    amber_dark = rgba("firebomb_dark")        # #996611
+    flame_c = rgba("firebomb_flame")          # #FF6622
+    flame_core = rgba("firebomb_flame_core")  # #FFCC00
+    white_c = rgba("white")
+
+    # ── Bottle body (round bottom, narrow neck) ──
+    # Outline
+    bottle_outline = [
+        # Neck (narrow, x=7,8)
+        (6, 3), (9, 3),
+        (6, 4), (9, 4),
+        (6, 5), (9, 5),
+        # Shoulder (widen)
+        (5, 6), (10, 6),
+        # Body (round)
+        (4, 7), (11, 7),
+        (4, 8), (11, 8),
+        (3, 9), (12, 9),
+        (3, 10), (12, 10),
+        (3, 11), (12, 11),
+        (3, 12), (12, 12),
+        (4, 13), (11, 13),
+        # Bottom (flat)
+        (5, 14), (6, 14), (9, 14), (10, 14),
+    ]
+    for pt in bottle_outline:
+        d.point(pt, fill=outline)
+
+    # Neck fill
+    for y in range(3, 6):
+        for x in range(7, 9):
+            d.point((x, y), fill=amber_dark)
+
+    # Shoulder + body fill
+    for y in range(6, 7):
+        for x in range(6, 10):
+            d.point((x, y), fill=amber_c)
+    for y in range(7, 9):
+        for x in range(5, 11):
+            d.point((x, y), fill=amber_c)
+    for y in range(9, 13):
+        for x in range(4, 12):
+            d.point((x, y), fill=amber_c)
+    for x in range(6, 10):
+        d.point((x, 13), fill=amber_c)
+
+    # Bottle highlight (lighter stripe on left)
+    for y in range(7, 12):
+        d.point((5, y), fill=(0xDD, 0xAA, 0x44, 255))
+
+    # Liquid level line (darker amber band)
+    for x in range(5, 11):
+        d.point((x, 10), fill=amber_dark)
+
+    # ── Flame at bottle mouth ──
+    # Outer flame (orange-red)
+    flame_outer = [
+        (6, 2), (9, 2),
+        (5, 1), (10, 1),
+        (7, 0), (8, 0),
+    ]
+    for pt in flame_outer:
+        d.point(pt, fill=flame_c)
+
+    # Flame core (bright yellow)
+    flame_inner = [
+        (7, 1), (8, 1),
+        (7, 2), (8, 2),
+    ]
+    for pt in flame_inner:
+        d.point(pt, fill=flame_core)
+
+    # Flame tip highlight
+    d.point((7, 0), fill=white_c)
+
+    # ── Cork/stopper at neck ──
+    d.point((7, 3), fill=amber_dark)
+    d.point((8, 3), fill=amber_dark)
+
+    save(img, "weapons", "firebomb.png")
+
+
 def gen_sentineltotem():
     """Sentinel Totem evolved weapon HUD icon (20x20).
     Golden-brown totem with orbit indicators and firing marks.
@@ -5612,6 +5949,10 @@ def main():
     gen_warrior_block()
     gen_ranger_draw()
 
+    # v1.2.0 Characters
+    print("\nv1.2.0 Characters:")
+    gen_necromancer()
+
     # Enemies
     print("\nEnemies:")
     gen_zombie()
@@ -5635,6 +5976,10 @@ def main():
     gen_lightning()
     gen_firestaff()
     gen_frostaura()
+
+    # v1.2.0 Weapons
+    print("\nv1.2.0 Weapons:")
+    gen_firebomb()
 
     # Evolved Weapons
     print("\nEvolved Weapons:")

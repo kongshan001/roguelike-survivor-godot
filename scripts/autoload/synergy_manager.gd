@@ -153,6 +153,22 @@ func get_synergy_value(synergy_id: String, key: String, default: Variant = null)
 	return active_synergies[synergy_id].get(key, default)
 
 
+func get_cooldown_reduction(synergy_id: String) -> float:
+	## Returns cooldown reduction in seconds for the given synergy.
+	## Resonance: -0.1s per kill (caller applies on kill).
+	if synergy_id == "resonance" and active_synergies.has("resonance"):
+		return 0.1
+	return 0.0
+
+
+func get_speed_bonus(synergy_id: String) -> float:
+	## Returns additive speed multiplier bonus for the given synergy.
+	## Overcharge: +0.05 (5% move speed).
+	if synergy_id == "overcharge" and active_synergies.has("overcharge"):
+		return 0.05
+	return 0.0
+
+
 func get_active_count() -> int:
 	return active_synergies.size()
 

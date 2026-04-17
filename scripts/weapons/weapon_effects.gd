@@ -69,3 +69,37 @@ static func create_evolution_flash(parent: Node) -> void:
 	var tween := flash.create_tween()
 	tween.tween_property(flash, "color:a", 0.0, 0.3)
 	tween.tween_callback(flash.queue_free)
+
+
+static func create_resonance_ripple(parent: Node, pos: Vector2) -> void:
+	## Resonance synergy VFX: gold inner ring + blue outer ring expanding.
+	# Inner ring: gold, 30px fixed
+	var inner: ColorRect = ColorRect.new()
+	inner.size = Vector2(30, 30)
+	inner.position = pos - Vector2(15, 15)
+	inner.color = Color(1.0, 0.84, 0.0, 0.6)
+	parent.add_child(inner)
+	# Outer ring: blue, 30 -> 60px expanding
+	var outer: ColorRect = ColorRect.new()
+	outer.size = Vector2(30, 30)
+	outer.position = pos - Vector2(15, 15)
+	outer.color = Color(0.3, 0.5, 1.0, 0.4)
+	parent.add_child(outer)
+	var t: Tween = parent.create_tween()
+	t.tween_property(outer, "size", Vector2(60, 60), 0.2)
+	t.parallel().tween_property(outer, "position", pos - Vector2(30, 30), 0.2)
+	t.tween_callback(func(): inner.queue_free(); outer.queue_free())
+
+
+static func create_overcharge_explosion(parent: Node, pos: Vector2, stacks: int) -> void:
+	## Overcharge synergy VFX: expanding blue ring scaled by stack count.
+	var radius: float = 80.0
+	var ring: ColorRect = ColorRect.new()
+	ring.size = Vector2(4, 4)
+	ring.position = pos - Vector2(2, 2)
+	ring.color = Color(0.3, 0.5, 1.0, 0.5 + stacks * 0.15)
+	parent.add_child(ring)
+	var t: Tween = parent.create_tween()
+	t.tween_property(ring, "size", Vector2(radius * 2, radius * 2), 0.2)
+	t.parallel().tween_property(ring, "position", pos - Vector2(radius, radius), 0.2)
+	t.tween_callback(func(): ring.queue_free())

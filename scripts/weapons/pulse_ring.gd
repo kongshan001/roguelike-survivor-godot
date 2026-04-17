@@ -112,3 +112,5 @@ func _spawn_resonance_pulse(pos: Vector2) -> void:
 	ring._is_resonance = true
 	ring.global_position = pos
 	get_parent().call_deferred("add_child", ring)
+	# Resonance ripple VFX
+	load("res://scripts/weapons/weapon_effects.gd").create_resonance_ripple(get_parent(), pos)

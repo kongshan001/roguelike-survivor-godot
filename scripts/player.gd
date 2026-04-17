@@ -213,6 +213,11 @@ func _physics_process(delta):
 
 	var direction = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	velocity = direction * move_speed * speed_multiplier
+	# Overcharge synergy: +5% move speed
+	if SynergyManager:
+		var oc_bonus: float = SynergyManager.get_speed_bonus("overcharge")
+		if oc_bonus > 0.0:
+			velocity *= (1.0 + oc_bonus)
 	is_moving = velocity.length_squared() > 1.0
 	move_and_slide()
 

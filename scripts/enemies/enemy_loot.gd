@@ -53,6 +53,9 @@ func handle_kill_rewards(enemy_data: EnemyData, last_hit_by: String, was_crit: b
 	if SaveManager and last_hit_by != "":
 		_track_weapon_kill(last_hit_by)
 
+	# Notify kill event for synergy systems (e.g. Resonance cooldown reduction)
+	GameManager.enemy_killed.emit(last_hit_by)
+
 
 func _calculate_gold_drop(enemy_data: EnemyData, last_hit_by: String, was_crit: bool) -> int:
 	## Calculate gold drop amount with all bonuses applied.

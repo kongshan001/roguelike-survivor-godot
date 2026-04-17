@@ -16,6 +16,7 @@ signal wave_changed(wave: int)
 signal wave_started(wave: int, wave_name: String)
 signal wave_completed(wave: int)
 signal victory_achieved(gold_bonus: int)
+signal enemy_killed(source: String)
 
 # Wave state machine constants
 enum WaveState { WARMUP, ACTIVE, INTERMISSION, VICTORY }

@@ -3005,3 +3005,16 @@ Time: 20.79s
   - `scripts/weapons/beam_line.gd`: 新增 overcharge 标记逻辑
   - `scripts/weapons/overcharge_mark.gd`: 新建 (108行)
   - `test/unit/test_synergy_manager.gd`: 更新总数断言 + 新增8个weapon_weapon测试
+
+#### 测试
+- **结果**: 2274 pass, 0 fail, 3 pending, 4814 asserts
+- **修改文件清单**:
+  - `scripts/autoload/synergy_manager.gd`: 新增 get_cooldown_reduction() + get_speed_bonus() 方法
+  - `scripts/autoload/game_manager.gd`: 新增 enemy_killed signal
+  - `scripts/enemies/enemy_loot.gd`: 击杀时 emit enemy_killed
+  - `scripts/weapon_controller.gd`: _ready() 连接 enemy_killed, 新增 _on_enemy_killed() 回调 (Resonance减CD)
+  - `scripts/player.gd`: Overcharge 移速加成 +5%
+  - `scripts/enemies/enemy_death_effects.gd`: Elite 击退抵抗 (shake 50%)
+  - `scripts/weapons/weapon_effects.gd`: 新增 create_resonance_ripple() + create_overcharge_explosion() VFX
+  - `scripts/weapons/pulse_ring.gd`: Resonance 子脉冲触发 ripple VFX
+  - `scripts/weapons/overcharge_mark.gd`: 爆炸时触发 overcharge VFX

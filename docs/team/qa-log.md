@@ -4,6 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-18 R32 | 2277 | 4813 | 2272 通过, 0 失败, 5 pending, 7 orphan(baseline), 38项新测试(test_v110_acceptance 25/25+test_r32_synergy_vfx 2/4+test_r32_final_items 6/9), v1.1.0验收全部通过(12项范围逐一验证: 12进化配方+20协同定义+spiral/pulse/beam 3种类型+7基础武器5级精通+build_pause_panel+elite_knight注册+Ghost/Bat动画+6场景Sprite2D+Resonance子脉冲+Overcharge过载+player_skill.gd+player.gd 380行<400+总测试数2277>=2239), pending项: create_resonance_ripple VFX(2)+knockback_resistance(3)等待Programmer实现 |
 | 2026-04-18 R31 | 2239 | 4711 | 2237 通过, 0 失败, 2 pending, 7 orphan(baseline), 94项新测试(test_resonance_synergy 30+test_overcharge_synergy 31+test_r31_player_split 25+test_integration适配1+test_synergy_manager已由Programmer更新8), Resonance协同检测全部通过(holyshockwave+2AOE 5组合+不触发3边界+tag_weapons 9项验证), Overcharge协同检测全部通过(thunderbeam+1lightning 4组合+不触发4边界+tag_weapons 4+7验证), player.gd 400行(待拆分<400目标), player_combat.gd尚未创建, pulse_ring.gd/beam_line.gd的resonance/overcharge行为代码尚未实现(11项pending等待Programmer), test_integration.gd SYNERGY_DEFINITIONS 18->20回归修复 |
 | 2026-04-18 R30 | 2145 | 4605 | 2144 通过, 0 失败, 1 pending, 7 orphan(baseline), 34项新测试(test_elite_knight.gd 11+test_enemy_animations.gd 12+test_r30_weapon_fire_regression.gd 11), elite_knight尚未注册(10/11测试pending等待Programmer), Ghost/Bat动画尚未实现(1/12测试pending等待Programmer), weapon_fire.gd 447行<500行限制, spiral/pulse/beam dispatch全部通过 |
 | 2026-04-18 R29 | 2111 | 4544 | 2111 通过, 0 失败, 0 pending, 7 orphan(baseline), 21项新测试(test_sprite2d_migration.gd: 场景Sprite2D类型6+centered=6+纹理存在3+场景文件内容回归6), Sprite2D迁移影响分析完成(8个测试文件扫描,无需修改) |

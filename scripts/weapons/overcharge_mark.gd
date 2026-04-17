@@ -111,6 +111,8 @@ func _detonate() -> void:
 
 	# Visual: expanding purple ring
 	_spawn_explosion_visual(pos)
+	# Overcharge synergy VFX (blue ring scaled by stacks)
+	load("res://scripts/weapons/weapon_effects.gd").create_overcharge_explosion(get_parent(), pos, _stacks)
 
 	queue_free()
 
