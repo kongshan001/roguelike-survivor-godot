@@ -203,26 +203,34 @@ func test_badge_visible_at_tier_1():
 # =====================================================================
 
 func test_source_references_mastery_badge():
+	# After R25 split, mastery badge code lives in hud_mastery_panel.gd
+	# hud.gd delegates via _mastery_panel.ensure_badge()
 	var source: String = _hud.get_script().source_code
-	assert_true(source.find("_ensure_mastery_badge") != -1,
-		"HUD source should have _ensure_mastery_badge method")
-	assert_true(source.find("_mastery_badges") != -1,
-		"HUD source should have _mastery_badges dict")
+	assert_true(source.find("_ensure_mastery_badge") != -1 or source.find("ensure_badge") != -1,
+		"HUD source should reference ensure_badge (direct or delegated)")
+	assert_true(source.find("_mastery_panel") != -1,
+		"HUD source should have _mastery_panel subsystem")
 
 
 func test_source_references_pulse():
-	var source: String = _hud.get_script().source_code
+	# After R25 split, _start_badge_pulse lives in hud_mastery_panel.gd
+	var panel: RefCounted = _hud._mastery_panel
+	assert_true(panel != null, "HUD should have _mastery_panel subsystem")
+	var source: String = panel.get_script().source_code
 	assert_true(source.find("_start_badge_pulse") != -1,
-		"HUD source should have _start_badge_pulse for Tier 4")
+		"hud_mastery_panel source should have _start_badge_pulse for Tier 4")
 
 
 func test_source_references_flash():
-	var source: String = _hud.get_script().source_code
+	# After R25 split, _show_mastery_flash lives in hud_mastery_panel.gd
+	var panel: RefCounted = _hud._mastery_panel
+	assert_true(panel != null, "HUD should have _mastery_panel subsystem")
+	var source: String = panel.get_script().source_code
 	assert_true(source.find("_show_mastery_flash") != -1,
-		"HUD source should have _show_mastery_flash for Tier 3+")
+		"hud_mastery_panel source should have _show_mastery_flash for Tier 3+")
 
 
 func test_source_references_tier_up_handler():
 	var source: String = _hud.get_script().source_code
 	assert_true(source.find("_on_mastery_tier_up") != -1,
-		"HUD source should handle mastery_tier_up signal")
+		"HUD source should handle mastery_tier_up signal (delegates to panel)")

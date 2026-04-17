@@ -4,6 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-17 R25 | 1719 | 3765 | 1719 通过, 0 失败, 0 pending, 0 orphan. **Programmer R25 尚未完成**: hud_mastery_panel.gd 和 achievement_checker.gd 均不存在, 拆分未执行. 现有精通/成就测试全部通过. 待 Programmer R25 完成后补充拆分验证测试. |
 | 2026-04-17 R24 | 1719 | 3768 | 1719 通过, 0 失败, 0 pending, 0 orphan, 19项新测试(教程步骤6-8扩展), 3项已有测试适配(TUTORIAL_TOTAL_STEPS 5->8, complete_step边界更新) |
 | 2026-04-17 R21 | 1635 | 3623 | 1635 通过, 0 失败, 0 pending, 0 orphan, 115项新测试(击中反馈55+投射物拖尾44+已有测试适配7+enemy_loot.gd提取适配6+weapon_lv3修复2), enemy.gd 359行(从500行降低), 3项回归BUG修复(_handle_splitter_death参数变更, die()函数体搜索范围扩展, _spawn_food_at迁移) |
 | 2026-04-17 R20 | 1520 | 3486 | 1520 通过, 0 失败, 0 pending, 0 orphan, 122项新测试(XP曲线31+T4商店39+武器精通52), 2项已有测试适配(max_level 3->4, achievements 28->30), BUG-275 已修复 |
@@ -40,6 +41,58 @@
 | 2026-04-13 | 428 | 909 | 全部通过（weapon_registry 17项 + boomerang 17项新测试，player.gd 20处常量提取） |
 | 2026-04-14 | 428 | 910 | 全部通过（ColorRect->Sprite2D像素精灵迁移回归测试 + 视觉验证） |
 | 2026-04-15 | 467 | 1079 | 全部通过（覆盖率分析：33源文件中10个无专门测试文件） |
+
+## R25 QA 测试报告
+
+### 任务完成状态
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 任务A: 验证 Programmer R25 拆分 | **受阻** | hud_mastery_panel.gd 和 achievement_checker.gd 均不存在, Programmer R25 尚未完成 |
+| 任务B: 编写拆分后测试 | **受阻** | 依赖 Programmer R25 先创建目标文件, 无法编写针对不存在代码的测试 |
+| 任务C: 更新现有测试 | 不需要 | hud.gd 和 save_manager.gd 未被修改, 现有测试仍然全部通过 |
+| 任务D: 回归测试 | 完成 | 1719 通过, 0 失败, 3765 断言, 17.2s |
+
+### 回归测试结果
+
+```
+Scripts: 60
+Tests: 1719
+Passing: 1719 (100%)
+Failing: 0
+Pending: 0
+Orphan: 0
+Asserts: 3765
+Time: 17.244s
+```
+
+### 待 Programmer R25 完成后的验证清单
+
+**hud_mastery_panel.gd 需要验证的 API 契约** (从 hud.gd 第 401-441 行提取):
+- 常量: MASTERY_TIER_COLORS (5色), MASTERY_TIER_BORDERS (5色), MASTERY_TIER_NAMES (5名), MASTERY_BADGE_SIZE=6.0, MASTERY_FILL_SIZE=4.0, MASTERY_FILL_OFFSET=1.0
+- 变量: _mastery_badges (Dictionary), _mastery_flash (ColorRect)
+- 方法: _ensure_mastery_badge(weapon_id, slot), _on_mastery_tier_up(weapon_id, new_tier), _show_mastery_flash(flash_color), _start_badge_pulse(badge), _get_weapon_display_name(weapon_id)
+
+**achievement_checker.gd 需要验证的 API 契约** (从 save_manager.gd 第 199-308 行提取):
+- 方法: check_quests_and_achievements(), _check_quest(quest_id, condition), _check_achievement(achievement_id, condition), _check_shop_achievements(), check_mastery_achievements()
+- 信号连接: quest_completed, achievement_unlocked, mastery_tier_up
+
+### 现有精通测试验证 (全部通过)
+
+| 测试文件 | 测试数 | 状态 |
+|----------|--------|------|
+| test_mastery_badge.gd | 17 | 17 通过 |
+| test_mastery_toast.gd | 18 | 18 通过 |
+
+### 结论
+
+Programmer R25 的代码拆分任务 (hud_mastery_panel.gd / achievement_checker.gd) 尚未执行。当前代码库处于 R24 状态, 所有 1719 项测试通过。QA 将在 Programmer R25 完成拆分后:
+1. 读取新建文件确认 API
+2. 编写针对拆分后模块的测试
+3. 更新现有测试以适配新接口
+4. 执行完整回归测试
+
+---
 
 ## R20 QA 测试报告
 

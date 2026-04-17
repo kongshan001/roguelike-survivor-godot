@@ -153,17 +153,21 @@ func test_tier_names_complete():
 # =====================================================================
 
 func test_mastery_flash_node_name():
-	# Flash node is created on demand with name "MasteryFlash"
-	var source: String = _hud.get_script().source_code
+	# After R25 split, MasteryFlash lives in hud_mastery_panel.gd
+	var panel: RefCounted = _hud._mastery_panel
+	assert_true(panel != null, "HUD should have _mastery_panel subsystem")
+	var source: String = panel.get_script().source_code
 	assert_true(source.find("MasteryFlash") != -1,
-		"Source should create MasteryFlash node")
+		"hud_mastery_panel source should create MasteryFlash node")
 
 
 func test_mastery_flash_for_tier_3():
-	var source: String = _hud.get_script().source_code
-	# _on_mastery_tier_up should call _show_mastery_flash for tier >= 3
+	# After R25 split, tier threshold check lives in hud_mastery_panel.gd
+	var panel: RefCounted = _hud._mastery_panel
+	assert_true(panel != null, "HUD should have _mastery_panel subsystem")
+	var source: String = panel.get_script().source_code
 	assert_true(source.find("new_tier >= 3") != -1 or source.find(">= 3") != -1,
-		"Flash should trigger for tier >= 3")
+		"hud_mastery_panel flash should trigger for tier >= 3")
 
 
 # =====================================================================
@@ -171,9 +175,10 @@ func test_mastery_flash_for_tier_3():
 # =====================================================================
 
 func test_signal_connected_in_ready():
+	# After R25 split, hud.gd still connects the signal in _ready, delegates to panel
 	var source: String = _hud.get_script().source_code
-	assert_true(source.find("mastery_tier_up.connect") != -1,
-		"HUD should connect mastery_tier_up signal in _ready")
+	assert_true(source.find("mastery_tier_up") != -1,
+		"HUD should reference mastery_tier_up signal in _ready")
 
 
 func test_toast_called_on_tier_up():

@@ -17,30 +17,9 @@ const CARD_HOVER_GLOW: Color = Color(1.1, 1.05, 0.95)
 # --- Subsystems ---
 var _toast: RefCounted = null
 var _skill_btn: RefCounted = null
+var _mastery_panel: RefCounted = null
 var _run_quests: Array[String] = []
 var _run_achievements: Array[String] = []
-
-# --- Mastery Badge ---
-var _mastery_badges: Dictionary = {}  # weapon_id -> {border: ColorRect, fill: ColorRect}
-var _mastery_flash: ColorRect = null
-const MASTERY_BADGE_SIZE: float = 6.0
-const MASTERY_FILL_SIZE: float = 4.0
-const MASTERY_FILL_OFFSET: float = 1.0
-const MASTERY_TIER_COLORS: Array[Color] = [
-	Color.TRANSPARENT,  # Tier 0: hidden
-	Color(0.80, 0.55, 0.35),  # Tier 1: Bronze
-	Color(0.78, 0.78, 0.82),  # Tier 2: Silver
-	Color(0.95, 0.82, 0.30),  # Tier 3: Gold
-	Color(1.0, 0.85, 0.30),   # Tier 4: Diamond
-]
-const MASTERY_TIER_BORDERS: Array[Color] = [
-	Color.TRANSPARENT,
-	Color(0.50, 0.35, 0.20),  # Deep bronze
-	Color(0.50, 0.50, 0.55),  # Deep silver
-	Color(0.65, 0.55, 0.15),  # Deep gold
-	Color(0.75, 0.60, 0.10),  # Deep diamond
-]
-const MASTERY_TIER_NAMES: Array[String] = ["Novice", "Apprentice", "Adept", "Expert", "Master"]
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -88,6 +67,8 @@ func _ready():
 
 	_toast = load("res://scripts/hud_toast.gd").new(self)
 	_toast.setup_container()
+
+	_mastery_panel = load("res://scripts/hud_mastery_panel.gd").new(self, _toast)
 
 	if GameManager.selected_difficulty == "endless":
 		_setup_retreat_button()
@@ -398,65 +379,34 @@ func _reset_card_state(card: Control) -> void:
 	card.scale = Vector2.ONE
 	card.modulate = Color.WHITE
 
-# --- Mastery Badge & Toast ---
+# --- Mastery pass-through constants (for test backward compatibility) ---
+# These delegate to hud_mastery_panel.gd so existing tests still pass.
+var MASTERY_TIER_COLORS: Array[Color]:
+	get: return _mastery_panel.MASTERY_TIER_COLORS if _mastery_panel else []
+var MASTERY_TIER_BORDERS: Array[Color]:
+	get: return _mastery_panel.MASTERY_TIER_BORDERS if _mastery_panel else []
+var MASTERY_TIER_NAMES: Array[String]:
+	get: return _mastery_panel.MASTERY_TIER_NAMES if _mastery_panel else []
+var MASTERY_BADGE_SIZE: float:
+	get: return _mastery_panel.MASTERY_BADGE_SIZE if _mastery_panel else 0.0
+var _mastery_badges: Dictionary:
+	get: return _mastery_panel._mastery_badges if _mastery_panel else {}
+
+# --- Mastery (delegates to hud_mastery_panel.gd) ---
 
 func _get_weapon_display_name(weapon_id: String) -> String:
-	var names: Dictionary = {
-		"knife": "Knife", "holywater": "Holy Water", "lightning": "Lightning",
-		"bible": "Bible", "firestaff": "Fire Staff", "frostaura": "Frost Aura",
-		"boomerang": "Boomerang",
-	}
-	return names.get(weapon_id, weapon_id)
+	if _mastery_panel:
+		return _mastery_panel.get_weapon_display_name(weapon_id)
+	return weapon_id
 
 func _on_mastery_tier_up(weapon_id: String, new_tier: int) -> void:
-	var weapon_name: String = _get_weapon_display_name(weapon_id)
-	var tier_color: Color = MASTERY_TIER_COLORS[new_tier]
-	var text: String = "%s Mastery: %s" % [weapon_name, MASTERY_TIER_NAMES[new_tier]]
-	if new_tier == 4:
-		text += " +8% DMG"
-	_toast.show_toast(text, tier_color)
-	if new_tier >= 3:
-		_show_mastery_flash(tier_color)
+	if _mastery_panel:
+		_mastery_panel.on_tier_up(weapon_id, new_tier)
 
 func _show_mastery_flash(flash_color: Color) -> void:
-	if _mastery_flash == null:
-		_mastery_flash = ColorRect.new()
-		_mastery_flash.name = "MasteryFlash"
-		_mastery_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
-		_mastery_flash.color = Color(flash_color.r, flash_color.g, flash_color.b, 0.15)
-		add_child(_mastery_flash)
-	_mastery_flash.color = Color(flash_color.r, flash_color.g, flash_color.b, 0.15)
-	_mastery_flash.visible = true
-	var tween: Tween = create_tween()
-	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	tween.tween_property(_mastery_flash, "color:a", 0.0, 0.4)
-	tween.tween_callback(func() -> void:
-		if is_instance_valid(_mastery_flash):
-			_mastery_flash.visible = false
-	)
+	if _mastery_panel:
+		_mastery_panel._show_mastery_flash(flash_color)
 
 func _ensure_mastery_badge(weapon_id: String, slot: Control) -> void:
-	if _mastery_badges.has(weapon_id):
-		return
-	var tier: int = SaveManager.get_weapon_mastery_tier(weapon_id) if SaveManager else 0
-	var border: ColorRect = ColorRect.new()
-	border.name = "MasteryBadge"
-	border.size = Vector2(MASTERY_BADGE_SIZE, MASTERY_BADGE_SIZE)
-	border.position = slot.size - Vector2(MASTERY_BADGE_SIZE + 1.0, MASTERY_BADGE_SIZE + 1.0)
-	border.color = MASTERY_TIER_BORDERS[tier]
-	border.visible = tier > 0
-	var fill: ColorRect = ColorRect.new()
-	fill.size = Vector2(MASTERY_FILL_SIZE, MASTERY_FILL_SIZE)
-	fill.position = Vector2(MASTERY_FILL_OFFSET, MASTERY_FILL_OFFSET)
-	fill.color = MASTERY_TIER_COLORS[tier]
-	border.add_child(fill)
-	if tier == 4:
-		_start_badge_pulse(border)
-	slot.add_child(border)
-	_mastery_badges[weapon_id] = {"border": border, "fill": fill}
-
-func _start_badge_pulse(badge: ColorRect) -> void:
-	var pulse: Tween = create_tween().set_loops()
-	pulse.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	pulse.tween_property(badge, "modulate:a", 0.70, 0.75).set_ease(Tween.EASE_IN_OUT)
-	pulse.tween_property(badge, "modulate:a", 1.00, 0.75).set_ease(Tween.EASE_IN_OUT)
+	if _mastery_panel:
+		_mastery_panel.ensure_badge(weapon_id, slot)

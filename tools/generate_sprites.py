@@ -124,6 +124,24 @@ PALETTE = {
     "totem_gold":       (0xB3, 0x99, 0x33),  # #B39933 golden-brown totem body
     "totem_dark":       (0x8B, 0x73, 0x22),  # #8B7322 darker golden-brown detail
     "totem_proj":       (0xE6, 0xD9, 0x80),  # #E6D980 golden projectile
+    # Shared passive icons (R25)
+    "passive_crit_gold":      (0xFF, 0xCC, 0x33),  # #FFCC33 warm gold ring
+    "passive_crit_dark":      (0xD9, 0xA6, 0x1A),  # #D9A61A darker gold ring
+    "passive_armor_steel":    (0x99, 0x9A, 0xA6),  # #999AA6 steel silver
+    "passive_armor_dark":     (0x73, 0x73, 0x80),  # #737380 darker steel
+    "passive_magnet_red":     (0xE6, 0x40, 0x40),  # #E64040 red pole
+    "passive_magnet_blue":    (0x4D, 0x4D, 0xE6),  # #4D4DE6 blue pole
+    "passive_magnet_body":    (0xB3, 0xB3, 0xBF),  # #B3B3BF silver magnet body
+    "passive_boots_sky":      (0x4D, 0xB3, 0xFF),  # #4DB3FF sky blue
+    "passive_boots_dark":     (0x33, 0x80, 0xCC),  # #3380CC darker blue
+    "passive_hp_crimson":     (0xD9, 0x26, 0x59),  # #D92659 crimson crystal
+    "passive_hp_dark":        (0xA6, 0x1A, 0x40),  # #A61A40 dark crimson
+    "passive_hp_pink":        (0xFF, 0x99, 0xBF),  # #FF99BF pink highlight
+    "passive_regen_green":    (0x33, 0xD9, 0x66),  # #33D966 emerald green
+    "passive_regen_dark":     (0x26, 0xA6, 0x4D),  # #26A64D darker green
+    "passive_coin_gold":      (0xFF, 0xD9, 0x1A),  # #FFD91A bright gold coin
+    "passive_coin_dark":      (0xD9, 0xB3, 0x0D),  # #D9B30D darker gold edge
+    "passive_coin_amber":     (0xE6, 0x8C, 0x00),  # #E68C00 amber star emblem
 }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -4004,6 +4022,413 @@ def gen_passive_ranger_crosshair():
     save(img, "passives", "ranger_crosshair.png")
 
 
+def gen_passive_crit():
+    """Passive icon: Crit Ring (16x16, warm gold).
+    Gold ring with 4-pointed star burst at top-right.
+    Primary #FFCC33, Secondary #D9A61A, Accent white star.
+    """
+    img, d = draw_img(16, 16)
+    gold_c = rgba("passive_crit_gold")       # #FFCC33 warm gold
+    gold_dark = rgba("passive_crit_dark")     # #D9A61A darker gold
+    white = rgba("white")
+    gold_lt = (0xFF, 0xE6, 0x80, 255)        # #FFE680 highlight
+
+    # Ring shadow (outer edge, radius 6)
+    _draw_outline_circle(d, 8, 8, 6, gold_dark)
+
+    # Ring body (radius 5 fill)
+    _fill_circle(d, 8, 8, 5, gold_c)
+
+    # Hollow center (radius 3, transparent to create ring)
+    for dy in range(-3, 4):
+        dx_max = int((9 - dy * dy) ** 0.5)
+        for dx in range(-dx_max, dx_max + 1):
+            d.point((8 + dx, 8 + dy), fill=(0, 0, 0, 0))
+
+    # Re-draw inner ring edge (dark border of the hole)
+    _draw_outline_circle(d, 8, 8, 3, gold_dark)
+
+    # Ring highlight (top-left arc)
+    d.point((5, 3), fill=gold_lt)
+    d.point((4, 4), fill=gold_lt)
+    d.point((3, 5), fill=gold_lt)
+
+    # Star burst at top-right (4-pointed star at pixel 12,3)
+    # Horizontal arms
+    d.point((10, 3), fill=white)
+    d.point((11, 3), fill=white)
+    d.point((12, 3), fill=white)
+    d.point((13, 3), fill=white)
+    d.point((14, 3), fill=white)
+    # Vertical arms
+    d.point((12, 1), fill=white)
+    d.point((12, 2), fill=white)
+    d.point((12, 4), fill=white)
+    d.point((12, 5), fill=white)
+    # Diagonal accents (small)
+    d.point((11, 2), fill=white)
+    d.point((13, 2), fill=white)
+    d.point((11, 4), fill=white)
+    d.point((13, 4), fill=white)
+
+    save(img, "passives", "crit.png")
+
+
+def gen_passive_armor():
+    """Passive icon: Armor shield (16x16, steel silver).
+    Heater shield shape with gold rivets and crossbar.
+    Primary #999AA6, Secondary #737380, Accent #FFD700 gold rivets.
+    """
+    img, d = draw_img(16, 16)
+    steel_c = rgba("passive_armor_steel")     # #999AA6 steel silver
+    steel_dark = rgba("passive_armor_dark")   # #737380 darker steel
+    gold_c = rgba("gold")                     # #FFD700 gold rivets
+
+    # Shield outline (heater shield: flat top, pointed bottom)
+    shield_outline = [
+        # Top edge
+        (3, 2), (4, 2), (5, 2), (6, 2), (7, 2), (8, 2), (9, 2), (10, 2), (11, 2), (12, 2),
+        # Left side
+        (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9),
+        # Left taper
+        (3, 10), (3, 11), (4, 12), (5, 13),
+        # Bottom point
+        (7, 14), (8, 14),
+        # Right taper
+        (10, 13), (11, 12), (12, 11), (13, 10),
+        # Right side
+        (13, 9), (13, 8), (13, 7), (13, 6), (13, 5), (13, 4), (13, 3),
+    ]
+    for pt in shield_outline:
+        d.point(pt, fill=steel_dark)
+
+    # Shield body fill (steel silver)
+    shield_rows = {
+        3: (3, 12), 4: (3, 12), 5: (3, 12), 6: (3, 12), 7: (3, 12),
+        8: (3, 12), 9: (3, 12),
+        10: (3, 12), 11: (4, 11), 12: (5, 10), 13: (6, 9),
+    }
+    for y, (x0, x1) in shield_rows.items():
+        for x in range(x0, x1 + 1):
+            d.point((x, y), fill=steel_c)
+
+    # Crossbar (horizontal dark line)
+    for x in range(4, 12):
+        d.point((x, 9), fill=steel_dark)
+        d.point((x, 10), fill=steel_dark)
+
+    # Gold rivets (two 2px dots near top)
+    d.point((5, 5), fill=gold_c)
+    d.point((5, 6), fill=gold_c)
+    d.point((10, 5), fill=gold_c)
+    d.point((10, 6), fill=gold_c)
+
+    save(img, "passives", "armor.png")
+
+
+def gen_passive_magnet():
+    """Passive icon: Horseshoe magnet (16x16, red+blue poles).
+    U-shaped magnet, red left tip, blue right tip, silver body.
+    Primary #E64040 red, Secondary #4D4DE6 blue, Accent #B3B3BF silver.
+    """
+    img, d = draw_img(16, 16)
+    red_c = rgba("passive_magnet_red")        # #E64040 red pole
+    blue_c = rgba("passive_magnet_blue")      # #4D4DE6 blue pole
+    silver_c = rgba("passive_magnet_body")    # #B3B3BF silver body
+    white = rgba("white")
+
+    # Left arm (vertical bar)
+    for y in range(3, 13):
+        d.point((3, y), fill=silver_c)
+        d.point((4, y), fill=silver_c)
+    # Right arm (vertical bar)
+    for y in range(3, 13):
+        d.point((11, y), fill=silver_c)
+        d.point((12, y), fill=silver_c)
+
+    # Bottom curve connecting arms
+    curve_pts = [
+        (3, 13), (4, 13), (5, 14), (6, 14), (7, 14), (8, 14), (9, 14), (10, 14),
+        (11, 13), (12, 13),
+    ]
+    for pt in curve_pts:
+        d.point(pt, fill=silver_c)
+
+    # Red pole tip (left arm top)
+    for y in range(2, 5):
+        d.point((3, y), fill=red_c)
+        d.point((4, y), fill=red_c)
+    d.point((3, 1), fill=red_c)
+    d.point((4, 1), fill=red_c)
+
+    # Blue pole tip (right arm top)
+    for y in range(2, 5):
+        d.point((11, y), fill=blue_c)
+        d.point((12, y), fill=blue_c)
+    d.point((11, 1), fill=blue_c)
+    d.point((12, 1), fill=blue_c)
+
+    # Highlight lines (left edge of each arm)
+    d.point((3, 5), fill=white)
+    d.point((3, 6), fill=white)
+    d.point((3, 7), fill=white)
+    d.point((11, 5), fill=white)
+    d.point((11, 6), fill=white)
+    d.point((11, 7), fill=white)
+
+    # Field lines (semi-transparent gold arcs near tips)
+    field_gold = (0xFF, 0xD7, 0x00, 80)
+    d.point((1, 2), fill=field_gold)
+    d.point((2, 1), fill=field_gold)
+    d.point((14, 2), fill=field_gold)
+    d.point((13, 1), fill=field_gold)
+
+    save(img, "passives", "magnet.png")
+
+
+def gen_passive_speedboots():
+    """Passive icon: Speed Boots (16x16, sky blue).
+    Side-view boot silhouette with 3 speed lines behind.
+    Primary #4DB3FF sky blue, Secondary #3380CC darker blue, Accent white speed lines.
+    """
+    img, d = draw_img(16, 16)
+    sky_c = rgba("passive_boots_sky")         # #4DB3FF sky blue
+    dark_c = rgba("passive_boots_dark")       # #3380CC darker blue
+    white = rgba("white")
+    speed_alpha = (0xFF, 0xFF, 0xFF, 153)     # white with ~0.6 alpha
+
+    # Boot shaft (side view)
+    for y in range(3, 9):
+        for x in range(7, 12):
+            d.point((x, y), fill=sky_c)
+
+    # Toe cap (extending right)
+    for y in range(7, 9):
+        for x in range(12, 14):
+            d.point((x, y), fill=dark_c)
+
+    # Sole
+    for x in range(5, 14):
+        d.point((x, 9), fill=dark_c)
+        d.point((x, 10), fill=dark_c)
+
+    # Heel (extending down-left)
+    for y in range(9, 13):
+        d.point((5, y), fill=dark_c)
+        d.point((6, y), fill=dark_c)
+
+    # Lace detail (crossing lines on shaft)
+    d.point((9, 4), fill=white)
+    d.point((10, 4), fill=white)
+
+    # Speed lines (3 horizontal lines behind boot)
+    for dx in range(6):
+        d.point((0 + dx, 4), fill=speed_alpha)
+    for dx in range(6):
+        d.point((1 + dx, 7), fill=speed_alpha)
+    for dx in range(6):
+        d.point((0 + dx, 10), fill=speed_alpha)
+
+    save(img, "passives", "speedboots.png")
+
+
+def gen_passive_maxhp():
+    """Passive icon: Max Health Crystal (16x16, crimson).
+    Octagonal crystal/gem with facet lines and highlight.
+    Primary #D92659 crimson, Secondary #A61A40 dark crimson, Accent #FF99BF pink highlight.
+    """
+    img, d = draw_img(16, 16)
+    crim_c = rgba("passive_hp_crimson")       # #D92659 crimson
+    crim_dark = rgba("passive_hp_dark")       # #A61A40 dark crimson
+    pink_c = rgba("passive_hp_pink")          # #FF99BF pink highlight
+
+    # Octagonal crystal shape (centered at 8,9)
+    # Top point, upper-right, right, lower-right, bottom, lower-left, left, upper-left
+    crystal_outline = [
+        # Top
+        (8, 2), (7, 2),
+        # Upper-right
+        (9, 2), (10, 3), (11, 4), (12, 5),
+        # Right
+        (12, 6), (12, 7), (12, 8), (12, 9),
+        # Lower-right
+        (12, 10), (11, 11), (10, 12), (9, 13),
+        # Bottom
+        (8, 13), (7, 13),
+        # Lower-left
+        (6, 13), (5, 12), (4, 11), (3, 10),
+        # Left
+        (3, 9), (3, 8), (3, 7), (3, 6),
+        # Upper-left
+        (3, 5), (4, 4), (5, 3), (6, 2),
+    ]
+    for pt in crystal_outline:
+        d.point(pt, fill=crim_dark)
+
+    # Fill interior
+    fill_rows = {
+        3: (6, 9), 4: (5, 10), 5: (4, 11), 6: (4, 11),
+        7: (4, 11), 8: (4, 11), 9: (4, 11), 10: (4, 11),
+        11: (5, 10), 12: (6, 9),
+    }
+    for y, (x0, x1) in fill_rows.items():
+        for x in range(x0, x1 + 1):
+            d.point((x, y), fill=crim_c)
+
+    # Facet line 1 (vertical center)
+    for y in range(3, 13):
+        d.point((8, y), fill=crim_dark)
+
+    # Facet line 2 (horizontal center)
+    for x in range(4, 12):
+        d.point((x, 8), fill=crim_dark)
+
+    # Top highlight triangle
+    d.point((7, 3), fill=pink_c)
+    d.point((8, 3), fill=pink_c)
+    d.point((9, 3), fill=pink_c)
+    d.point((8, 4), fill=pink_c)
+
+    # Bottom shadow triangle
+    d.point((7, 12), fill=crim_dark)
+    d.point((8, 12), fill=crim_dark)
+    d.point((9, 12), fill=crim_dark)
+
+    save(img, "passives", "maxhp.png")
+
+
+def gen_passive_regen():
+    """Passive icon: Regen Amulet (16x16, emerald green).
+    Circular medallion with top loop and white cross in center.
+    Primary #33D966 emerald green, Secondary #26A64D darker green, Accent white cross.
+    """
+    img, d = draw_img(16, 16)
+    green_c = rgba("passive_regen_green")     # #33D966 emerald green
+    green_dark = rgba("passive_regen_dark")   # #26A64D darker green
+    white = rgba("white")
+    green_lt = (0x4D, 0xE6, 0x80, 255)       # #4DE680 highlight
+
+    # Chain hint (line from top to loop)
+    d.point((8, 0), fill=green_dark)
+
+    # Loop at top (small arc)
+    d.point((7, 1), fill=green_dark)
+    d.point((8, 1), fill=green_dark)
+    d.point((9, 1), fill=green_dark)
+    d.point((7, 2), fill=green_dark)
+    d.point((9, 2), fill=green_dark)
+
+    # Medallion border (radius 6)
+    _draw_outline_circle(d, 8, 9, 6, green_dark)
+
+    # Medallion body fill (radius 5)
+    _fill_circle(d, 8, 9, 5, green_c)
+
+    # Cross vertical bar
+    for y in range(5, 14):
+        d.point((7, y), fill=white)
+        d.point((8, y), fill=white)
+
+    # Cross horizontal bar
+    for x in range(4, 12):
+        d.point((x, 8), fill=white)
+        d.point((x, 9), fill=white)
+
+    # Ring highlight (top-left arc)
+    d.point((4, 5), fill=green_lt)
+    d.point((5, 4), fill=green_lt)
+    d.point((6, 4), fill=green_lt)
+
+    save(img, "passives", "regen.png")
+
+
+def gen_passive_luckycoin():
+    """Passive icon: Lucky Coin (16x16, bright gold).
+    Circular coin with dentilled edge and star emblem.
+    Primary #FFD91A bright gold, Secondary #D9B30D darker gold edge, Accent #E68C00 amber star.
+    """
+    img, d = draw_img(16, 16)
+    gold_c = rgba("passive_coin_gold")        # #FFD91A bright gold
+    gold_dark = rgba("passive_coin_dark")      # #D9B30D darker gold edge
+    amber_c = rgba("passive_coin_amber")      # #E68C00 amber star emblem
+    gold_lt = (0xFF, 0xE6, 0x80, 255)         # #FFE680 highlight
+    gold_shadow = (0xCC, 0xA8, 0x00, 255)     # #CCA800 shadow
+
+    # Dentilled outer edge (radius 6 with bumps at 45-degree intervals)
+    _draw_outline_circle(d, 8, 8, 6, gold_dark)
+    # Bumps (8 small 1px extensions)
+    bump_pts = [
+        (8, 1), (13, 3), (15, 8), (13, 13),
+        (8, 15), (3, 13), (1, 8), (3, 3),
+    ]
+    for pt in bump_pts:
+        d.point(pt, fill=gold_dark)
+
+    # Coin body fill (radius 5)
+    _fill_circle(d, 8, 8, 5, gold_c)
+
+    # Inner circle outline (radius 4)
+    _draw_outline_circle(d, 8, 8, 4, gold_dark)
+
+    # Star emblem (5-pointed star at center, simplified)
+    # Vertical point up
+    d.point((8, 3), fill=amber_c)
+    # Vertical point down
+    d.point((8, 12), fill=amber_c)
+    # Horizontal point left
+    d.point((3, 8), fill=amber_c)
+    # Horizontal point right
+    d.point((12, 8), fill=amber_c)
+    # Diagonal points
+    d.point((5, 5), fill=amber_c)
+    d.point((11, 5), fill=amber_c)
+    d.point((5, 11), fill=amber_c)
+    d.point((11, 11), fill=amber_c)
+    # Star center
+    d.point((7, 7), fill=amber_c)
+    d.point((8, 7), fill=amber_c)
+    d.point((7, 8), fill=amber_c)
+    d.point((8, 8), fill=amber_c)
+    d.point((7, 9), fill=amber_c)
+    d.point((8, 9), fill=amber_c)
+    d.point((9, 7), fill=amber_c)
+    d.point((9, 8), fill=amber_c)
+    d.point((6, 7), fill=amber_c)
+    d.point((6, 8), fill=amber_c)
+    # Connect arms to center
+    d.point((7, 6), fill=amber_c)
+    d.point((8, 6), fill=amber_c)
+    d.point((7, 5), fill=amber_c)
+    d.point((8, 5), fill=amber_c)
+    d.point((9, 6), fill=amber_c)
+    d.point((6, 6), fill=amber_c)
+    d.point((9, 9), fill=amber_c)
+    d.point((6, 9), fill=amber_c)
+    d.point((9, 10), fill=amber_c)
+    d.point((6, 10), fill=amber_c)
+    d.point((7, 10), fill=amber_c)
+    d.point((8, 10), fill=amber_c)
+    d.point((10, 7), fill=amber_c)
+    d.point((10, 8), fill=amber_c)
+    d.point((10, 9), fill=amber_c)
+    d.point((5, 7), fill=amber_c)
+    d.point((5, 8), fill=amber_c)
+    d.point((5, 9), fill=amber_c)
+
+    # Highlight (top-left arc)
+    d.point((4, 3), fill=gold_lt)
+    d.point((5, 3), fill=gold_lt)
+    d.point((3, 4), fill=gold_lt)
+    d.point((4, 4), fill=gold_lt)
+
+    # Shadow (bottom-right arc)
+    d.point((12, 12), fill=gold_shadow)
+    d.point((11, 12), fill=gold_shadow)
+    d.point((12, 11), fill=gold_shadow)
+
+    save(img, "passives", "luckycoin.png")
+
+
 # ── Lv3 Transform Effect Sprites ───────────────────────────────────────────
 
 def gen_knife_ricochet():
@@ -4905,6 +5330,16 @@ def main():
     gen_passive_mage_vortex()
     gen_passive_warrior_shield()
     gen_passive_ranger_crosshair()
+
+    # Shared Passive Icons
+    print("\nShared Passive Icons:")
+    gen_passive_crit()
+    gen_passive_armor()
+    gen_passive_magnet()
+    gen_passive_speedboots()
+    gen_passive_maxhp()
+    gen_passive_regen()
+    gen_passive_luckycoin()
 
     # Lv3 Transform Effect Sprites
     print("\nLv3 Transform Effects:")

@@ -194,118 +194,73 @@ func get_gold_bonus() -> float:
 	return [0.0, 0.10, 0.20, 0.30, 0.40][level]
 
 
-# --- Quest/Achievement Checking ---
+# --- Quest/Achievement Checking (delegates to achievement_checker.gd) ---
 
 func check_quests_and_achievements() -> void:
-	# Called at end of game or during gameplay
-	var kills: int = GameManager.enemies_killed
-	var elapsed: float = GameManager.elapsed_time
-	var boss_kills: int = GameManager.boss_kill_count
-	var best_combo: int = GameManager.best_combo
-	var difficulty: String = GameManager.selected_difficulty
-	var character: String = GameManager.selected_character
+	# Collect run stats from GameManager (bridge layer -- only place SaveManager reads GM)
+	var run_stats: Dictionary = {
+		"kills": GameManager.enemies_killed,
+		"elapsed": GameManager.elapsed_time,
+		"boss_kills": GameManager.boss_kill_count,
+		"best_combo": GameManager.best_combo,
+		"difficulty": GameManager.selected_difficulty,
+		"character": GameManager.selected_character,
+		"char_kills": GameManager.character_kills,
+		"damage_taken": GameManager.damage_taken,
+		"kills_at_60": GameManager.kills_at_60,
+		"gold": GameManager.gold,
+		"evolutions": GameManager.get_meta("evolutions") if GameManager.has_meta("evolutions") else {},
+		"synergies": _collect_active_synergies(),
+	}
+	var save_data: Dictionary = {
+		"total_kills": total_kills,
+		"games_played": games_played,
+		"completed_quests": completed_quests,
+		"characters_cleared": characters_cleared,
+		"evolution_history": evolution_history,
+		"synergy_history": synergy_history,
+		"endless_unlocked": endless_unlocked,
+		"weapon_kills": weapon_kills,
+		"mastery_thresholds": MASTERY_THRESHOLDS,
+		"base_weapons": BASE_WEAPONS,
+	}
 
-	# Quests
-	var char_kills: int = GameManager.character_kills
-	_check_quest("warrior_30", character == "warrior" and char_kills >= 30)
-	_check_quest("ranger_30", character == "ranger" and char_kills >= 30)
-	_check_quest("kill_50", kills >= 50)
-	_check_quest("kill_100", kills >= 100)
-	_check_quest("kill_boss", boss_kills > 0)
-	_check_quest("combo_20", best_combo >= 20)
-	_check_quest("combo_50", best_combo >= 50)
-	_check_quest("endless_5min", difficulty == "endless" and elapsed >= 300.0)
-	_check_quest("endless_10min", difficulty == "endless" and elapsed >= 600.0)
-	_check_quest("endless_boss3", difficulty == "endless" and boss_kills >= 3)
-	_check_quest("endless_kill200", difficulty == "endless" and kills >= 200)
-	_check_quest("hard_survive", difficulty == "hard" and elapsed >= 120.0)
-	_check_quest("hard_boss", difficulty == "hard" and boss_kills > 0)
-	_check_quest("no_damage", not GameManager.damage_taken and elapsed >= 60.0)
-	# Achievements
-	total_kills += kills
-	games_played += 1
-	_check_achievement("total_kills_100", total_kills >= 100)
-	_check_achievement("total_kills_500", total_kills >= 500)
-	_check_achievement("total_kills_2000", total_kills >= 2000)
-	_check_achievement("games_10", games_played >= 10)
-	_check_achievement("games_50", games_played >= 50)
-	_check_achievement("survive_3min", difficulty == "normal" and elapsed >= 180.0)
-	_check_achievement("survive_5min", difficulty == "normal" and elapsed >= 300.0)
-	_check_achievement("survive_hard_5min", difficulty == "hard" and elapsed >= 300.0)
-	_check_achievement("boss_kill", boss_kills > 0)
-	_check_achievement("hard_boss_kill", difficulty == "hard" and boss_kills > 0)
-	_check_achievement("no_damage_survive", not GameManager.damage_taken and elapsed >= 120.0 and kills > 0)
-	_check_achievement("kill_100_single", kills >= 100)
-	_check_achievement("survive_10min", elapsed >= 600.0)
-	_check_achievement("combo_30", best_combo >= 30)
-	_check_achievement("combo_50", best_combo >= 50)
-	_check_achievement("hard_survive_ach", difficulty == "hard" and elapsed >= 120.0)
-	# Fast boss: kill boss within 3 minutes
-	_check_achievement("fast_boss", boss_kills > 0 and elapsed <= 180.0)
-	# Pacifist: 1 minute without killing
-	_check_achievement("pacifist_1min", elapsed >= 60.0 and GameManager.kills_at_60 == 0)
-	# Character clears
-	if character != "" and elapsed >= 180.0:
-		characters_cleared[character] = true
-	_check_achievement("all_chars", characters_cleared.size() >= 3)
+	var checker: RefCounted = load("res://scripts/autoload/achievement_checker.gd").new()
+	checker.quest_check_requested.connect(_check_quest)
+	checker.achievement_check_requested.connect(_check_achievement)
+	checker.soul_reward_requested.connect(add_soul_fragments)
+	checker.state_update_requested.connect(_apply_checker_state)
 
-	# Quest completion achievements
-	var completed_count: int = 0
-	for id in completed_quests:
-		if completed_quests[id]:
-			completed_count += 1
-	_check_achievement("quests_half", completed_count >= QUESTS.size() / 2)
-	_check_achievement("quests_all", completed_count >= QUESTS.size())
-	# Endless unlock: beat boss
-	if boss_kills > 0:
-		endless_unlocked = true
+	var result: Dictionary = checker.check_all(run_stats, save_data)
 
-	# Accumulate evolution history across sessions
-	if GameManager.has_meta("evolutions"):
-		for evo_id: String in GameManager.get_meta("evolutions"):
-			evolution_history[evo_id] = true
-	# Accumulate synergy history
-	if SynergyManager:
-		for syn: Dictionary in SynergyManager.SYNERGY_DEFINITIONS:
-			if SynergyManager.has_synergy(syn["id"]):
-				synergy_history[syn["id"]] = true
-
-	# Evolution achievements
-	var evolutions: Array = []
-	if GameManager.has_meta("evolutions"):
-		evolutions = GameManager.get_meta("evolutions")
-	_check_achievement("evolve_weapon", evolutions.size() >= 1)
-
-	# All evolved: collected all 9 evolution weapons (cumulative)
-	var all_evo_ids: Array = ["thunderholywater", "fireknife", "holydomain", "blizzard", "frostknife", "flamebible", "thunderang", "blazerang", "sentineltotem"]
-	var evo_count: int = 0
-	for eid: String in all_evo_ids:
-		if evolution_history.has(eid):
-			evo_count += 1
-	_check_achievement("all_evolved", evo_count >= all_evo_ids.size())
-
-	# Synergy achievements
-	if SynergyManager:
-		var syn_count: int = 0
-		for syn: Dictionary in SynergyManager.SYNERGY_DEFINITIONS:
-			if SynergyManager.has_synergy(syn["id"]):
-				syn_count += 1
-		_check_achievement("synergy_first", syn_count >= 1)
-
-	# All synergies: triggered all 18 synergy effects (cumulative)
-	_check_achievement("all_synergies", SynergyManager != null and synergy_history.size() >= SynergyManager.SYNERGY_DEFINITIONS.size())
-
-	# Convert gold to soul fragments (normal: 30%, endless: 45% with 1.5x bonus)
-	var soul_rate: float = 0.3
-	if GameManager.selected_difficulty == "endless":
-		soul_rate = 0.45
-	var soul_reward: int = int(GameManager.gold * soul_rate)
-	add_soul_fragments(soul_reward)
-
-	# Mastery achievements
-	check_mastery_achievements()
+	# Apply accumulated state from checker
+	total_kills = result.get("total_kills", total_kills)
+	games_played = result.get("games_played", games_played)
+	endless_unlocked = result.get("endless_unlocked", endless_unlocked)
+	characters_cleared = result.get("characters_cleared", characters_cleared)
+	evolution_history = result.get("evolution_history", evolution_history)
+	synergy_history = result.get("synergy_history", synergy_history)
 
 	save()
+
+
+func _collect_active_synergies() -> Array:
+	var result: Array = []
+	if SynergyManager:
+		for syn: Dictionary in SynergyManager.SYNERGY_DEFINITIONS:
+			if SynergyManager.has_synergy(syn["id"]):
+				result.append(syn["id"])
+	return result
+
+
+func _apply_checker_state(key: String, value: Variant) -> void:
+	match key:
+		"total_kills": total_kills = value
+		"games_played": games_played = value
+		"endless_unlocked": endless_unlocked = value
+		"characters_cleared": characters_cleared = value
+		"evolution_history": evolution_history = value
+		"synergy_history": synergy_history = value
 
 
 func _check_quest(quest_id: String, condition: bool) -> void:

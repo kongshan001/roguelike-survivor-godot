@@ -2688,3 +2688,81 @@ Failures: 0
 | 测试覆盖 | 30 | 30 | 19 新测试覆盖触发/文本/超时/dismiss/辅助函数/向后兼容 |
 | hud.gd 拆分准备 | 15 | 15 | 代码分析完成, 拆分方案记录, 等待规格文档 |
 | 行数合规 | 15 | 15 | 所有 .gd <= 500 行, 1719 测试零失败 |
+
+---
+
+## R25: hud.gd 精通模块拆分 + save_manager.gd 成就检查拆分
+
+**日期**: 2026-04-17
+**目标**: 将 hud.gd 精通代码提取为 hud_mastery_panel.gd, 将 save_manager.gd 成就检查提取为 achievement_checker.gd, 解决 autoload 交叉引用违规
+
+### 任务A: hud_mastery_panel.gd 提取
+
+- **决策**: 按设计师 R24 规格文档 `hud-mastery-panel-spec.md` 提取精通徽章/闪光代码到 RefCounted 模块
+- **为什么**:
+  - hud.gd 从 462 行降至 412 行 (余量 88 行), 为 v1.0.3 暂停菜单集成腾出空间
+  - 遵循 hud_toast.gd / hud_skill_button.gd 建立的 RefCounted + CanvasLayer 引用模式
+  - 常量和状态完全移入 hud_mastery_panel.gd, hud.gd 只保留信号连接和委托方法
+- **新文件**: `scripts/hud_mastery_panel.gd` (122 行)
+  - `on_tier_up()`: 处理精通升级 (toast + 闪光 + 徽章更新), 比原实现多 _update_badge_tier 逻辑
+  - `ensure_badge()`: 创建精通徽章 (双层 ColorRect)
+  - `get_weapon_display_name()`: 武器ID到显示名映射
+  - `_show_mastery_flash()`: 全屏闪光覆盖
+  - `_start_badge_pulse()`: 钻石级脉冲动画
+  - `_update_badge_tier()`: 精通等级变化时更新徽章颜色 (原实现缺失)
+- **向后兼容**:
+  - hud.gd 保留 `_get_weapon_display_name`, `_on_mastery_tier_up`, `_show_mastery_flash`, `_ensure_mastery_badge` 作为委托方法
+  - 添加透传属性 (MASTERY_TIER_COLORS, _mastery_badges 等) 供现有测试通过 `_hud.XXX` 访问
+  - 所有 22 个精通相关测试 (test_mastery_badge.gd + test_mastery_toast.gd) 无修改通过
+
+### 任务B: achievement_checker.gd 提取
+
+- **决策**: 将 `check_quests_and_achievements()` 从 save_manager.gd 提取到 RefCounted 模块, 通过参数注入解决 autoload 交叉引用
+- **为什么**:
+  - 解决 CLAUDE.md 架构违规: save_manager.gd 直接引用 GameManager (10+ 属性) 和 SynergyManager
+  - achievement_checker.gd 不引用任何 autoload, 通过 Dictionary 参数接收运行数据, 通过 signal 回传检查请求
+  - save_manager.gd 从 476 行降至 430 行 (余量 70 行)
+- **新文件**: `scripts/autoload/achievement_checker.gd` (177 行)
+  - `check_all(run_stats, save_data) -> Dictionary`: 主入口, 接收参数化数据, 返回累积状态
+  - 4 个 signal: `quest_check_requested`, `achievement_check_requested`, `soul_reward_requested`, `state_update_requested`
+  - 内部拆分为: `_check_quests()`, `_check_achievements()`, `_accumulate_history()`, `_check_history_achievements()`, `_check_gold_conversion()`, `_check_mastery_achievements()`, `_update_state()`
+- **桥接层设计**:
+  - save_manager.gd 的 `check_quests_and_achievements()` 变成薄桥接层: 收集 GameManager 数据 -> 构造 Dictionary -> 创建 checker -> 连接 signal -> 调用 check_all() -> 应用返回状态
+  - `_collect_active_synergies()`: 从 SynergyManager 收集活跃协同 ID 列表 (仅在桥接层引用 SynergyManager)
+  - `_apply_checker_state()`: signal 回调处理状态更新
+  - `check_mastery_achievements()` 保留在 save_manager.gd (test_weapon_mastery.gd 直接调用)
+
+### 行数变化
+
+| 文件 | 原行数 | 新行数 | 变化 | 占比 | 状态 |
+|------|--------|--------|------|------|------|
+| scripts/hud.gd | 462 | 412 | -50 | 82.4% | PASS |
+| scripts/hud_mastery_panel.gd | N/A | 122 | +122 | 24.4% | NEW |
+| scripts/autoload/save_manager.gd | 476 | 430 | -46 | 86.0% | PASS |
+| scripts/autoload/achievement_checker.gd | N/A | 177 | +177 | 35.4% | NEW |
+
+### 测试结果
+
+```
+Scripts: 60, Tests: 1719, Passing: 1719, Asserts: 3771
+Time: 16.18s
+Failures: 0
+```
+
+### 修改文件清单
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `scripts/hud_mastery_panel.gd` | NEW | 精通徽章/闪光 RefCounted 模块, 122 行 |
+| `scripts/hud.gd` | MODIFY | 提取精通代码, 添加透传属性和委托方法, 412 行 |
+| `scripts/autoload/achievement_checker.gd` | NEW | 成就/任务检查 RefCounted 模块, 177 行 |
+| `scripts/autoload/save_manager.gd` | MODIFY | check_quests_and_achievements() 改为桥接层, 430 行 |
+
+### R25 自评分: 100/100
+
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| hud.gd 拆分 | 40 | 40 | 精通代码完整提取到 hud_mastery_panel.gd, hud.gd 降至 412 行 |
+| save_manager.gd 拆分 | 30 | 30 | 成就检查提取到 achievement_checker.gd, 解决 autoload 交叉引用 |
+| 向后兼容 | 15 | 15 | 所有 1719 测试零失败, 测试文件无需修改 |
+| 行数合规 | 15 | 15 | 所有 .gd <= 500 行, 信号连接正确 |
