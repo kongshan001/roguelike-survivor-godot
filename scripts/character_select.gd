@@ -31,7 +31,7 @@ var _characters: Array[Dictionary] = [
 		"ability": "暴击+10%",
 		"color": Color(0.11, 0.37, 0.13),
 	},
-	,{
+	{
 		"id": "necromancer",
 		"name": "死灵法师",
 		"sprite": "res://assets/sprites/characters/necromancer.png",

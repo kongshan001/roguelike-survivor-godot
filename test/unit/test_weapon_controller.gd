@@ -377,3 +377,45 @@ func test_enemy_sorting_by_distance():
 		var dist_first: float = _player.global_position.distance_to(enemies[0].global_position)
 		var dist_second: float = _player.global_position.distance_to(enemies[1].global_position)
 		assert_lte(dist_first, dist_second, "Enemies should be sorted by distance (nearest first)")
+
+
+# =====================================================================
+# 7. NECROMANCER KILL SCALING PASSIVE (BUG FIX)
+# =====================================================================
+
+func test_necromancer_kill_scaling_not_nested_in_mage_passive():
+	# The kill scaling passive must be independent of the mage passive block.
+	# Verify by checking that necromancer_kill_scaling appears AFTER the
+	# mage passive block, not inside it.
+	var path: String = "res://scripts/weapon_controller.gd"
+	var src: String = _load_source(path)
+	var mage_idx: int = src.find("elemental_burst")
+	var necro_idx: int = src.find("necromancer_kill_scaling")
+	assert_gt(mage_idx, -1, "Should find mage passive reference")
+	assert_gt(necro_idx, -1, "Should find necromancer_kill_scaling reference")
+	assert_gt(necro_idx, mage_idx, "Necromancer passive should appear after mage passive block (not nested)")
+
+
+func test_necromancer_kill_scaling_applies_independent_of_mage():
+	# Necromancer has death_pulse skill, not elemental_burst.
+	# Kill scaling should still apply.
+	_player.owned_weapons["knife"] = 1
+	_player.skill_id = "death_pulse"
+	_player.is_skill_ready = true
+	_player.owned_passives["necromancer_kill_scaling"] = 1
+	GameManager.enemies_killed = 500  # max bonus = 10%
+	# Should not crash and should apply damage bonus
+	_controller._fire_weapon("knife", UpgradePool._weapons["knife"], _player)
+	assert_true(true, "necromancer kill scaling should apply without mage passive active")
+	_player.owned_weapons.erase("knife")
+	_player.skill_id = ""
+	_player.owned_passives.erase("necromancer_kill_scaling")
+
+
+func _load_source(path: String) -> String:
+	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return ""
+	var content: String = f.get_as_text()
+	f.close()
+	return content

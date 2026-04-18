@@ -77,6 +77,7 @@ const SFX_IDS: Dictionary = {
 	"enemy_death": "sfx_enemy_death",
 	"boss_roar": "sfx_boss_roar",
 	"elite_death": "sfx_elite_death",
+	"enemy_bullet_hit": "sfx_enemy_bullet_hit",
 	# UI
 	"ui_click": "sfx_ui_click",
 	"ui_select": "sfx_ui_select",

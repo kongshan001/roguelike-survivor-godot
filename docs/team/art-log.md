@@ -9335,3 +9335,170 @@ T+???:    0.5s alpha -> 0.0 淡出, visible=false
 **加分项**: Boss 晕影消退时机 4 种条件建议(+3), 受伤/升级对比表清晰(+2), 角色四色系对比论证(+2)
 
 **扣分项**: Boss 晕影 4 边缘为纯色无渐变, 需 Shader 才能达到中心透明效果(-3), 受伤检测简化可能误触(-2), 异步 Tween 测试未覆盖(-2)
+
+## R35 美术任务 (2026-04-18) -- 死灵法师死亡脉冲 VFX + HudScreenEffects 参数细化
+
+### 前置说明
+
+R35 承接 R34 的屏幕效果规范, 进行两项工作:
+1. 为死灵法师 death_pulse 技能编写完整 VFX 视觉规格
+2. 基于 R34 规范细化 HudScreenEffects 的参数, 输出独立的实现指南文档
+
+---
+
+### 任务 1: 死灵法师 Death Pulse VFX 视觉规格
+
+**输出文件**: `docs/superpowers/specs/necromancer-vfx.md`
+
+#### 1.1 扩散暗环 (Expanding Dark Ring)
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 形状 | 圆形 (ColorRect 缩放) | 以玩家位置为中心 |
+| 初始尺寸 | 0x0 px | 从玩家中心开始不可见 |
+| 最终尺寸 | 240x240 px | NECROMANCER_SKILL_RADIUS * 2 = 120 * 2 |
+| 扩散时长 | 0.9 s | TICK_INTERVAL * TICKS = 0.3 * 3 |
+| 颜色 | Color(0.40, 0.15, 0.55) | 暗紫色, 死亡能量 |
+| Alpha 起点 | 0.7 | 比 Mage 的 0.8 更低, 更暗的氛围 |
+| Alpha 终点 | 0.0 | 完全淡出 |
+| Alpha 衰减 | 线性插值 | `alpha = 0.7 * (1.0 - t / expand_time)` |
+| Z-Index | 10 | 敌人层之上, HUD 之下 |
+
+#### 1.2 与现有代码的对比
+
+| 属性 | 当前代码 (skill_effects.gd:278) | R35 规格 | 变更原因 |
+|------|------|------|------|
+| RGB | (0.5, 0.3, 0.7) | (0.40, 0.15, 0.55) | 更暗, 更"死灵"感; 接近角色主题色 |
+| Alpha 起点 | 0.6 | 0.7 | 施法瞬间更可见; 仍低于 Mage 的 0.8 |
+| Alpha 衰减 | 线性 | 线性 | 不变 |
+
+#### 1.3 Tick 伤害视觉反馈
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| Tick 次数 | 3 | NECROMANCER_SKILL_TICKS |
+| Tick 间隔 | 0.3 s | NECROMANCER_SKILL_TICK_INTERVAL |
+| 敌人闪烁色 | Color(0.5, 0.2, 0.7, 0.4) | 浅紫色调, 半透明 |
+| 闪烁时长 | 0.1 s / tick | 极短, 仅可感知 |
+| 应用方式 | modulate 属性 | 同 Mage 冰冻色调模式 |
+
+#### 1.4 屏幕震动
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 强度 | 3.0 | NECROMANCER_SKILL_SCREENSHAKE |
+| 时长 | 0.12 s | NECROMANCER_SKILL_SCREENSHAKE_DUR |
+| 衰减率 | 25.0/s | 线性衰减 |
+| 触发时机 | 施法瞬间 (t=0) | 单次脉冲 |
+
+四技能屏幕震动对比:
+
+| 技能 | 强度 | 时长 | 感觉 |
+|------|------|------|------|
+| Elemental Burst (Mage) | 4.0 | 0.15s | 重型爆炸 |
+| Shield Charge (Warrior) | 3.0 | 0.1s | 冲击撞击 |
+| Arrow Rain (Ranger) | 2.0 | 0.08s | 快速弹幕 |
+| **Death Pulse (Necromancer)** | **3.0** | **0.12s** | **暗能脉冲** |
+
+#### 1.5 技能图标
+
+| 属性 | 规格 | 说明 |
+|------|------|------|
+| 形状 | 圆形 + 内部能量线 | 圆形 = 以自身为中心的 AoE |
+| 尺寸 | 24x24 px | 与其他技能图标一致 |
+| 颜色 | Color(0.27, 0.13, 0.40) 深紫 | 角色主题色 |
+| 文件 | `assets/sprites/skills/death_pulse.png` | 待创建 |
+
+---
+
+### 任务 2: HudScreenEffects 参数细化
+
+**输出文件**: `docs/superpowers/specs/hud-screen-effects-impl.md`
+
+#### 2.1 R34 -> R35 参数变更
+
+| 效果 | 参数 | R34 值 | R35 值 | 变更原因 |
+|------|------|--------|--------|---------|
+| 受伤闪红 | 淡出时长 | 0.25s | **0.15s** | 更快消退减少战斗视觉干扰 |
+| 升级闪光 | 淡出时长 | 0.4s | **0.3s** | 更紧凑的时机配合升级面板 |
+| Boss 暗角 | 脉动频率 | 1.5Hz (freq) | **0.5s (period)** | 更清晰的规格定义; 0.5s周期=2.0Hz |
+
+#### 2.2 最终视觉参数汇总
+
+| 效果 | 颜色 | Alpha 峰值 | 淡入 | 淡出 | 脉动 | 触发 |
+|------|------|----------|------|------|------|------|
+| 受伤闪红 | Color(0.8, 0.0, 0.0) | 0.3 | 0s | **0.15s** | 无 | take_damage |
+| 升级闪光 | Color(1.0, 1.0, 0.8) | 0.25 | 0.05s | **0.3s** | 无 | level_up |
+| Boss 暗角 | Color(0.6, 0.0, 0.0) | 0.35 | 1.0s | 0.5s | +/-0.05 @ **0.5s周期** | boss wave |
+
+#### 2.3 完整代码规范
+
+`docs/superpowers/specs/hud-screen-effects-impl.md` 包含:
+
+1. **hud_screen_effects.gd 完整代码** (~150行): RefCounted 模块, 包含 DAMAGE_FLASH / LEVEL_UP_FLASH / BOSS_VIGNETTE 三组常量和对应方法
+2. **hud.gd 集成代码片段**: 6 个集成点 (声明/初始化/伤害回调/升级回调/波次回调/脉动处理)
+3. **GUT 测试参考**: 18 个测试用例 (常量验证 10 + 节点创建 4 + 功能测试 4)
+
+#### 2.4 代码架构
+
+```
+CanvasLayer (hud.gd, layer=100)
+  +-- DamageFlash (ColorRect, PRESET_FULL_RECT, visible=false)
+  +-- LevelUpFlash (ColorRect, PRESET_FULL_RECT, visible=false)
+  +-- BossVignetteTop (ColorRect, 40px high, visible=false)
+  +-- BossVignetteBottom (ColorRect, 40px high, visible=false)
+  +-- BossVignetteLeft (ColorRect, 40px wide, visible=false)
+  +-- BossVignetteRight (ColorRect, 40px wide, visible=false)
+```
+
+---
+
+### R35 配色表新增汇总
+
+| 资产名 | 色名 | Color 值 | Hex | 用途 |
+|--------|------|---------|-----|------|
+| Death Pulse Ring | 暗紫死灵能量 | Color(0.40, 0.15, 0.55) | #662680 | 死亡脉冲扩散暗环 (新) |
+| Death Pulse Tick Flash | 浅紫命中闪烁 | Color(0.5, 0.2, 0.7) | #8033B3 | Tick 伤害敌人闪烁 (新) |
+| Death Pulse Icon | 深紫主题色 | Color(0.27, 0.13, 0.40) | #442266 | HUD 技能图标 (与角色同) |
+
+注: 受伤闪红/升级闪光/Boss 暗角的配色与 R33/R34 完全一致, 仅时间参数有调整。
+
+---
+
+### 设计决策记录
+
+1. **Death Pulse 暗环颜色 (0.40, 0.15, 0.55) 比代码中更暗**: 死亡能量应给人"吸收/幽暗"感, 而非 Mage 爆裂蓝光的"释放/明亮"感。更深的紫色接近 Necromancer 角色色 (0.27, 0.13, 0.40), 保持视觉一致性。
+
+2. **Death Pulse 仅 1 个 VFX 节点**: 4 个技能中 VFX 节点最少的 (Mage 1+N, Warrior 3+N, Ranger 1+12+12, Necromancer 1)。理由: 死亡脉冲是 25s CD 的强力技能, 不需要华丽效果; 简洁的单一暗环传达"死亡"主题的力量感。
+
+3. **受伤闪红淡出 0.25s -> 0.15s**: 战斗中频繁受伤时, 0.25s 的红色残影会叠加造成视觉混乱。0.15s 仍可感知但消退更快, 减少干扰。Trade-off: 单次受伤时闪红稍短, 但在密集战斗 (3+ 敌人同时攻击) 中体验显著改善。
+
+4. **升级闪光淡出 0.4s -> 0.3s**: 升级时面板弹出需要视觉焦点在面板选项上, 0.4s 的白色残影会分散注意力。0.3s 在提供"升级感"后快速消退, 让玩家更快阅读选项。
+
+5. **Boss 暗角脉动改用 period (0.5s) 替代 frequency (1.5Hz)**: 0.5s 周期 = 2.0Hz, 实际频率略高于 R34 的 1.5Hz。更高的频率使暗角呼吸感更明显, 在 Boss 战的紧张氛围中更易感知。period 格式比 frequency 更直观 (直接对应可视的"一亮一暗"周期)。
+
+6. **Death Pulse 屏幕震动 3.0/0.12s**: 与 Warrior 同等强度但更长持续时间, 创造"波动"而非"冲击"的感觉。Designer spec 中建议 5.0/0.12s, 但 SkillData 中 canonical 值为 3.0, 以代码为准。
+
+---
+
+### 质量自评: 90/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| Death Pulse VFX 规范完整性 | 18 | 20 | 完整暗环规格+Tick反馈+屏幕震动+技能图标。Tick 闪烁为建议(当前代码未实现)(-2) |
+| HudScreenEffects 参数细化 | 18 | 20 | 3 个效果参数更新+完整代码+18 个测试用例。受伤检测简化方案未优化(-2) |
+| 配色一致性 | 15 | 15 | Death Pulse 配色与角色主题色系一致; 屏幕效果配色与 R33/R34 一致 |
+| 代码可集成性 | 15 | 15 | RefCounted 模块完整可复制; hud.gd 集成点明确到行号 |
+| 文档质量 | 14 | 15 | 两个独立规格文档; necromancer-vfx.md 有动画时间线和对比表 |
+| 设计决策论证 | 10 | 15 | 6 个决策记录含原因和替代方案。缺少对"为什么不用多层环"等问题的论证(-5) |
+
+**加分项**: 死灵法师 VFX 完整规格是第 4 个技能的补齐(+5), 四技能屏幕震动对比表(+3), HudScreenEffects 独立实现指南降低集成难度(+3), R34->R35 参数变更追踪表(+2)
+
+**扣分项**: Death Pulse Tick 闪烁为新增建议但当前代码不支持(-2), 受伤检测 `current < max_hp` 简化方案可能误触(HP恢复时也触发)(-3), 死灵法师技能图标 PNG 待创建(-3), Boss 暗角仍为纯色无渐变(-2)
+
+### 下一步行动
+
+1. Programmer 创建 `scripts/hud_screen_effects.gd` (参照 `docs/superpowers/specs/hud-screen-effects-impl.md`)
+2. Programmer 修改 `scripts/skill_effects.gd` line 278 将暗环颜色更新为 R35 规格
+3. Programmer 在 `tools/generate_sprites.py` 中添加 `gen_death_pulse()` 函数
+4. QA 编写 `test/unit/test_hud_screen_effects.gd` (参照实现指南中的 18 个测试用例)

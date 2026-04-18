@@ -55,6 +55,7 @@ const WARRIOR_AFTERIMAGE_ALPHA: float = 0.4
 
 ## Mage: Elemental Burst -- expanding ring, freeze enemies in radius
 func elemental_burst(player: CharacterBody2D, damage_bonus: float = 0.0) -> void:
+	if AudioManager: AudioManager.play_sfx_by_id("player_skill")
 	var pos: Vector2 = player.global_position
 	var dmg: float = MAGE_SKILL_DAMAGE * (1.0 + damage_bonus)
 	var arena: Node = player.get_parent()
@@ -89,6 +90,7 @@ func elemental_burst(player: CharacterBody2D, damage_bonus: float = 0.0) -> void
 
 ## Warrior: Shield Charge -- dash forward, damage and stun enemies in path
 func shield_charge(player: CharacterBody2D, direction: Vector2, damage_bonus: float = 0.0) -> void:
+	if AudioManager: AudioManager.play_sfx_by_id("player_skill")
 	var dmg: float = WARRIOR_SKILL_DAMAGE * (1.0 + damage_bonus)
 	var arena: Node = player.get_parent()
 	if not arena:
@@ -129,6 +131,7 @@ func shield_charge(player: CharacterBody2D, direction: Vector2, damage_bonus: fl
 
 ## Ranger: Arrow Rain -- arrows fall on target area
 func arrow_rain(player: CharacterBody2D, damage_bonus: float = 0.0) -> void:
+	if AudioManager: AudioManager.play_sfx_by_id("player_skill")
 	var dmg: float = RANGER_SKILL_DAMAGE_PER_ARROW * (1.0 + damage_bonus)
 	var arena: Node = player.get_parent()
 	if not arena:
@@ -265,6 +268,7 @@ func _find_arrow_rain_target(player: CharacterBody2D) -> Vector2:
 
 ## Necromancer: Death Pulse -- expanding dark ring, damages enemies in radius over multiple ticks
 func death_pulse(player: CharacterBody2D, damage_bonus: float = 0.0) -> void:
+	if AudioManager: AudioManager.play_sfx_by_id("player_skill")
 	var pos: Vector2 = player.global_position
 	var dmg: float = NECROMANCER_SKILL_DAMAGE * (1.0 + damage_bonus)
 	var arena: Node = player.get_parent()

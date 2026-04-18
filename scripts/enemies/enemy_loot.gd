@@ -42,6 +42,8 @@ func handle_kill_rewards(enemy_data: EnemyData, last_hit_by: String, was_crit: b
 	GameManager.enemy_count -= 1
 
 	var gold_amount: int = _calculate_gold_drop(enemy_data, last_hit_by, was_crit)
+	if gold_amount > 0:
+		if AudioManager: AudioManager.play_sfx_by_id("gold_drop")
 	GameManager.add_gold(gold_amount)
 
 	# holywater_luckycoin synergy: holy water kill +1 gold
@@ -180,6 +182,7 @@ func spawn_crate_drop(enemy_data: EnemyData, global_pos: Vector2, pickup_mgr: No
 
 func _spawn_item_crate(global_pos: Vector2, pickup_mgr: Node) -> void:
 	## Create and place an item crate at the given position.
+	if AudioManager: AudioManager.play_sfx_by_id("chest_open")
 	var crate_scene: PackedScene = preload("res://scenes/item_crate.tscn")
 	var crate: Area2D = crate_scene.instantiate()
 	crate.global_position = global_pos

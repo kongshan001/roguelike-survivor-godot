@@ -3444,3 +3444,148 @@ R25 聚焦架构拆分。成功提取 hud_mastery_panel.gd 和 achievement_check
 - 角色注册四步模式 (character_select → skill_data → upgrade_pool → player_skill)
 - 击杀缩放被动模式 (interval-based stat boost with cap)
 - PM测试修复模式 (函数体搜索窗口随代码增长自动扩展)
+
+---
+
+## Round 35 评估 — v1.2.0 Phase B完成 + Firebomb设计
+
+**时间**: 2026-04-18
+**参与角色**: Designer / Programmer / QA / Art / Reviewer / PM
+
+### 里程碑
+
+- v1.2.0 Phase B 完成: SFX集成全部15/15脚本 + 死灵法师全功能
+- 测试套件: 2445 测试, 2426 通过, 0 失败, 19 pending (Firebomb待实现)
+- PM修复 2 个 Critical BUG (character_select语法 + weapon_controller嵌套逻辑)
+- Firebomb武器设计规格完成 (496行)
+
+### 各角色评估
+
+#### Designer — 评分: 92
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 需求交付 | 95 | Firebomb设计规格 496行, 16章节, 含数值表+进化路线 |
+| 文档质量 | 90 | 从necromancer-design.md提取并扩展为独立规格, 自包含无交叉引用 |
+| 数值设计 | 92 | 投掷型武器新类型(thrown_flask+fire_pool), Thunderbomb进化(30%链式闪电) |
+| 创新性 | 90 | 雷电链从火池触发("闪电塔"效果), 与其他进化武器差异化 |
+
+**复盘**: Firebomb提取为独立规格是正确决策——所有角色可用, 非死灵法师专属。进化配方 firebomb+lightning 主题一致性强。
+
+#### Programmer — 评分: 92
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 功能实现 | 95 | SFX集成补全9脚本(总计15/15完成), 死灵法师被动BUG修复 |
+| 代码质量 | 90 | 所有AudioManager调用null guard, enemy_bullet_hit新增SFX_ID |
+| 架构合规 | 90 | arena.gd使用信号连接模式而非直接调用 |
+| BUG修复 | 95 | 发现并修复weapon_controller.gd嵌套BUG(死灵法师被动不生效) |
+| 效率 | 88 | 执行时间~12min, 一次性完成SFX+BUG修复 |
+
+**复盘**: Programmer本轮自觉发现并修复了嵌套BUG(Reviewer报告的BUG-2), 质量意识强。SFX集成全部15脚本完成, v1.2.0 Phase B闭环。
+
+**关键代码变更**:
+- enemy_death_effects.gd: elite_death + boss_roar SFX
+- enemy_loot.gd: gold_drop + chest_open SFX
+- arena.gd: wave_start + wave_clear SFX (信号连接模式)
+- skill_effects.gd: player_skill SFX (4个技能入口)
+- enemy_bullet.gd: enemy_bullet_hit SFX
+- hud.gd: upgrade_done SFX
+- audio_manager.gd: SFX_IDS 33→34条目
+- weapon_controller.gd: 嵌套BUG修复
+
+#### QA — 评分: 88
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 测试覆盖 | 90 | 2445测试(+41 vs R34), firebomb 21测试预先编写 |
+| 缺陷发现 | 85 | 未独立发现嵌套BUG(Reviewer先发现) |
+| 回归保障 | 90 | 0 failures, 回归测试确认 |
+| 文档记录 | 88 | qa-log完整, 8项PEND-R35-*跟踪firebomb实现 |
+
+**复盘**: QA预先编写21项Firebomb测试(Pending模式), 为下轮Programmer实现提供了明确验收标准。SFX待测试项从4→5(新增skill_effects)。
+
+#### Art — 评分: 90
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 视觉规范 | 92 | necromancer-vfx.md + hud-screen-effects-impl.md 两份详细规格 |
+| 代码级指导 | 90 | hud_screen_effects.gd ~150行参考实现 + 18项GUT测试用例 |
+| 资产管理 | 88 | 新增Death Pulse Ring配色, 参数变更日志 |
+
+**复盘**: Art产出了可直接指导Programmer实现的代码级规格(含源代码+测试用例), 这是跨角色协作的最佳实践。HudScreenEffects下轮可直接实现。
+
+#### Reviewer — 评分: 85
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| 缺陷发现 | 95 | 发现2个Critical BUG(character_select语法+嵌套逻辑) |
+| 架构审查 | 85 | SFX集成PASS, 死灵法师部分通过 |
+| 准确性 | 75 | BUG-2判定为嵌套, 实际Programmer确认是BUG并修复(Reviewer判断正确) |
+
+**复盘**: Reviewer本轮贡献最大——发现2个Critical BUG。BUG-1(PM修复)和BUG-2(Programmer修复)均已解决。评分从75上调至85。
+
+### PM操作
+
+- 修复 character_select.gd 双逗号语法错误 (line 34: `,{` → `{`)
+- 确认 weapon_controller.gd 嵌套BUG由Programmer修复
+- 验证测试: 2445 tests, 0 failures
+
+### 项目综合评分
+
+| 维度 | 分数 |
+|------|------|
+| 功能完成度 | 90 |
+| 代码质量 | 90 |
+| 测试覆盖 | 88 |
+| 文档同步 | 90 |
+| **综合** | **89.8** |
+
+---
+
+## 测试统计 (R34→R35)
+
+| 指标 | R34 | R35 | 变化 |
+|------|-----|-----|------|
+| 总测试数 | 2404 | 2445 | +41 |
+| 断言数 | 5069 | 5124 | +55 |
+| 失败数 | 0 | 0 | = |
+| Pending数 | 4 | 19 | +15 (Firebomb 19项) |
+| 脚本数 | 83 | 84 | +1 |
+
+---
+
+## 反思复盘
+
+**项目综合评分 89.8 >= 80, 不强制反思。**
+
+**SFX集成100%完成**: 15/15脚本全部覆盖, v1.2.0 Phase B正式闭环。AudioManager系统从设计到实现到测试全链路打通。
+
+**Critical BUG修复**: 本轮发现并修复2个BUG——character_select数组语法和weapon_controller嵌套逻辑。Agent交叉审查有效捕获缺陷。
+
+**Firebomb下轮实现**: Designer已完成496行设计规格, QA已预写21项测试, Programmer下轮可直接实现。
+
+**HudScreenEffects就绪**: Art产出代码级实现指南(~150行), 下轮可直接编码。
+
+---
+
+## 下轮优先级路线 (Round 36 — v1.2.0 Phase C)
+
+| Phase | 负责角色 | 任务 |
+|-------|---------|------|
+| 36A | Programmer | Firebomb武器实现 (thrown_flask.gd + fire_pool.gd + 注册) |
+| 36B | Programmer | HudScreenEffects实现 (hud_screen_effects.gd ~150行) |
+| 36C | Designer | 音量控制UI设计规格 |
+| 36D | QA | Firebomb功能验收测试 + HudScreenEffects测试 |
+| 36E | Art | Firebomb精灵资产 (投掷瓶+火池) |
+| 36F | Reviewer | Phase C架构审查 |
+
+---
+
+## 技能迭代记录 (R35)
+
+本轮新增可复用模式:
+- SFX信号连接模式 (arena.gd通过信号触发SFX, 避免跨节点直接引用)
+- 预先编写Pending测试模式 (QA在实现前编写测试, 为Programmer提供验收标准)
+- 代码级VFX规格模式 (Art输出含源代码+测试用例的实现指南)
+- PM Critical BUG快速修复模式 (Agent发现→PM立即修复→测试验证)

@@ -183,6 +183,7 @@ func _select_upgrade(index: int) -> void:
 		"passive": player.apply_passive(option.id)
 		"evolution": _perform_evolution(player, option)
 
+	if AudioManager: AudioManager.play_sfx_by_id("upgrade_done")
 	$UpgradePanel.visible = false
 
 	if _pending_level_ups > 0:

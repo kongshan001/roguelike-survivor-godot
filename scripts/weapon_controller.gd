@@ -65,12 +65,12 @@ func _fire_weapon(weapon_id: String, data: WeaponData, player: CharacterBody2D):
 
 	# Mage passive: Mana Attunement -- +10% weapon damage while skill is on cooldown
 	if player.skill_id == "elemental_burst" and not player.is_skill_ready:
-
-		# Necromancer passive: Kill Scaling Damage -- +2% per 100 kills, max +20%
-		if player.has_passive("necromancer_kill_scaling") and GameManager:
-			var kill_bonus: float = minf(float(GameManager.enemies_killed) / 100.0 * 0.02, 0.20)
-			dmg_bonus *= (1.0 + kill_bonus)
 		dmg_bonus *= (1.0 + 0.10)
+
+	# Necromancer passive: Kill Scaling Damage -- +2% per 100 kills, max +20%
+	if player.has_passive("necromancer_kill_scaling") and GameManager:
+		var kill_bonus: float = minf(float(GameManager.enemies_killed) / 100.0 * 0.02, 0.20)
+		dmg_bonus *= (1.0 + kill_bonus)
 
 	# Weapon mastery bonus (additive with shop bonus)
 	if SaveManager:

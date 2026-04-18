@@ -10,6 +10,7 @@
 | 2026-04-18 | R32 v1.1.0最终验收 | 2239测试全通过, v1.1.0 CONDITIONAL PASS, 3项协同基线效果缺失, 2项P1债务关闭 |
 | 2026-04-18 | R33 v1.2.0 Phase A审核 | 2289测试(4失败audio_manager), 90.8评分, AudioManager架构PASS但测试未适配, hud.gd未拆分(362行) |
 | 2026-04-18 | R33b v1.2.0 Phase A补充审核 | 2336测试(0失败), 91.2评分, QA修复全部audio测试+扩展到61个, Designer输出necromancer规格 |
+| 2026-04-18 | R35 v1.2.0 Phase B审核 | 2404测试(0失败), 84.5评分, 2个Critical BUG(死灵法师选择崩溃+被动逻辑嵌套错误), 详见下方 |
 
 ## 技术债务
 
@@ -34,6 +35,11 @@
 | LOW | spiral_blade.gd O(n*m) 嵌套循环 (R29 P2, R30 降级) | R32 未变化 |
 | Low | audio_manager.gd 274行超200行目标 | R33 新发现, SFX_IDS/BGM_IDS可提取 |
 | ~~Medium~~ | ~~test_audio_manager.gd 测试与实现不匹配~~ | R33b 已解决 (61 tests, 0 failures) |
+| **CRITICAL** | **character_select.gd L34 多余逗号导致解析错误** | R35 新发现, `},{` 双逗号, 场景加载必崩 |
+| **CRITICAL** | **weapon_controller.gd L67-72 死灵法师被动嵌套在法师条件内** | R35 新发现, kill_scaling仅当mage技能冷却时生效 |
+| Medium | skill_data.gd 死灵法师技能常量与设计规格偏离 | R35 新发现, 详见审核报告 |
+| Low | character_select.gd 描述文本与设计规格不一致 | R35 新发现, "初始冰冻光环" vs "击杀越多，伤害越高" |
+| Low | 死灵法师颜色偏离设计规格 | R35 新发现, Color(0.5,0.3,0.7) vs 规格 Color(0.27,0.13,0.40) |
 
 ## 优化建议
 
@@ -11396,3 +11402,328 @@ Designer 在 R33 输出了完整的 Necromancer + Firebomb 设计规格:
 **待改进**:
 - 未检查 104 个 pending() 调用的状态 (继承自 R33, 需要 QA 专项审计)
 - necromancer-design.md 的数值平衡仅做了静态分析, 未做模拟验证
+
+---
+
+## R35 审核报告 (2026-04-18) -- v1.2.0 Phase B 审核
+
+### 审核环境
+
+- 基线: R33b 结束, 2336 测试全通过, 项目评分 91.2
+- R34 已完成: SFX 触发点集成 (6文件) + 死灵法师角色注册 (8文件)
+- R35 任务: SFX 集成架构审查 + 死灵法师集成审查 + 技术债务追踪 + 测试基线确认
+- Programmer-log 已更新 R34 条目, QA-log 已更新 R34 条目 (2404 tests, 0 fail)
+
+---
+
+### 任务 1: SFX 集成架构审查
+
+#### 1.1 AudioManager 调用 -- null guard 检查
+
+| 文件 | SFX ID | guard 模式 | 状态 |
+|------|--------|-----------|------|
+| scripts/player.gd:215 | "player_dash" | `if AudioManager: AudioManager.play_sfx_by_id(...)` | PASS |
+| scripts/player.gd:307 | "player_hurt" | `if AudioManager: AudioManager.play_sfx_by_id(...)` | PASS |
+| scripts/enemy.gd:251 | "enemy_death" | `if AudioManager: AudioManager.play_sfx_by_id(...)` | PASS |
+| scripts/xp_gem.gd:58 | "xp_pickup" | `if AudioManager: AudioManager.play_sfx_by_id(...)` | PASS |
+| scripts/hud.gd:121 | "player_levelup" | `if AudioManager: AudioManager.play_sfx_by_id(...)` | PASS |
+| scripts/projectile.gd:101 | "weapon_hit" | `if AudioManager: AudioManager.play_sfx_by_id(...)` | PASS |
+
+**结论**: PASS -- 所有 6 处调用均使用行内 null guard 模式。
+
+#### 1.2 SFX_ID 定义完整性
+
+| SFX ID | 在 SFX_IDS 中 | 使用位置 | 状态 |
+|--------|---------------|---------|------|
+| player_hurt | PASS | player.gd:307 | PASS |
+| player_dash | PASS | player.gd:215 | PASS |
+| player_levelup | PASS | hud.gd:121 | PASS |
+| enemy_death | PASS | enemy.gd:251 | PASS |
+| xp_pickup | PASS | xp_gem.gd:58 | PASS |
+| weapon_hit | PASS | projectile.gd:101 | PASS |
+
+**结论**: PASS -- 所有使用的 SFX ID 均已在 audio_manager.gd SFX_IDS 中定义。
+
+#### 1.3 循环引用检查
+
+| audio_manager.gd 引用其他 autoload? | 结果 |
+|--------------------------------------|------|
+| GameManager | **未引用** -- PASS |
+| SaveManager | **未引用** -- PASS |
+| UpgradePool | **未引用** -- PASS |
+| SynergyManager | **未引用** -- PASS |
+
+**结论**: PASS -- audio_manager.gd 完全独立, 无循环引用风险。
+
+#### 1.4 音频总线配置
+
+| 总线 | 常量名 | 默认音量 | 创建逻辑 | 状态 |
+|------|--------|---------|---------|------|
+| Master | BUS_MASTER | 80 | 内置总线, 无需创建 | PASS |
+| BGM | BUS_BGM | 60 | _ensure_audio_buses() 动态创建 | PASS |
+| SFX | BUS_SFX | 80 | _ensure_audio_buses() 动态创建 | PASS |
+| UI | BUS_UI | 70 | _ensure_audio_buses() 动态创建 | PASS |
+
+**结论**: PASS -- 4 总线布局合理, 动态创建保证非编辑器环境兼容。
+
+---
+
+### 任务 2: 死灵法师集成审查
+
+#### 2.1 character_select.gd 注册 -- CRITICAL BUG
+
+**文件**: `/Users/ks_128/Documents/godot_demo/scripts/character_select.gd`
+
+**问题**: 第 33-34 行存在数组语法错误:
+
+```
+		},           <-- ranger dict 结束, 数组分隔符
+		,{           <-- 多余的前导逗号, 导致数组双逗号
+			"id": "necromancer",
+```
+
+**严重度**: **CRITICAL** -- GDScript 数组字面量中 `,,` (双逗号) 是解析错误。当玩家导航到角色选择场景时, `_characters` 变量初始化将失败, 导致场景加载崩溃。
+
+**测试为何未发现**: `test_r34_necromancer.gd` 仅通过 `_load_source()` 读取源文件文本搜索字符串模式 (如 `src.find('"necromancer"')`), 不实际解析或实例化 `character_select.gd` 脚本。因此语法错误逃过了所有测试。
+
+**建议修复**: 第 34 行 `		,{` 应改为 `		{` (移除前导逗号)。
+
+#### 2.2 skill_data.gd 常量 vs 设计规格
+
+**文件**: `/Users/ks_128/Documents/godot_demo/scripts/data/skill_data.gd`
+
+| 常量 | 实现值 | 设计规格值 | 偏差 |
+|------|--------|-----------|------|
+| NECROMANCER_SKILL_ID | "death_pulse" | "death_pulse" | 一致 |
+| NECROMANCER_SKILL_COOLDOWN | 25.0 | 25.0 | 一致 |
+| NECROMANCER_SKILL_DAMAGE | **12.0** | **8.0** (base) | **偏差** -- 实现采用固定12.0而非8.0+kill scaling |
+| NECROMANCER_SKILL_RADIUS | 120.0 | 120.0 | 一致 |
+| NECROMANCER_SKILL_TICKS | 3 | -- | **新增** -- 设计规格无此概念 |
+| NECROMANCER_SKILL_TICK_INTERVAL | 0.3 | -- | **新增** -- 设计规格无此概念 |
+| NECROMANCER_SKILL_SCREENSHAKE | 3.0 | 5.0 | **偏差** -- 较规格更低 |
+| NECROMANCER_SKILL_SCREENSHAKE_DUR | 0.12 | 0.12 | 一致 |
+| NECROMANCER_KILL_SCALING_INTERVAL | 100 | 100 | 一致 |
+| NECROMANCER_KILL_SCALING_BONUS | 0.02 | 0.02 | 一致 |
+| NECROMANCER_KILL_SCALING_MAX | 0.20 | 0.20 | 一致 |
+| (缺失) NECRO_SKILL_KILL_BONUS_RATE | -- | 0.05 | **缺失** -- 技能伤害无击杀缩放 |
+| (缺失) NECRO_SKILL_KILL_BONUS_CAP | -- | 30.0 | **缺失** |
+
+**分析**: 实现采用了**简化模型** -- 技能固定 12.0 伤害, 分 3 tick 在 0.9s 内释放, 每个 tick 4.0。设计规格定义了 8.0 基础 + 击杀缩放 (最高 38.0)。实现的模型更简单但放弃了核心设计卖点 -- 死灵法师技能随击杀数增长。
+
+**严重度**: Medium -- 角色仍可玩, 但缺失设计规格定义的核心 "死亡滚雪球" 技能体验。
+
+#### 2.3 upgrade_pool.gd 角色被动 -- CRITICAL BUG 上下文
+
+**文件**: `/Users/ks_128/Documents/godot_demo/scripts/autoload/upgrade_pool.gd`
+
+upgrade_pool.gd 第 186 行正确注册了:
+```gdscript
+"necromancer_kill_scaling": {"name": "Death Attunement", ..., "character": "necromancer"}
+```
+
+get_random_upgrades() 正确使用 `selected_character` 参数过滤角色被动。注册本身 **PASS**。
+
+但是, weapon_controller.gd 中的被动效果逻辑有 Critical 错误 (见 2.4)。
+
+#### 2.4 weapon_controller.gd 被动逻辑 -- CRITICAL BUG
+
+**文件**: `/Users/ks_128/Documents/godot_demo/scripts/weapon_controller.gd`
+
+**问题**: 第 66-73 行:
+
+```gdscript
+# Mage passive: Mana Attunement -- +10% weapon damage while skill is on cooldown
+if player.skill_id == "elemental_burst" and not player.is_skill_ready:
+
+    # Necromancer passive: Kill Scaling Damage -- +2% per 100 kills, max +20%
+    if player.has_passive("necromancer_kill_scaling") and GameManager:
+        var kill_bonus: float = minf(float(GameManager.enemies_killed) / 100.0 * 0.02, 0.20)
+        dmg_bonus *= (1.0 + kill_bonus)
+    dmg_bonus *= (1.0 + 0.10)
+```
+
+**严重度**: **CRITICAL** -- 死灵法师的 `kill_scaling` 被动代码被**错误嵌套**在法师条件块内:
+1. 外层条件 `player.skill_id == "elemental_burst" and not player.is_skill_ready` 仅当角色是法师且技能冷却中时为真
+2. 死灵法师的 `skill_id` 是 `"death_pulse"`, 永远不会满足 `"elemental_burst"` 条件
+3. 因此死灵法师的击杀缩放被动**永远不会生效**
+
+**影响**: 死灵法师的核心被动 (每 100 击杀 +2% 伤害) 完全失效, 角色没有被动能力, 与设计规格严重偏离。
+
+**建议修复**: 将 necromancer_kill_scaling 逻辑提取到独立的条件块, 与 mage passive 并列:
+
+```gdscript
+# Mage passive
+if player.skill_id == "elemental_burst" and not player.is_skill_ready:
+    dmg_bonus *= (1.0 + 0.10)
+
+# Necromancer passive: Kill Scaling
+if player.has_passive("necromancer_kill_scaling") and GameManager:
+    var kill_bonus: float = minf(float(GameManager.enemies_killed) / 100.0 * 0.02, 0.20)
+    dmg_bonus *= (1.0 + kill_bonus)
+```
+
+#### 2.5 player.gd 死灵法师分支初始化
+
+**文件**: `/Users/ks_128/Documents/godot_demo/scripts/player.gd`
+
+| 检查项 | 状态 | 说明 |
+|--------|------|------|
+| _setup_character_animation match 分支 | PASS | "necromancer" case 存在, 设置 color/texture/skill |
+| NECROMANCER_SKILL_COOLDOWN 引用 | PASS | 第 39 行正确引用 SkillData 常量 |
+| _init_skill("death_pulse", NECROMANCER_SKILL_COOLDOWN) | PASS | 第 167 行正确初始化 |
+| damage_bonus += 0.0 | PASS | 不加 flat bonus, 由运行时 kill scaling 提供 |
+| _idle_texture | PASS | _load_texture_safe("res://assets/sprites/characters/necromancer.png") |
+| _action_texture | PASS | _load_texture_safe("res://assets/sprites/characters/necromancer_cast.png") |
+
+**注意**: `apply_passive()` 的 match 语句 (第 366-387 行) 没有 `necromancer_kill_scaling` 分支。这是正确的, 因为该被动不在升级时直接修改 player 属性, 而是在 weapon_controller.gd 中运行时计算。但由于 2.4 中的 Critical BUG, 这个运行时计算永远不会执行。
+
+#### 2.6 arena.gd 死灵法师分支
+
+**文件**: `/Users/ks_128/Documents/godot_demo/scripts/arena.gd`
+
+| 检查项 | 状态 | 说明 |
+|--------|------|------|
+| match 分支存在 | PASS | 第 43-47 行 |
+| max_health = 7.0 | PASS | 符合规格 |
+| move_speed = 150.0 | PASS | 符合规格 |
+| pickup_range = 45.0 | PASS | 符合规格 (+29% vs 35 baseline) |
+| add_weapon("frostaura") | PASS | 符合规格 (控制型初始武器) |
+
+**结论**: PASS
+
+#### 2.7 skill_effects.gd death_pulse 实现
+
+**文件**: `/Users/ks_128/Documents/godot_demo/scripts/skill_effects.gd`
+
+| 检查项 | 状态 | 说明 |
+|--------|------|------|
+| death_pulse() 函数存在 | PASS | 第 267-297 行 |
+| 伤害公式 | 简化模型 | 固定 12.0*(1+damage_bonus), 非 8.0+kill_bonus (见 2.2) |
+| tick-based 伤害 | PASS | 3 tick, 每 tick 4.0 伤害 |
+| AOE 范围 120.0 | PASS | NECROMANCER_SKILL_RADIUS |
+| 视觉效果 (暗色扩展环) | PASS | Color(0.5, 0.3, 0.7, 0.6) 紫色 |
+| screen_shake 调用 | PASS | 通过 arena.screen_shake() |
+
+#### 2.8 设计规格一致性汇总
+
+| 维度 | 设计规格 (necromancer-design.md) | 实际实现 | 偏差评级 |
+|------|----------------------------------|---------|---------|
+| 角色属性 (HP/速度/拾取) | 7/150/45 | 7/150/45 | 无偏差 |
+| 初始武器 | frostaura | frostaura | 无偏差 |
+| 被动 (kill scaling) | 每100杀+2%, 上限+20% | 代码存在但被错误嵌套, **永不生效** | **Critical** |
+| 技能 (death_pulse) | 8.0基础+击杀缩放(最高38.0) | 固定12.0(3tick x 4.0) | **Medium** |
+| 技能CD | 25.0s | 25.0s | 无偏差 |
+| 颜色 | Color(0.27, 0.13, 0.40) | Color(0.5, 0.3, 0.7) | Low (亮紫 vs 暗紫) |
+| 描述 | "击杀越多，伤害越高" | "低血量法师，初始冰冻光环" | Low |
+| 精灵资源 | 需 necromancer.png | _load_texture_safe 已引用 | 待确认 |
+
+---
+
+### 任务 3: 技术债务追踪更新
+
+#### 3.1 文件行数检查
+
+| 文件 | R33b 行数 | R35 行数 | 占 500 行% | 变化 |
+|------|----------|---------|-----------|------|
+| scripts/player.gd | 323 | **395** | **79.0%** | +72 (necromancer+SFX) |
+| scripts/enemy.gd | 362 | **369** | 73.8% | +7 (SFX) |
+| scripts/weapon_controller.gd | 152 | **170** | 34.0% | +18 (necro passive) |
+| scripts/hud.gd | 362 | **363** | 72.6% | +1 (SFX) |
+| scripts/autoload/audio_manager.gd | 338 | **339** | 67.8% | +1 |
+| scripts/autoload/upgrade_pool.gd | 279 | **281** | 56.2% | +2 (necro passive) |
+| scripts/skill_effects.gd | 280 | **311** | 62.2% | +31 (death_pulse) |
+| scripts/player_skill.gd | 98 | **126** | 25.2% | +28 (necro skill) |
+| scripts/data/skill_data.gd | -- | **79** | 15.8% | 新增 necromancer 常量 |
+
+**关注**: player.gd 从 323 增至 395 行 (+22.3%), 距离 500 行上限仍有 105 行余量, 但增长速度较快。若后续版本继续添加角色, 可能需要提前拆分。
+
+**所有文件均 < 500 行**: PASS
+
+#### 3.2 新增架构问题
+
+| # | 问题 | 文件 | 严重度 |
+|---|------|------|--------|
+| 1 | character_select.gd 双逗号语法错误 | character_select.gd:34 | **CRITICAL** |
+| 2 | 死灵法师被动嵌套在法师条件内 | weapon_controller.gd:67-72 | **CRITICAL** |
+| 3 | 技能伤害模型偏离设计规格 | skill_data.gd / skill_effects.gd | Medium |
+| 4 | 角色描述文本不一致 | character_select.gd vs necromancer-design.md | Low |
+| 5 | 颜色值偏离设计规格 | 4 个文件 | Low |
+
+#### 3.3 既有技术债务状态
+
+| 债务 | R33b 状态 | R35 状态 | 变化 |
+|------|----------|---------|------|
+| Resonance 基线 (CD缩减) | Medium, 未修复 | Medium, 未修复 | -- |
+| Overcharge 基线 (速度+15%) | Medium, 未修复 | Medium, 未修复 | -- |
+| Frostbite Loop 缺 ICD | Medium, 未修复 | Medium, 未修复 | -- |
+| beam_line.gd load+new | Low, 未修复 | Low, 未修复 | -- |
+| spiral_blade.gd O(n*m) | Low, 未修复 | Low, 未修复 | -- |
+| pulse_ring.gd load() | Low, 未修复 | Low, 未修复 | -- |
+| audio_manager.gd 274行 | Low | 339行 (67.8%) | 增长, 但仍在安全范围 |
+
+---
+
+### 任务 4: 测试基线
+
+Programmer-log 报告 R34 测试结果: **2404 tests, 2400 pass, 0 fail, 4 pending, 5071 asserts**
+
+新增测试:
+- test_r34_sfx_integration.gd: 42 个测试 (SFX 守卫检查 + API 验证)
+- test_r34_necromancer.gd: 26 个测试 (角色定义 + 属性 + 技能 + 被动验证)
+
+**测试覆盖缺口**:
+1. **无 character_select.gd 场景加载测试** -- 语法错误逃过检测
+2. **无 weapon_controller.gd 被动逻辑测试** -- 嵌套条件错误逃过检测
+3. **无死灵法师被动伤害集成测试** -- kill_scaling 是否实际影响武器伤害未验证
+
+---
+
+### 任务 5: 评分
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| 功能完成度 | 55 | 100 | SFX 集成 PASS; 死灵法师角色注册存在但 2 个 Critical BUG 导致核心功能不可用 |
+| 代码质量 | 70 | 100 | 所有文件 < 500 行; null guard 一致; 但 weapon_controller.gd 条件嵌套错误和 character_select.gd 语法错误严重降低质量分 |
+| 架构合规 | 80 | 100 | audio_manager 无循环引用; autoload 隔离良好; 角色系统扩展模式正确; 4 总线布局合理 |
+| 测试适配 | 90 | 100 | 2404 测试全通过; 新增 68 个 R34 测试; 但源码模式测试无法检测运行时语法/逻辑错误 |
+
+**综合评分: 84.5/100** (较 R33b 的 91.2 下降 6.7 分)
+
+---
+
+### 给各角色的建议
+
+**Programmer -- 必须修复 (P0 Critical)**:
+1. `/Users/ks_128/Documents/godot_demo/scripts/character_select.gd` 第 34 行: 将 `		,{` 改为 `		{` (移除多余前导逗号)
+2. `/Users/ks_128/Documents/godot_demo/scripts/weapon_controller.gd` 第 66-73 行: 将 necromancer_kill_scaling 逻辑从法师条件块内提取为独立并列条件块
+
+**Programmer -- 建议修复 (Medium)**:
+3. `/Users/ks_128/Documents/godot_demo/scripts/data/skill_data.gd` + `scripts/skill_effects.gd`: 考虑实现设计规格的击杀缩放技能伤害模型 (8.0 基础 + kills*0.05*8.0, 上限 38.0), 或确认简化模型 (固定 12.0/3tick) 为有意的设计决策并在 programmer-log 中记录偏差
+
+**QA -- 建议补充测试**:
+4. 添加 `test_r35_necromancer_passive_active.gd`: 创建 player + weapon_controller 实例, 设置 `GameManager.enemies_killed = 500`, 验证 `dmg_bonus` 实际包含 kill_scaling 加成 (会暴露 BUG #2)
+5. 添加 character_select 场景实例化测试, 验证 `_characters.size() == 4` (会暴露 BUG #1)
+6. 添加测试验证 necromancer_kill_scaling 被动在 `skill_id != "elemental_burst"` 时仍然生效
+
+**Designer -- 确认决策**:
+7. 确认死灵法师技能是否采用简化模型 (固定 12.0/3tick) 还是完整击杀缩放模型 (8.0+kill scaling 至 38.0)。当前实现偏离 `docs/superpowers/specs/necromancer-design.md` Section 3.4
+8. 确认颜色值: 当前 Color(0.5, 0.3, 0.7) (亮紫) vs 规格 Color(0.27, 0.13, 0.40) (暗紫)
+
+---
+
+### 审核人自评 (R35): 82/100
+
+| 维度 | 得分 | 满分 | 说明 |
+|------|------|------|------|
+| SFX 架构审查 | 28 | 30 | 6 文件逐一验证 null guard/SFX_ID/循环引用/总线配置 |
+| 死灵法师集成审查 | 28 | 30 | 发现 2 个 Critical BUG (语法错误 + 逻辑嵌套), 设计规格偏差分析 |
+| 技术债务追踪 | 14 | 20 | 行数更新完整, 新旧债务均追踪, 但未运行实际测试验证 |
+| 测试基线验证 | 12 | 20 | 依赖 Programmer-log 报告的 2404 数据, 未自行执行 run_tests.sh |
+
+**加分项**:
+- 发现 2 个 Critical BUG 均被 2404 个测试漏过 (源码模式测试的局限性), 证明了人工代码审查的不可替代性
+- 完成 skill_data 常量与设计规格的逐字段对比, 发现 5 处偏差
+
+**待改进**:
+- 未实际运行 `./run_tests.sh` 确认基线 (依赖日志数据, 可能不代表当前 HEAD 状态)
+- character_select.gd 的语法错误分析依赖 GDScript 解析规则推论, 未通过实际场景加载验证

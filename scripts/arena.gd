@@ -65,6 +65,10 @@ func _ready():
 	# Connect victory signal for normal/hard mode
 	GameManager.victory_achieved.connect(_on_victory_achieved)
 
+	# Connect wave SFX triggers
+	GameManager.wave_started.connect(_on_wave_started_sfx)
+	GameManager.wave_completed.connect(_on_wave_completed_sfx)
+
 	_draw_grid()
 
 	# Tutorial system
@@ -176,3 +180,11 @@ func _on_victory_achieved(_gold_bonus: int) -> void:
 	tween.tween_callback(func():
 		get_tree().change_scene_to_file("res://scenes/game_over_screen.tscn")
 	)
+
+
+func _on_wave_started_sfx(_wave: int, _wave_name: String) -> void:
+	if AudioManager: AudioManager.play_sfx_by_id("wave_start")
+
+
+func _on_wave_completed_sfx(_wave: int) -> void:
+	if AudioManager: AudioManager.play_sfx_by_id("wave_clear")

@@ -169,6 +169,7 @@ func _play_skeleton_death(enemy: CharacterBody2D, sprite: Sprite2D) -> void:
 
 func _play_elite_skeleton_death(enemy: CharacterBody2D, sprite: Sprite2D) -> void:
 	## Elite skeleton: expand -> shrink + rotate + dark red + fade
+	if AudioManager: AudioManager.play_sfx_by_id("elite_death")
 	var t: Tween = enemy.create_tween()
 	# Brief expand
 	t.tween_property(sprite, "scale", Vector2(1.4, 1.4), 0.15).set_ease(Tween.EASE_OUT)
@@ -220,6 +221,7 @@ func _play_fire_slime_death(enemy: CharacterBody2D, sprite: Sprite2D) -> void:
 
 func _play_elite_knight_death(enemy: CharacterBody2D, sprite: Sprite2D) -> void:
 	## Elite knight: tilt + sink + dark purple + fade
+	if AudioManager: AudioManager.play_sfx_by_id("elite_death")
 	var base_y: float = sprite.position.y
 	var t: Tween = enemy.create_tween()
 	# Dark purple tint
@@ -233,6 +235,7 @@ func _play_elite_knight_death(enemy: CharacterBody2D, sprite: Sprite2D) -> void:
 
 func _play_boss_death(enemy: CharacterBody2D, sprite: Sprite2D) -> void:
 	## Boss: multi-stage death: shock -> shake -> explode -> gold flash -> vanish
+	if AudioManager: AudioManager.play_sfx_by_id("boss_roar")
 	var base_pos: Vector2 = sprite.position
 	var t: Tween = enemy.create_tween()
 	# Stage 1: shock expand

@@ -135,9 +135,9 @@ func test_sfx_ids_includes_wave_clear():
 # =====================================================================
 
 func test_sfx_ids_minimum_count():
-	# v1.2.0 Phase A defines at least 33 SFX entries
-	assert_true(AudioManager.SFX_IDS.size() >= 33,
-		"SFX_IDS should have at least 33 entries, got %d" % AudioManager.SFX_IDS.size())
+	# v1.2.0 Phase B defines at least 34 SFX entries
+	assert_true(AudioManager.SFX_IDS.size() >= 34,
+		"SFX_IDS should have at least 34 entries, got %d" % AudioManager.SFX_IDS.size())
 
 
 # =====================================================================
@@ -235,21 +235,49 @@ func test_enemy_has_enemy_death_sfx():
 func test_enemy_death_effects_has_audio_manager_reference():
 	var path: String = "res://scripts/enemies/enemy_death_effects.gd"
 	var src: String = _load_source(path)
-	var has_ref: bool = (src.find("AudioManager") >= 0)
-	if not has_ref:
-		pending("enemy_death_effects.gd does not yet reference AudioManager -- SFX integration pending")
-		return
-	assert_true(has_ref, "enemy_death_effects.gd should reference AudioManager")
+	assert_true(src.find("AudioManager") >= 0, "enemy_death_effects.gd should reference AudioManager")
+
+
+func test_enemy_death_effects_has_elite_death_sfx():
+	var path: String = "res://scripts/enemies/enemy_death_effects.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find('play_sfx_by_id("elite_death")') >= 0,
+		"enemy_death_effects.gd should call play_sfx_by_id with elite_death")
+
+
+func test_enemy_death_effects_has_boss_roar_sfx():
+	var path: String = "res://scripts/enemies/enemy_death_effects.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find('play_sfx_by_id("boss_roar")') >= 0,
+		"enemy_death_effects.gd should call play_sfx_by_id with boss_roar")
+
+
+func test_enemy_death_effects_sfx_calls_use_guard():
+	_assert_all_sfx_guarded("res://scripts/enemies/enemy_death_effects.gd", "enemy_death_effects.gd")
 
 
 func test_enemy_loot_has_audio_manager_reference():
 	var path: String = "res://scripts/enemies/enemy_loot.gd"
 	var src: String = _load_source(path)
-	var has_ref: bool = (src.find("AudioManager") >= 0)
-	if not has_ref:
-		pending("enemy_loot.gd does not yet reference AudioManager -- SFX integration pending")
-		return
-	assert_true(has_ref, "enemy_loot.gd should reference AudioManager")
+	assert_true(src.find("AudioManager") >= 0, "enemy_loot.gd should reference AudioManager")
+
+
+func test_enemy_loot_has_gold_drop_sfx():
+	var path: String = "res://scripts/enemies/enemy_loot.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find('play_sfx_by_id("gold_drop")') >= 0,
+		"enemy_loot.gd should call play_sfx_by_id with gold_drop")
+
+
+func test_enemy_loot_has_chest_open_sfx():
+	var path: String = "res://scripts/enemies/enemy_loot.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find('play_sfx_by_id("chest_open")') >= 0,
+		"enemy_loot.gd should call play_sfx_by_id with chest_open")
+
+
+func test_enemy_loot_sfx_calls_use_guard():
+	_assert_all_sfx_guarded("res://scripts/enemies/enemy_loot.gd", "enemy_loot.gd")
 
 
 # =====================================================================
@@ -298,18 +326,10 @@ func test_hud_has_player_levelup_sfx():
 
 func test_projectile_has_audio_manager_reference():
 	var src: String = _load_source(PROJECTILE_PATH)
-	var has_ref: bool = (src.find("AudioManager") >= 0)
-	if not has_ref:
-		pending("projectile.gd does not yet reference AudioManager -- SFX integration pending")
-		return
-	assert_true(has_ref, "projectile.gd should reference AudioManager")
+	assert_true(src.find("AudioManager") >= 0, "projectile.gd should reference AudioManager")
 
 
 func test_projectile_sfx_calls_use_guard():
-	var src: String = _load_source(PROJECTILE_PATH)
-	if src.find("AudioManager") < 0:
-		pending("projectile.gd has no AudioManager calls -- guard test not applicable")
-		return
 	_assert_all_sfx_guarded(PROJECTILE_PATH, "projectile.gd")
 
 
@@ -317,14 +337,11 @@ func test_projectile_sfx_calls_use_guard():
 # 10. weapon_controller SFX integration status
 # =====================================================================
 
-func test_weapon_controller_has_audio_manager_reference():
+func test_weapon_controller_has_necromancer_kill_scaling():
 	var path: String = "res://scripts/weapon_controller.gd"
 	var src: String = _load_source(path)
-	var has_ref: bool = (src.find("AudioManager") >= 0)
-	if not has_ref:
-		pending("weapon_controller.gd does not yet reference AudioManager -- SFX integration pending")
-		return
-	assert_true(has_ref, "weapon_controller.gd should reference AudioManager")
+	assert_true(src.find("necromancer_kill_scaling") >= 0,
+		"weapon_controller.gd should reference necromancer_kill_scaling passive")
 
 
 # =====================================================================
@@ -334,8 +351,84 @@ func test_weapon_controller_has_audio_manager_reference():
 func test_arena_has_audio_manager_reference():
 	var path: String = "res://scripts/arena.gd"
 	var src: String = _load_source(path)
-	var has_ref: bool = (src.find("AudioManager") >= 0)
-	if not has_ref:
-		pending("arena.gd does not yet reference AudioManager -- SFX integration pending")
-		return
-	assert_true(has_ref, "arena.gd should reference AudioManager")
+	assert_true(src.find("AudioManager") >= 0, "arena.gd should reference AudioManager")
+
+
+func test_arena_has_wave_start_sfx():
+	var path: String = "res://scripts/arena.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find('play_sfx_by_id("wave_start")') >= 0,
+		"arena.gd should call play_sfx_by_id with wave_start")
+
+
+func test_arena_has_wave_clear_sfx():
+	var path: String = "res://scripts/arena.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find('play_sfx_by_id("wave_clear")') >= 0,
+		"arena.gd should call play_sfx_by_id with wave_clear")
+
+
+func test_arena_sfx_calls_use_guard():
+	_assert_all_sfx_guarded("res://scripts/arena.gd", "arena.gd")
+
+
+# =====================================================================
+# 12. SkillEffects SFX integration status
+# =====================================================================
+
+func test_skill_effects_has_audio_manager_reference():
+	var path: String = "res://scripts/skill_effects.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find("AudioManager") >= 0, "skill_effects.gd should reference AudioManager")
+
+
+func test_skill_effects_has_player_skill_sfx():
+	var path: String = "res://scripts/skill_effects.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find('play_sfx_by_id("player_skill")') >= 0,
+		"skill_effects.gd should call play_sfx_by_id with player_skill")
+
+
+func test_skill_effects_sfx_calls_use_guard():
+	_assert_all_sfx_guarded("res://scripts/skill_effects.gd", "skill_effects.gd")
+
+
+# =====================================================================
+# 13. Enemy Bullet SFX integration
+# =====================================================================
+
+func test_sfx_ids_includes_enemy_bullet_hit():
+	assert_true(AudioManager.SFX_IDS.has("enemy_bullet_hit"),
+		"SFX_IDS should contain enemy_bullet_hit")
+
+
+func test_enemy_bullet_has_audio_manager_reference():
+	var path: String = "res://scripts/enemy_bullet.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find("AudioManager") >= 0, "enemy_bullet.gd should reference AudioManager")
+
+
+func test_enemy_bullet_has_bullet_hit_sfx():
+	var path: String = "res://scripts/enemy_bullet.gd"
+	var src: String = _load_source(path)
+	assert_true(src.find('play_sfx_by_id("enemy_bullet_hit")') >= 0,
+		"enemy_bullet.gd should call play_sfx_by_id with enemy_bullet_hit")
+
+
+func test_enemy_bullet_sfx_calls_use_guard():
+	_assert_all_sfx_guarded("res://scripts/enemy_bullet.gd", "enemy_bullet.gd")
+
+
+# =====================================================================
+# 14. HUD upgrade_done SFX integration
+# =====================================================================
+
+func test_sfx_ids_includes_upgrade_done():
+	assert_true(AudioManager.SFX_IDS.has("upgrade_done"),
+		"SFX_IDS should contain upgrade_done")
+
+
+func test_hud_has_upgrade_done_sfx():
+	var src: String = _load_source(HUD_PATH)
+	assert_true(src.find('play_sfx_by_id("upgrade_done")') >= 0,
+		"hud.gd should call play_sfx_by_id with upgrade_done")

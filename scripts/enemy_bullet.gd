@@ -33,4 +33,5 @@ func _physics_process(delta):
 func _on_body_entered(body: Node2D):
 	if body.is_in_group("players") and body.has_method("take_damage"):
 		body.take_damage(damage)
+		if AudioManager: AudioManager.play_sfx_by_id("enemy_bullet_hit")
 		queue_free()

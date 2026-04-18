@@ -412,7 +412,7 @@ func test_play_bgm_by_id_unknown_id():
 # =====================================================================
 
 func test_sfx_ids_count():
-	assert_eq(AudioManager.SFX_IDS.size(), 33, "SFX_IDS should have 33 entries")
+	assert_eq(AudioManager.SFX_IDS.size(), 34, "SFX_IDS should have 34 entries")
 
 
 func test_sfx_ids_unique():

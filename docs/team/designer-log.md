@@ -49,7 +49,7 @@
 | P1 | 暂停精通面板实施 | ✅ 已完成（hud_mastery_panel.gd build_pause_panel + hud.gd Escape handler） |
 | P2 | 音频系统设计规格 | 已完成（R32） |
 | P2 | 第4角色（死灵法师）设计规格 | 已完成（R33，规格见 specs/necromancer-design.md） |
-| P2 | 投掷武器（firebomb）设计规格 | 已完成（R33，规格见 specs/necromancer-design.md） |
+| P2 | 投掷武器（firebomb）设计规格 | 已完成（R33设计，R35独立规格见 specs/firebomb-design.md） |
 | P2 | 本地排行榜设计规格 | v1.2.0 Phase C |
 | P2 | 混沌难度模式设计规格 | v1.2.0 Phase C 或 v1.3.0 |
 
@@ -4307,6 +4307,154 @@ New Files (depends on Behavior):
    - `sfx_thunderbomb_shock.wav` (0.15s, electric discharge)
 
 5. **Integration test coverage**: The 20 Necromancer tests and 15 Firebomb tests defined in the spec (necromancer-design.md Sections 7.1-7.2) should be written BEFORE implementation begins (test-first approach), but this requires Programmer Agent coordination.
+
+---
+
+## R35 2026-04-18 -- Firebomb Weapon Dedicated Design Spec
+
+### 1. Task Background
+
+Project status: 2404 tests all passing, v1.2.0 Phase B in progress. R34 completed the audio resource strategy, Necromancer integration checklist, and progress tracking. The Firebomb weapon design was originally embedded within `docs/superpowers/specs/necromancer-design.md` Sections 4-4.6 (R33), but it needs a dedicated, self-contained design spec document that the Programmer Agent can reference independently.
+
+This round extracts and expands the Firebomb design into a standalone spec with complete numerical tables, implementation notes, test cases, and decision records.
+
+### 2. Firebomb Dedicated Design Spec
+
+**Output file**: `docs/superpowers/specs/firebomb-design.md` (new)
+
+**Design overview**: The firebomb is the 8th base weapon type ("throwing"), introducing a parabolic arc projectile that creates a persistent fire pool at the landing point. This fills the "point AoE" niche not covered by any existing weapon. The spec includes:
+
+1. **Pre-requisite research** (Section 2): Genre analysis of throwing/DoT weapons in VS, Brotato, HoloCure, and H5 project. Key finding: throwing + persistent pool combination is underused in the genre.
+
+2. **Base weapon constants** (Section 3): 7 core attributes + 7 throwing-specific constants, all with exact values and units.
+
+3. **Level scaling** (Section 4): Lv1/Lv2/Lv3 progression table with DPS calculations. Lv3 quality change = "Burning Ground" (1.5 DPS, 20% slow, 1.5s linger after pool expires).
+
+4. **Evolution: thunderbomb** (Section 5): firebomb + lightning recipe. 5.0/tick damage, 1.2s CD, 80px pool, 30% chain lightning chance per tick (2 chains, 8.0 damage each). DPS estimate: 25.0 single target, ~49.0 multi-target with chains. A-tier, comparable to thunderang (25.0).
+
+5. **weapon_data.gd new fields** (Section 6): 10 throwing-specific export vars, plus comment update to include "throwing" type.
+
+6. **upgrade_pool.gd registration** (Section 7): Complete GDScript code blocks for firebomb base and thunderbomb evolved weapon registration.
+
+7. **weapon_registry.gd addition** (Section 8): New evolution recipe bringing total from 12 to 13.
+
+8. **Implementation notes** (Section 9): Parabolic arc math (simplified Y-offset lerp approach), fire pool lifecycle (7 steps), thunderbomb chain lightning logic.
+
+9. **Synergy compatibility** (Section 10): Analysis of 5 existing synergies + 3 future synergy opportunities (v1.3.0).
+
+10. **Mastery integration** (Section 11): firebomb added to BASE_WEAPONS array, thunderbomb added to evolved_parents mapping.
+
+11. **Test cases** (Section 13): 20 tests across 3 categories (base weapon, evolution, Lv3 quality change).
+
+12. **Numerical summary tables** (Section 14): Complete constant tables for firebomb (16 constants) and thunderbomb (13 constants).
+
+13. **File change budget** (Section 15): ~166 lines across 8 files (2 new, 6 modified).
+
+14. **Decision records** (Section 16): 7 decisions with rationale and alternatives considered.
+
+### 3. Key Numerical Decisions
+
+#### 3.1 DPS Balance
+
+| Metric | Firebomb Lv1 | Firebomb Lv3 | Thunderbomb |
+|--------|-------------|-------------|-------------|
+| Single-target DPS | 4.8 | 19.0 | 25.0 |
+| Multi-target (3 enemies) | 14.4 | 57.0 | 49.0 (chains) |
+| Cooldown | 2.5s | 1.5s | 1.2s |
+| Pool radius | 50px | 70px | 80px |
+
+**Assessment**: Firebomb single-target DPS at Lv3 (19.0) is the highest of all base weapons, balanced by the requirement that enemies stand in the pool. Multi-target DPS (57.0) is situational -- depends on enemy density. Thunderbomb single-target (25.0) matches thunderang at rank 1 among evolved weapons.
+
+#### 3.2 Max 3 Simultaneous Pools
+
+At Lv3 with 2 flasks/throw and 1.5s CD, the player generates approximately 1.3 pools/second. 3 pools cover approximately 2.3 seconds of throwing. This is a performance safety cap that does not affect normal gameplay.
+
+#### 3.3 Lv3 Burning Ground Design Choice
+
+Burning ground (1.5 DPS, 20% slow, 1.5s) was chosen over alternatives because:
+- Different from firestaff's Searing Burst (kill-triggered explosion) -- no overlap
+- Zone persistence rewards pre-positioning
+- 20% slow synergizes with frostaura's stronger slow
+
+### 4. Priority Table Update
+
+| Priority | Item | Status |
+|----------|------|--------|
+| P0 | v1.1.0 core scope | DONE |
+| P0 | Resonance + Overcharge weapon_weapon synergies | DONE |
+| P0 | v1.2.0 audio system design spec | DONE (R32) |
+| P0 | v1.2.0 AudioManager core implementation | DONE (R33, Phase A 100%) |
+| P0 | v1.2.0 SFX trigger wiring + asset sourcing | Phase B (in progress, 6/15 scripts done) |
+| P1 | v1.2.0 Necromancer character design spec | DONE (R33) |
+| P1 | v1.2.0 Necromancer character implementation | Phase C |
+| P1 | v1.2.0 Firebomb weapon design spec | DONE (R35, dedicated spec) |
+| P1 | v1.2.0 Firebomb weapon implementation | Phase D |
+| P2 | v1.2.0 volume control UI + persistence | Phase E |
+| P2 | v1.2.0 local leaderboard | Phase F |
+| P2 | v1.2.0 Chaos difficulty | v1.3.0 |
+
+### 5. Decision Records
+
+**Dedicated firebomb-design.md (extracted from necromancer-design.md)**:
+- **Decision**: Extract firebomb weapon design into a standalone spec document
+- **Why**: The original firebomb design was embedded in Sections 4-4.6 of necromancer-design.md. While this was convenient during initial brainstorming, the Programmer Agent needs a self-contained reference that does not require reading the entire Necromancer character spec. The firebomb is a standalone weapon available to all characters (not Necromancer-exclusive), so its spec should be independent
+- **Alternative**: Keep firebomb in necromancer-design.md with cross-references (creates coupling between character and weapon specs, harder to maintain)
+
+**Lv3 quality change = Burning Ground (not larger pool or more flasks)**:
+- **Decision**: Lv3 effect is lingering burning ground after pool expires
+- **Why**: Larger pool radius alone is boring (purely numerical). More flasks would be too similar to Lv2 scaling (2 flasks at Lv2, adding more at Lv3 is incremental). Burning ground creates a new mechanic (zone persistence after weapon expires) that rewards positioning
+- **Alternative**: +1 flask at Lv3 (too similar to Lv2, no qualitative change), +20px pool radius only (boring)
+
+**Thunderbomb chain from pool center (not from enemies)**:
+- **Decision**: Chain lightning originates from the electrified pool position, not from each enemy hit
+- **Why**: Creates a "lightning tower" effect unique among weapons. Pool-centered chains reward strategic flask placement in dense areas. If chains originated from enemies, the behavior would overlap with thunderholywater (which chains from orbit hits) and thunderang (which chains from boomerang hits)
+- **Alternative**: Chain from each enemy in pool (too chaotic, overlaps with thunderholywater), single target electric burst (boring, does not feel like an evolution)
+
+**Evolution recipe firebomb + lightning**:
+- **Decision**: Fire pool + electricity = electrified pool. Uses lightning (common ingredient appearing in 4 recipes)
+- **Why**: Thematically consistent with existing fire+lightning evolutions (firestaff appears in fireknife/flamebible/blazerang). Lightning is the most versatile evolution ingredient
+- **Alternative**: firebomb + firestaff (both fire-themed -- redundant), firebomb + frostaura (fire+ice not a standard combo in our evolution system)
+
+**Max 3 simultaneous pools**:
+- **Decision**: Hard cap at 3 active pools per player
+- **Why**: Performance safety. At Lv3 (2 flasks/throw, 1.5s CD), natural pool density is ~1.3 pools/second. 3 pools covers 2.3s of throwing. Exceeding 3 would require aggressive CD reduction builds which are rare
+- **Alternative**: Unlimited pools (memory/rendering risk), 5 pools (generous but unnecessary overhead)
+
+### 6. Output Files
+
+| File | Function | Priority |
+|------|----------|----------|
+| `docs/superpowers/specs/firebomb-design.md` (new) | Firebomb weapon standalone design spec with complete numerical tables, implementation notes, test cases | P1 HIGH |
+| `docs/team/designer-log.md` (this file) | R35 execution record | P1 HIGH |
+
+### 7. Self-Assessment
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Numerical completeness | 9/10 | 29 constants defined with exact values, units, and file locations. Deducted 1 point for not specifying the parabolic arc formula with enough detail for direct implementation (simplified vs physics-based approach ambiguity) |
+| DPS balance analysis | 9/10 | Compared against all 7 existing base weapons and 9+ evolved weapons. Multi-target premium quantified. Deducted 1 point for theoretical-only calculations (actual DPS depends on enemy movement patterns) |
+| Implementation readiness | 9/10 | Complete upgrade_pool.gd code blocks, weapon_data.gd field definitions, weapon_registry.gd recipe. Deducted 1 point for not providing complete thrown_flask.gd code (only algorithm description) |
+| Integration coverage | 10/10 | Mastery, achievements, synergies, and save_manager changes all covered with specific code blocks |
+| Test case completeness | 9/10 | 20 tests across 3 categories with priority levels. Deducted 1 point for not including edge cases (no enemies in range, enemies leaving pool mid-tick) |
+| Spec independence from parent | 10/10 | Fully self-contained. No required reading of necromancer-design.md to implement firebomb |
+
+**Composite score**: 93/100
+
+### 8. Improvement Areas
+
+1. **Parabolic arc math**: The spec provides two approaches (physics-based and lerp-based) but does not commit to one. The Programmer Agent needs to decide during implementation. A committed approach with exact code would be more actionable.
+
+2. **Pool tick edge cases**: What happens when an enemy enters the pool mid-tick? What happens when an enemy dies from a pool tick (does _last_hit_by = "firebomb" for kill attribution)? These edge cases should be explicitly addressed.
+
+3. **Thunderbomb chain lightning visual**: The spec references reusing `weapon_effects.gd` `create_lightning_effect()` but does not specify the color (should be electric blue matching thunderbomb's Color(0.50, 0.70, 1.00)).
+
+4. **SFX for firebomb**: R34 identified 4 new SFX files needed (firebomb_throw, firebomb_ignite, fire_pool_tick, thunderbomb_shock) but these are not included in the audio spec's 33-file count. The audio spec should be updated to 37 SFX files.
+
+5. **Interaction with Necromancer passive**: Pool tick kills count toward Necromancer's kill_bonus passive. In a dense swarm with Lv3 firebomb, this could generate kills rapidly. The interaction is documented but not quantified (expected kill rate from pool ticks vs direct weapon kills).
+
+---
+
+*R35 generated by Designer Agent on 2026-04-18*
 
 ---
 

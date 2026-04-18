@@ -4,6 +4,7 @@
 
 | 日期 | 测试数 | 断言数 | 结果 |
 |------|--------|--------|------|
+| 2026-04-18 R35 | 2426 | 5096 | 2406 通过, 0 失败, 20 pending, 7 orphan(baseline), 22项新测试(test_r34_sfx_integration +1 skill_effects pending + test_r35_firebomb 21项全部pending), SFX集成skill_effects.gd检查已添加(pending), Firebomb武器测试框架就绪(21项: 注册5+进化2+WeaponData2+精通2+脚本4+dispatch1+雷暴瓶3+回归2), R34 pre-existing flaky已修复(0失败), PEND-R35-01~19为Firebomb待Programmer实现 |
 | 2026-04-18 R33 | 2336 | 4930 | 2336 通过, 0 失败, 0 pending, 7 orphan(baseline), 59项新测试(test_audio_manager.gd 61项: 实例化+BGM播放器+SFX音池+UI播放器+音频总线+API方法+音量clamp+dB映射+静音切换+常量计数+资源预加载+null安全), Programmer已完成audio_manager.gd(339行, v1.2.0 Phase A), hud.gd 436行未达<400拆分目标, PEND-R31-01~03仍待Programmer实现 |
 | 2026-04-18 R32 | 2277 | 4813 | 2272 通过, 0 失败, 5 pending, 7 orphan(baseline), 38项新测试(test_v110_acceptance 25/25+test_r32_synergy_vfx 2/4+test_r32_final_items 6/9), v1.1.0验收全部通过(12项范围逐一验证: 12进化配方+20协同定义+spiral/pulse/beam 3种类型+7基础武器5级精通+build_pause_panel+elite_knight注册+Ghost/Bat动画+6场景Sprite2D+Resonance子脉冲+Overcharge过载+player_skill.gd+player.gd 380行<400+总测试数2277>=2239), pending项: create_resonance_ripple VFX(2)+knockback_resistance(3)等待Programmer实现 |
 | 2026-04-18 R31 | 2239 | 4711 | 2237 通过, 0 失败, 2 pending, 7 orphan(baseline), 94项新测试(test_resonance_synergy 30+test_overcharge_synergy 31+test_r31_player_split 25+test_integration适配1+test_synergy_manager已由Programmer更新8), Resonance协同检测全部通过(holyshockwave+2AOE 5组合+不触发3边界+tag_weapons 9项验证), Overcharge协同检测全部通过(thunderbeam+1lightning 4组合+不触发4边界+tag_weapons 4+7验证), player.gd 400行(待拆分<400目标), player_combat.gd尚未创建, pulse_ring.gd/beam_line.gd的resonance/overcharge行为代码尚未实现(11项pending等待Programmer), test_integration.gd SYNERGY_DEFINITIONS 18->20回归修复 |
@@ -2916,3 +2917,124 @@ Skip:    4 (expected pending)
 | test/unit/test_r34_sfx_integration.gd | 新增 | R34 SFX集成测试(41项: SFX_IDS完整性15+格式2+交叉引用4+player集成4+enemy集成2+xp_gem集成3+hud集成3+projectile集成2 pending+未集成模块4 pending) |
 | test/unit/test_r34_necromancer.gd | 新增 | R34 死灵法师角色测试(27项: player.gd定义4+arena数值4+精灵2+角色选择5+升级池3+技能数据4+技能模块2+武器控制器1) |
 | docs/team/qa-log.md | 修改 | R34测试报告 |
+
+## R35 QA测试报告 (v1.2.0 Phase B -- Firebomb)
+
+**日期**: 2026-04-18
+**基线**: R34 2404测试 (2399通过, 1失败pre-existing flaky, 4 pending)
+**结果**: 2426测试, 2406通过, 0失败, 20 pending
+
+### 任务1: SFX集成测试更新 -- skill_effects新增 (42/42, 1 pending)
+
+test/unit/test_r34_sfx_integration.gd (42项测试, +1 新增)
+
+**新增测试**:
+- test_skill_effects_has_audio_manager_reference -- pending (skill_effects.gd未引用AudioManager)
+
+**SFX集成状态变化 (vs R34)**:
+- R34 1项pre-existing flaky(test_frost_aura_shatter_called_in_die) -- R35已修复, 0失败
+- SFX_IDS最小计数从33更新到34 (Designer新增1条SFX)
+- 5个SFX待集成文件状态不变: enemy_death_effects.gd, enemy_loot.gd, weapon_controller.gd, arena.gd, skill_effects.gd 均未引用AudioManager
+
+### 任务2: Firebomb武器测试 -- 全部pending等待Programmer (21/21 pending)
+
+test/unit/test_r35_firebomb.gd (21项测试)
+
+**武器注册 (5 pending)**:
+- test_firebomb_registered_in_upgrade_pool -- pending (upgrade_pool未注册firebomb)
+- test_firebomb_weapon_type_is_throwing -- pending (依赖注册)
+- test_firebomb_base_damage -- pending (依赖注册, 期望3.0/tick)
+- test_firebomb_cooldown -- pending (依赖注册, 期望2.5s)
+- test_firebomb_aoe_radius -- pending (依赖注册, 期望50.0px)
+
+**进化配方 (2 pending)**:
+- test_thunderbomb_evolution_recipe -- pending (weapon_registry未添加firebomb+lightning=thunderbomb)
+- test_evolution_recipes_count_after_firebomb -- pending (期望>=13配方, 当前12)
+
+**WeaponData (2 pending)**:
+- test_weapon_data_has_throwing_fields -- pending (weapon_data.gd无throwing专属字段)
+- test_weapon_data_type_comment_includes_throwing -- pending (weapon_type注释不含throwing)
+
+**精通追踪 (2 pending)**:
+- test_firebomb_in_base_weapons -- pending (BASE_WEAPONS数组不含firebomb, 当前7项)
+- test_base_weapons_count_after_firebomb -- pending (期望>=8项)
+
+**实现脚本 (4 pending)**:
+- test_thrown_flask_script_exists -- pending (thrown_flask.gd未创建)
+- test_thrown_flask_extends_node2d -- pending (依赖脚本创建)
+- test_fire_pool_script_exists -- pending (fire_pool.gd未创建)
+- test_fire_pool_has_tick_damage -- pending (依赖脚本创建)
+
+**Weapon Controller (1 pending)**:
+- test_weapon_controller_dispatches_throwing -- pending (weapon_controller.gd无throwing类型dispatch)
+
+**Thunderbomb进化武器 (3 pending)**:
+- test_thunderbomb_registered_in_upgrade_pool -- pending
+- test_thunderbomb_is_evolved -- pending (期望is_evolved=true)
+- test_thunderbomb_damage -- pending (期望5.0/tick)
+
+**回归 (2 pass)**:
+- test_existing_7_base_weapons_unchanged -- PASS (7项基础武器完整)
+- test_existing_12_evolution_recipes_unchanged -- PASS (12项进化配方完整)
+
+### 任务3: 全量回归
+
+```
+Scripts: 84
+Tests:   2426
+Pass:    2406
+Fail:    0
+Pending: 20
+Asserts: 5096
+Orphans: 7 (baseline)
+Time:    30.486s
+```
+
+与R34对比: 2404 -> 2426 (+22测试), 新增1个测试文件(test_r35_firebomb.gd), 修改1个(test_r34_sfx_integration.gd +1).
+R34 pre-existing flaky (test_frost_aura_shatter_called_in_die) 已修复, 0失败.
+
+### Pending项说明
+
+| ID | 严重度 | 模块 | 描述 | 状态 | 指派 |
+|----|--------|------|------|------|------|
+| PEND-R35-01 | Medium | upgrade_pool | firebomb基础武器未注册(weapon_id, damage, cooldown, aoe_radius, weapon_type) | 待处理 | Programmer |
+| PEND-R35-02 | Medium | weapon_registry | thunderbomb进化配方未添加(firebomb+lightning=thunderbomb) | 待处理 | Programmer |
+| PEND-R35-03 | Medium | weapon_data | throwing类型字段未添加(pool_duration, throw_height等) | 待处理 | Programmer |
+| PEND-R35-04 | Medium | save_manager | BASE_WEAPONS未添加firebomb (7->8) | 待处理 | Programmer |
+| PEND-R35-05 | Medium | weapons/thrown_flask.gd | 投掷物脚本未创建(抛物线投掷) | 待处理 | Programmer |
+| PEND-R35-06 | Medium | weapons/fire_pool.gd | 火池脚本未创建(持续灼烧AoE) | 待处理 | Programmer |
+| PEND-R35-07 | Medium | weapon_controller | throwing类型dispatch未实现 | 待处理 | Programmer |
+| PEND-R35-08 | Medium | upgrade_pool | thunderbomb进化武器未注册(is_evolved, damage=5.0) | 待处理 | Programmer |
+| PEND-R34-01 | Low | enemy_death_effects | 未集成AudioManager SFX调用 | 待处理 | Programmer |
+| PEND-R34-02 | Low | enemy_loot | 未集成AudioManager SFX调用 | 待处理 | Programmer |
+| PEND-R34-03 | Low | weapon_controller | 未集成AudioManager SFX调用 | 待处理 | Programmer |
+| PEND-R34-04 | Low | arena | 未集成AudioManager SFX调用(需BGM+SFX) | 待处理 | Programmer |
+| PEND-R34-05 | Low | skill_effects | 未集成AudioManager SFX调用(player_skill音效) | 待处理 | Programmer |
+| PEND-R33-01 | Medium | hud.gd | hud.gd 436行, 未达<400行拆分目标 | 待处理 | Programmer |
+| PEND-R31-01 | Medium | pulse_ring | resonance子脉冲行为未实现 | 待处理 | Programmer |
+| PEND-R31-02 | Medium | beam_line | overcharge过载标记行为未实现 | 待处理 | Programmer |
+| PEND-R31-03 | Medium | overcharge_mark | overcharge_mark.gd未创建 | 待处理 | Programmer |
+
+### SFX集成状态总览 (R35更新)
+
+| 脚本 | SFX ID | 调用位置 | 守卫 | 状态 |
+|------|--------|----------|------|------|
+| player.gd | player_dash | _physics_process (dash触发) | `if AudioManager:` | 已集成 |
+| player.gd | player_hurt | take_damage() | `if AudioManager:` | 已集成 |
+| enemy.gd | enemy_death | die() | `if AudioManager:` | 已集成 |
+| xp_gem.gd | xp_pickup | _collect() | `if AudioManager:` | 已集成 |
+| hud.gd | player_levelup | _on_level_up() | `if AudioManager:` | 已集成 |
+| projectile.gd | weapon_hit | _on_body_entered() | `if AudioManager:` | 已集成 |
+| enemy_death_effects.gd | -- | -- | -- | 待集成 |
+| enemy_loot.gd | -- | -- | -- | 待集成 |
+| weapon_controller.gd | -- | -- | -- | 待集成 |
+| arena.gd | -- | -- | -- | 待集成 |
+| skill_effects.gd | -- | -- | -- | 待集成 (R35新增检查) |
+
+### 文件变更
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| test/unit/test_r34_sfx_integration.gd | 修改 | +1 skill_effects SFX集成pending测试, SFX_IDS最小计数33->34 |
+| test/unit/test_r35_firebomb.gd | 新增 | R35 Firebomb武器测试(21项: 注册5+进化2+WeaponData2+精通2+脚本4+dispatch1+雷暴瓶3+回归2) |
+| docs/team/qa-log.md | 修改 | R35测试报告 |

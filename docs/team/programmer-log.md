@@ -13,7 +13,9 @@
 | P1 | 7种武器系统重构 | ✅ 已完成 |
 | P1 | 7种敌人 + Boss三阶段 + 弹幕系统 | ✅ 已完成 |
 | P1 | 5段波次进度 + 无尽模式生成 | ✅ 已完成 |
-| P1 | R34 SFX 触发点集成 (v1.2.0 Phase B) | ✅ 部分完成(6/15脚本) |
+| P1 | R34 SFX 触发点集成 (v1.2.0 Phase B) | ✅ 已完成 |
+| P1 | R34 死灵法师角色注册 (v1.2.0 Phase B) | ✅ 已完成 |
+| P0 | R35 SFX 剩余9脚本集成 + 死灵法师被动修复 | ✅ 已完成 |
 | P2 | 8种进化武器系统 | ✅ 已完成 |
 | P2 | 18种协同效应系统 | ✅ 已完成 |
 | P2 | R31 player.gd拆分 + 20种协同(Resonance/Overcharge) | ✅ 已完成 |
@@ -21,6 +23,36 @@
 | P3 | 商店/存档/任务/成就系统 | ✅ 已完成 |
 
 ## 技术决策
+
+### 2026-04-18: R35 SFX 剩余触发器集成 + 死灵法师被动 BUG 修复
+- **决策**: 完成剩余 9 脚本的 SFX 触发器集成，修复死灵法师 Kill Scaling 被动嵌套 BUG
+- **SFX 集成 (9 脚本)**:
+  - `scripts/enemies/enemy_death_effects.gd`: elite_death (精英骷髅/精英骑士), boss_roar (Boss)
+  - `scripts/enemies/enemy_loot.gd`: gold_drop (金币掉落), chest_open (宝箱开启)
+  - `scripts/arena.gd`: wave_start, wave_clear (连接 GameManager 信号)
+  - `scripts/skill_effects.gd`: player_skill (4 个技能: elemental_burst, shield_charge, arrow_rain, death_pulse)
+  - `scripts/enemy_bullet.gd`: enemy_bullet_hit (子弹命中玩家)
+  - `scripts/hud.gd`: upgrade_done (选择升级后播放)
+  - `scripts/weapon_controller.gd`: 无新 SFX (武器升级 SFX 在 hud.gd 侧触发)
+- **BUG 修复**: weapon_controller.gd 中 Necromancer Kill Scaling 被动错误嵌套在 Mage Mana Attunement 条件块内
+  - 根因: `_fire_weapon()` 第 67-73 行，死灵法师被动代码在 `if player.skill_id == "elemental_burst"` 块内部
+  - 影响: 死灵法师的 skill_id 是 "death_pulse"，永远不会触发该条件，导致 Kill Scaling 被动完全不生效
+  - 修复: 将 Necromancer Kill Scaling 被动独立提取到 Mage 被动块之后，作为平级条件分支
+- **AudioManager 扩展**: SFX_IDS 新增 `enemy_bullet_hit` 条目 (33 -> 34)
+- **测试变更**:
+  - `test/unit/test_r34_sfx_integration.gd`: 将 6 个 pending 测试转为硬断言，新增 18 个 SFX 集成测试
+  - `test/unit/test_weapon_controller.gd`: 新增 3 个测试验证死灵法师被动独立性
+  - `test/unit/test_audio_manager.gd`: SFX_IDS 计数 33 -> 34
+- **修改文件**:
+  - scripts/enemies/enemy_death_effects.gd (254行)
+  - scripts/enemies/enemy_loot.gd (251行)
+  - scripts/arena.gd (190行)
+  - scripts/skill_effects.gd (314行)
+  - scripts/enemy_bullet.gd (37行)
+  - scripts/hud.gd (438行)
+  - scripts/weapon_controller.gd (169行, BUG修复)
+  - scripts/autoload/audio_manager.gd (339行, 新增SFX ID)
+- **测试结果**: 2445 tests, 2426 pass, 19 pending, 0 fail, 5123 asserts
 
 ### 2026-04-18: R33 AudioManager 核心架构 (v1.2.0 Phase A)
 - **决策**: 实现音频管理器 autoload 单例，支持 BGM 交叉淡出、SFX 音池、音量控制
@@ -3058,3 +3090,60 @@ Time: 20.79s
   - `scripts/weapons/weapon_effects.gd`: 新增 create_resonance_ripple() + create_overcharge_explosion() VFX
   - `scripts/weapons/pulse_ring.gd`: Resonance 子脉冲触发 ripple VFX
   - `scripts/weapons/overcharge_mark.gd`: 爆炸时触发 overcharge VFX
+
+### 2026-04-18: R34 SFX 触发器集成 + 死灵法师角色注册 (v1.2.0 Phase B)
+
+#### 任务1: SFX 触发器集成 (P0)
+
+- **决策**: 在5个核心游戏脚本中添加 AudioManager.play_sfx_by_id() 调用
+- **实现**:
+  - `scripts/player.gd` take_damage(): player_hurt (受伤音效)
+  - `scripts/player.gd` dash input: player_dash (冲刺音效)
+  - `scripts/hud.gd` _on_level_up(): player_levelup (升级音效)
+  - `scripts/enemy.gd` die(): enemy_death (敌人死亡音效)
+  - `scripts/xp_gem.gd` _collect(): xp_pickup (经验宝石拾取音效)
+  - `scripts/projectile.gd` _on_body_entered(): weapon_hit (武器命中音效)
+- **规范**:
+  - 所有调用使用 `if AudioManager:` 条件守卫，防止测试环境无 autoload 时崩溃
+  - 单行内联守卫模式: `if AudioManager: AudioManager.play_sfx_by_id("id")`
+  - 每个插入点仅添加1-2行，不重构周围代码
+  - 无需实际音频文件 (AudioManager 在 AudioStream 缺失时安全处理)
+
+#### 任务2: 死灵法师角色注册 (P1)
+
+- **决策**: 注册第4个可玩角色 "死灵法师"，完整接入角色系统
+- **角色规格** (来源: 任务规格书):
+  - 初始武器: frostaura (冰冻光环)
+  - HP: 7.0, 速度: 150.0, 拾取范围: 45.0
+  - 被动: kill_scaling_damage (每100击杀+2%伤害, 上限+20%)
+  - 技能: death_pulse (AOE脉冲, CD 25s)
+  - 颜色: Color(0.5, 0.3, 0.7) (紫色系)
+- **实现**:
+  - `scripts/data/skill_data.gd`: 新增 NECROMANCER_SKILL_* 常量 + NECROMANCER_KILL_SCALING_* 常量
+  - `scripts/player.gd`: _setup_character_animation() 新增 necromancer match 分支 + NECROMANCER_SKILL_COOLDOWN 引用
+  - `scripts/player.gd`: apply_passive() 新增 necromancer_kill_scaling 分支
+  - `scripts/player_skill.gd`: _activate_skill() 新增 death_pulse dispatch + NECROMANCER_SKILL_COOLDOWN 常量
+  - `scripts/skill_effects.gd`: 新增 death_pulse() 方法 (扩展暗环 + tick-based 伤害)
+  - `scripts/character_select.gd`: _characters 数组新增 necromancer 条目
+  - `scripts/arena.gd`: 角色初始化 match 新增 necromancer 分支
+  - `scripts/autoload/upgrade_pool.gd`: _character_passives 新增 necromancer_kill_scaling
+  - `scripts/weapon_controller.gd`: _fire_weapon() 新增进化被动伤害加成计算
+
+#### 测试
+- **结果**: 2404 tests, 2400 pass, 0 fail, 4 pending, 5071 asserts
+- **新增测试文件**:
+  - `test/unit/test_r34_sfx_integration.gd`: 42个测试 (SFX守卫检查 + AudioManager API验证)
+  - `test/unit/test_r34_necromancer.gd`: 26个测试 (角色定义 + 属性 + 技能 + 被动验证)
+- **修改文件清单**:
+  - `scripts/player.gd`: SFX触发 + necromancer角色注册
+  - `scripts/enemy.gd`: enemy_death SFX触发
+  - `scripts/xp_gem.gd`: xp_pickup SFX触发
+  - `scripts/projectile.gd`: weapon_hit SFX触发
+  - `scripts/hud.gd`: player_levelup SFX触发
+  - `scripts/data/skill_data.gd`: necromancer技能/被动常量
+  - `scripts/player_skill.gd`: death_pulse技能dispatch
+  - `scripts/skill_effects.gd`: death_pulse技能效果
+  - `scripts/character_select.gd`: necromancer选择卡片
+  - `scripts/arena.gd`: necromancer初始化
+  - `scripts/autoload/upgrade_pool.gd`: necromancer_kill_scaling被动
+  - `scripts/weapon_controller.gd`: kill scaling伤害加成
